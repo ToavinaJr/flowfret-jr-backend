@@ -1,0 +1,345 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  DELETED
+}
+
+enum ProfileVisibility {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
+enum PostVisibility {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
+enum PostStatus {
+  ACTIVE
+  HIDDEN
+  DELETED
+}
+
+enum CommentStatus {
+  ACTIVE
+  HIDDEN
+  DELETED
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
+  BLOCKED
+}
+
+enum UploadStatus {
+  UPLOADED
+  PROCESSING
+  AVAILABLE
+  FAILED
+  DELETED
+}
+
+enum UploadSourceType {
+  POST
+  PROFILE
+  MESSAGE
+  OTHER
+}
+
+enum NotificationType {
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  COMMENT_CREATED
+  POST_CREATED
+  UPLOAD_READY
+  SYSTEM
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWED
+  DISMISSED
+  RESOLVED
+}
+
+enum AttachmentKind {
+  AUDIO
+  IMAGE
+  OTHER
+}
+
+model User {
+  id                   String                 @id @default(uuid()) @db.Uuid
+  email                String                 @unique @db.VarChar(255)
+  passwordHash         String                 @map("password_hash") @db.VarChar(255)
+  username             String                 @unique @db.VarChar(50)
+  status               UserStatus             @default(ACTIVE)
+  lastLoginAt          DateTime?              @map("last_login_at") @db.Timestamptz(6)
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile              Profile?
+  authoredPosts        Post[]                 @relation("UserAuthoredPosts")
+  comments             Comment[]              @relation("UserComments")
+  uploads              Upload[]
+  notifications        Notification[]
+  auditLogs             AuditLog[]             @relation("UserAuditLogs")
+  refreshTokens        RefreshToken[]
+  passwordResetTokens   PasswordResetToken[]
+  friendshipsRequested Friendship[]           @relation("FriendshipRequester")
+  friendshipsReceived  Friendship[]           @relation("FriendshipReceiver")
+  likes                PostLike[]
+  reports              PostReport[]           @relation("PostReportsByReporter")
+
+  @@map("users")
+}
+
+model Profile {
+  id          String            @id @default(uuid()) @db.Uuid
+  userId      String            @unique @map("user_id") @db.Uuid
+  displayName String            @map("display_name") @db.VarChar(120)
+  avatarUrl   String?           @map("avatar_url") @db.Text
+  bio         String?           @db.Text
+  location    String?           @db.VarChar(120)
+  websiteUrl  String?           @map("website_url") @db.Text
+  level       String?           @db.VarChar(50)
+  visibility  ProfileVisibility @default(PUBLIC)
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([visibility])
+  @@map("profiles")
+}
+
+model Post {
+  id             String          @id @default(uuid()) @db.Uuid
+  authorId       String          @map("author_id") @db.Uuid
+  content        String?         @db.Text
+  coverImageUrl  String?         @map("cover_image_url") @db.Text
+  audioUrl       String?         @map("audio_url") @db.Text
+  visibility     PostVisibility  @default(PUBLIC)
+  likeCount      Int             @default(0) @map("like_count")
+  commentCount   Int             @default(0) @map("comment_count")
+  status         PostStatus      @default(ACTIVE)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?       @map("deleted_at") @db.Timestamptz(6)
+
+  author       User             @relation("UserAuthoredPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  comments     Comment[]
+  likes        PostLike[]
+  reports      PostReport[]
+  attachments  PostAttachment[]
+  tags         PostTag[]
+
+  @@index([authorId, createdAt(sort: Desc)])
+  @@index([visibility, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("posts")
+}
+
+model Comment {
+  id         String        @id @default(uuid()) @db.Uuid
+  postId     String        @map("post_id") @db.Uuid
+  authorId   String        @map("author_id") @db.Uuid
+  content    String        @db.Text
+  status     CommentStatus @default(ACTIVE)
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt  DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation("UserComments", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt(sort: Desc)])
+  @@index([authorId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("comments")
+}
+
+model Friendship {
+  id          String           @id @default(uuid()) @db.Uuid
+  requesterId String           @map("requester_id") @db.Uuid
+  receiverId  String           @map("receiver_id") @db.Uuid
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  receiver  User @relation("FriendshipReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, receiverId], map: "friendships_requester_receiver_unique")
+  @@index([receiverId, status])
+  @@index([requesterId, status])
+  @@map("friendships")
+}
+
+model Upload {
+  id          String            @id @default(uuid()) @db.Uuid
+  userId      String            @map("user_id") @db.Uuid
+  fileName    String            @map("file_name") @db.VarChar(255)
+  fileType    String            @map("file_type") @db.VarChar(100)
+  fileSize    BigInt            @map("file_size") @db.BigInt
+  storagePath String            @map("storage_path") @db.Text
+  duration    Int?              @db.Integer
+  status      UploadStatus      @default(UPLOADED)
+  sourceType  UploadSourceType  @default(OTHER) @map("source_type")
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime?         @map("deleted_at") @db.Timestamptz(6)
+
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments   PostAttachment[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([sourceType, createdAt(sort: Desc)])
+  @@map("uploads")
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  payload   Json             @db.JsonB
+  readAt    DateTime?        @map("read_at") @db.Timestamptz(6)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String    @id @default(uuid()) @db.Uuid
+  actorId    String    @map("actor_id") @db.Uuid
+  action     String    @db.VarChar(100)
+  entityType String    @map("entity_type") @db.VarChar(100)
+  entityId   String?   @map("entity_id") @db.Uuid
+  metadata   Json      @db.JsonB
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User @relation("UserAuditLogs", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @map("token_hash") @db.VarChar(255)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt     DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model PostLike {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId], map: "post_likes_post_id_user_id_unique")
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("post_likes")
+}
+
+model PostReport {
+  id         String       @id @default(uuid()) @db.Uuid
+  postId     String       @map("post_id") @db.Uuid
+  reporterId String       @map("reporter_id") @db.Uuid
+  reason     String       @db.Text
+  status     ReportStatus @default(OPEN)
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  reviewedAt DateTime?    @map("reviewed_at") @db.Timestamptz(6)
+
+  post     Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter User @relation("PostReportsByReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([postId, status])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("post_reports")
+}
+
+model Tag {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(60)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  posts PostTag[]
+
+  @@index([name])
+  @@map("tags")
+}
+
+model PostTag {
+  postId String @map("post_id") @db.Uuid
+  tagId  String @map("tag_id") @db.Uuid
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@index([tagId])
+  @@map("post_tags")
+}
+
+model PostAttachment {
+  id        String         @id @default(uuid()) @db.Uuid
+  postId    String         @map("post_id") @db.Uuid
+  uploadId  String         @map("upload_id") @db.Uuid
+  kind      AttachmentKind
+  position  Int            @default(0)
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  upload Upload @relation(fields: [uploadId], references: [id], onDelete: Restrict)
+
+  @@index([postId, position])
+  @@index([uploadId])
+  @@map("post_attachments")
+}
