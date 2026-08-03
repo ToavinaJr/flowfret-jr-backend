@@ -22,6 +22,7 @@ import { NotificationsResolver } from './notifications/notifications.resolver';
 import { UploadsResolver } from './uploads/uploads.resolver';
 import { TagsResolver } from './tags/tags.resolver';
 import { UsersResolver } from './users/users.resolver';
+import { formatGraphQLError } from './common/format-graphql-error';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { UsersResolver } from './users/users.resolver';
       autoSchemaFile: true,
       sortSchema: true,
       context: ({ req }) => ({ req }),
+      formatError: formatGraphQLError,
     }),
   ],
   controllers: [AppController],
