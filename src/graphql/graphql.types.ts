@@ -47,6 +47,9 @@ export class UserModel {
   @Field()
   username!: string;
 
+  @Field(() => String, { nullable: true })
+  googleId?: string | null;
+
   @Field(() => UserStatus)
   status!: UserStatus;
 
@@ -819,6 +822,12 @@ export class VerifyEmailInput {
 
   @Field()
   code!: string;
+}
+
+@InputType()
+export class GoogleAuthInput {
+  @Field()
+  accessToken!: string;
 }
 
 @ObjectType()

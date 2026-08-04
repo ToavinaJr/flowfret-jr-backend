@@ -14,6 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import {
   AuthPayload,
+  GoogleAuthInput,
   LoginInput,
   RegisterInput,
   RegisterPendingPayload,
@@ -24,6 +25,15 @@ import {
 const OTP_LENGTH = 4;
 const OTP_TTL_MINUTES = 15;
 const TOKEN_BYTES = 32;
+
+interface GoogleUserInfo {
+  sub: string;
+  email: string;
+  email_verified: boolean | string;
+  name?: string;
+  given_name?: string;
+  picture?: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -72,7 +82,7 @@ export class AuthService {
       where: { email: input.email },
     });
 
-    if (!user) {
+    if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -97,6 +107,65 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
+    });
+
+    return this.createAuthPayload(user);
+  }
+
+  async loginWithGoogle(input: GoogleAuthInput): Promise<AuthPayload> {
+    const profile = await this.fetchGoogleProfile(input.accessToken);
+    const emailVerified =
+      profile.email_verified === true || profile.email_verified === 'true';
+
+    if (!profile.email || !emailVerified) {
+      throw new UnauthorizedException('Google email is not verified.');
+    }
+
+    const email = profile.email.toLowerCase();
+    const googleId = profile.sub;
+
+    let user = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ googleId }, { email }],
+      },
+    });
+
+    if (user) {
+      if (user.status === UserStatus.SUSPENDED || user.status === UserStatus.DELETED) {
+        throw new ForbiddenException('Account is not active.');
+      }
+
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleId: user.googleId ?? googleId,
+          status: UserStatus.ACTIVE,
+          lastLoginAt: new Date(),
+        },
+      });
+
+      return this.createAuthPayload(user);
+    }
+
+    const username = await this.allocateUniqueUsername(
+      profile.name ?? profile.given_name ?? email.split('@')[0],
+    );
+
+    user = await this.prisma.user.create({
+      data: {
+        email,
+        username,
+        googleId,
+        passwordHash: null,
+        status: UserStatus.ACTIVE,
+        lastLoginAt: new Date(),
+        profile: {
+          create: {
+            displayName: profile.name ?? username,
+            avatarUrl: profile.picture ?? null,
+          },
+        },
+      },
     });
 
     return this.createAuthPayload(user);
@@ -180,6 +249,56 @@ export class AuthService {
       expiresAt: verification.expiresAt,
       message: 'Un nouveau code OTP a été envoyé par e-mail.',
     };
+  }
+
+  private async fetchGoogleProfile(
+    accessToken: string,
+  ): Promise<GoogleUserInfo> {
+    let response: Response;
+    try {
+      response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    } catch {
+      throw new UnauthorizedException('Unable to reach Google.');
+    }
+
+    if (!response.ok) {
+      throw new UnauthorizedException('Invalid Google access token.');
+    }
+
+    const profile = (await response.json()) as GoogleUserInfo;
+    if (!profile.sub) {
+      throw new UnauthorizedException('Invalid Google profile.');
+    }
+    return profile;
+  }
+
+  private async allocateUniqueUsername(seed: string): Promise<string> {
+    const base = seed
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 40);
+
+    const root = base.length >= 3 ? base : `user_${base || 'google'}`;
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const candidate =
+        attempt === 0 ? root : `${root.slice(0, 40)}_${randomInt(1000, 9999)}`;
+      const exists = await this.prisma.user.findUnique({
+        where: { username: candidate },
+        select: { id: true },
+      });
+      if (!exists) {
+        return candidate.slice(0, 50);
+      }
+    }
+
+    return `user_${randomBytes(6).toString('hex')}`.slice(0, 50);
   }
 
   private async createAndSendOtp(user: {

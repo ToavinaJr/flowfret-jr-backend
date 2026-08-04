@@ -85,7 +85,8 @@ enum AttachmentKind {
 model User {
   id                   String                 @id @default(uuid()) @db.Uuid
   email                String                 @unique @db.VarChar(255)
-  passwordHash         String                 @map("password_hash") @db.VarChar(255)
+  passwordHash         String?                @map("password_hash") @db.VarChar(255)
+  googleId             String?                @unique @map("google_id") @db.VarChar(255)
   username             String                 @unique @db.VarChar(50)
   status               UserStatus             @default(PENDING)
   lastLoginAt          DateTime?              @map("last_login_at") @db.Timestamptz(6)

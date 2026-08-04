@@ -1,6 +1,7 @@
 import { Args, Mutation, Resolver } from '@nestjs/graphql';
 import {
   AuthPayload,
+  GoogleAuthInput,
   LoginInput,
   RegisterInput,
   RegisterPendingPayload,
@@ -25,6 +26,14 @@ export class AuthResolver {
   @Mutation(() => AuthPayload)
   async login(@Args('data') data: LoginInput): Promise<AuthPayload> {
     return this.authService.login(data);
+  }
+
+  @Public()
+  @Mutation(() => AuthPayload)
+  async loginWithGoogle(
+    @Args('data') data: GoogleAuthInput,
+  ): Promise<AuthPayload> {
+    return this.authService.loginWithGoogle(data);
   }
 
   @Public()
