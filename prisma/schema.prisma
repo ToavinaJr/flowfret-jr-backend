@@ -87,7 +87,7 @@ model User {
   email                String                 @unique @db.VarChar(255)
   passwordHash         String                 @map("password_hash") @db.VarChar(255)
   username             String                 @unique @db.VarChar(50)
-  status               UserStatus             @default(ACTIVE)
+  status               UserStatus             @default(PENDING)
   lastLoginAt          DateTime?              @map("last_login_at") @db.Timestamptz(6)
   createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -100,6 +100,7 @@ model User {
   auditLogs             AuditLog[]             @relation("UserAuditLogs")
   refreshTokens        RefreshToken[]
   passwordResetTokens   PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
   friendshipsRequested Friendship[]           @relation("FriendshipRequester")
   friendshipsReceived  Friendship[]           @relation("FriendshipReceiver")
   likes                PostLike[]
@@ -272,6 +273,22 @@ model PasswordResetToken {
   @@index([userId, usedAt])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  token     String    @unique @db.VarChar(64)
+  codeHash  String    @map("code_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
 }
 
 model PostLike {

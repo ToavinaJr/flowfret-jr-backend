@@ -7,10 +7,12 @@ import { AuthResolver } from './auth.resolver';
 import { AuthService } from './auth.service';
 import { GqlJwtAuthGuard } from './gql-jwt-auth.guard';
 import { JwtStrategy } from './jwt.strategy';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     ConfigModule,
+    MailModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

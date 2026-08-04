@@ -812,6 +812,15 @@ export class LoginInput {
   password!: string;
 }
 
+@InputType()
+export class VerifyEmailInput {
+  @Field()
+  token!: string;
+
+  @Field()
+  code!: string;
+}
+
 @ObjectType()
 export class AuthPayload {
   @Field()
@@ -819,4 +828,19 @@ export class AuthPayload {
 
   @Field(() => UserModel)
   user!: UserModel;
+}
+
+@ObjectType()
+export class RegisterPendingPayload {
+  @Field()
+  email!: string;
+
+  @Field()
+  verificationToken!: string;
+
+  @Field(() => GraphQLISODateTime)
+  expiresAt!: Date;
+
+  @Field()
+  message!: string;
 }
