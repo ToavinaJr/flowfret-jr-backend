@@ -26,7 +26,15 @@ import { formatGraphQLError } from './common/format-graphql-error';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: [
+        `.env.${process.env.NODE_ENV ?? 'development'}.local`,
+        `.env.${process.env.NODE_ENV ?? 'development'}`,
+        '.env.local',
+        '.env',
+      ],
+    }),
     PrismaModule,
     AuthModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
