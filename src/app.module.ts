@@ -23,6 +23,7 @@ import { UploadsResolver } from './uploads/uploads.resolver';
 import { TagsResolver } from './tags/tags.resolver';
 import { UsersResolver } from './users/users.resolver';
 import { formatGraphQLError } from './common/format-graphql-error';
+import { MusicModule } from './integrations/music/music.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { formatGraphQLError } from './common/format-graphql-error';
     }),
     PrismaModule,
     AuthModule,
+    MusicModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: true,
