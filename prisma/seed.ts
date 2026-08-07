@@ -1,12 +1,21 @@
 import { hash } from 'bcrypt';
 import { PrismaClient, PostStatus, PostVisibility, UserStatus } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { resolve } from 'node:path';
+
+const nodeEnv = process.env.NODE_ENV ?? 'development';
+config({ path: resolve(process.cwd(), `.env.${nodeEnv}.local`) });
+config({ path: resolve(process.cwd(), `.env.${nodeEnv}`) });
+config({ path: resolve(process.cwd(), '.env.local') });
+config({ path: resolve(process.cwd(), '.env') });
 
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
-  throw new Error('DATABASE_URL is required to run Prisma seed');
+  throw new Error(
+    `DATABASE_URL is required to run Prisma seed. Set it in .env.${nodeEnv}`,
+  );
 }
 
 const prisma = new PrismaClient({

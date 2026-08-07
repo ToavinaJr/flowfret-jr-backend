@@ -10,12 +10,8 @@ function isHttpException(error: unknown): error is HttpException {
 }
 
 function getOriginalException(error: unknown): unknown {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'originalError' in error
-  ) {
-    return (error as { originalError: unknown }).originalError;
+  if (typeof error === 'object' && error !== null && 'originalError' in error) {
+    return error.originalError;
   }
   return error;
 }

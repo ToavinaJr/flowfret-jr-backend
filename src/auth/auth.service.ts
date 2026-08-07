@@ -131,7 +131,10 @@ export class AuthService {
     });
 
     if (user) {
-      if (user.status === UserStatus.SUSPENDED || user.status === UserStatus.DELETED) {
+      if (
+        user.status === UserStatus.SUSPENDED ||
+        user.status === UserStatus.DELETED
+      ) {
         throw new ForbiddenException('Account is not active.');
       }
 
@@ -183,7 +186,9 @@ export class AuthService {
     });
 
     if (!record || record.usedAt) {
-      throw new BadRequestException('Invalid or already used verification link.');
+      throw new BadRequestException(
+        'Invalid or already used verification link.',
+      );
     }
 
     if (record.expiresAt.getTime() < Date.now()) {

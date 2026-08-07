@@ -8,9 +8,12 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor() {
-    const databaseUrl =
-      process.env.DATABASE_URL ??
-      'postgresql://postgres:admin123@localhost:5433/guitare_app?schema=public';
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error(
+        'DATABASE_URL is missing. Set it in .env.development (or .env).',
+      );
+    }
 
     super({
       adapter: new PrismaPg({ connectionString: databaseUrl }),

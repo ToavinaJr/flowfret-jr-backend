@@ -23,12 +23,22 @@ import { UploadsResolver } from './uploads/uploads.resolver';
 import { TagsResolver } from './tags/tags.resolver';
 import { UsersResolver } from './users/users.resolver';
 import { formatGraphQLError } from './common/format-graphql-error';
+import { MusicModule } from './integrations/music/music.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: [
+        `.env.${process.env.NODE_ENV ?? 'development'}.local`,
+        `.env.${process.env.NODE_ENV ?? 'development'}`,
+        '.env.local',
+        '.env',
+      ],
+    }),
     PrismaModule,
     AuthModule,
+    MusicModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: true,
