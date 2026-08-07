@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { AudiusService } from '../audius/audius.service';
+import { AUDIUS_API_URL, AUDIUS_WEB_URL } from '../audius/audius.constants';
+import type { AudiusTrack } from '../audius/audius.types';
 import { GENIUS_MAX_CONCURRENCY } from '../genius/genius.constants';
 import { GeniusService } from '../genius/genius.service';
-import { YouTubeService } from '../youtube/youtube.service';
-import type { YouTubeVideo } from '../youtube/youtube.types';
 import type { MusicSearchResult, MusicTrack } from './music.types';
 
 @Injectable()
@@ -10,7 +11,7 @@ export class MusicService {
   private readonly logger = new Logger(MusicService.name);
 
   constructor(
-    private readonly youtubeService: YouTubeService,
+    private readonly audiusService: AudiusService,
     private readonly geniusService: GeniusService,
   ) {}
 
@@ -20,23 +21,23 @@ export class MusicService {
       throw new BadRequestException('Search query cannot be empty');
     }
 
-    const youtubeResult = await this.youtubeService.searchMusic(
+    const audiusResult = await this.audiusService.searchTracks(
       normalizedQuery,
       limit,
     );
 
-    const uniqueTracks = this.dedupeTracks(youtubeResult.videos);
+    const uniqueTracks = this.dedupeTracks(audiusResult.tracks);
     const enrichedTracks = await this.enrichWithGenius(uniqueTracks);
 
     return {
       tracks: enrichedTracks,
-      total: youtubeResult.total,
+      total: audiusResult.total,
     };
   }
 
-  private dedupeTracks(tracks: YouTubeVideo[]): YouTubeVideo[] {
+  private dedupeTracks(tracks: AudiusTrack[]): AudiusTrack[] {
     const seen = new Set<string>();
-    const unique: YouTubeVideo[] = [];
+    const unique: AudiusTrack[] = [];
 
     for (const track of tracks) {
       if (seen.has(track.id)) {
@@ -50,7 +51,7 @@ export class MusicService {
   }
 
   private async enrichWithGenius(
-    tracks: YouTubeVideo[],
+    tracks: AudiusTrack[],
   ): Promise<MusicTrack[]> {
     const results: MusicTrack[] = [];
 
@@ -69,8 +70,8 @@ export class MusicService {
     return results;
   }
 
-  private async mapTrack(track: YouTubeVideo): Promise<MusicTrack> {
-    const primaryArtist = track.channelTitle;
+  private async mapTrack(track: AudiusTrack): Promise<MusicTrack> {
+    const primaryArtist = track.user.name;
     let geniusUrl: string | null = null;
     let geniusMatchScore: number | null = null;
 
@@ -90,14 +91,33 @@ export class MusicService {
     }
 
     return {
-      youtubeId: track.id,
+      audiusId: track.id,
       title: track.title,
-      artists: [{ id: track.channelId, name: track.channelTitle }],
-      imageUrl: track.thumbnailUrl,
-      youtubeUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(track.id)}`,
+      artists: [{ id: track.user.id, name: track.user.name }],
+      imageUrl: this.pickArtwork(track),
+      audiusUrl: this.buildAudiusUrl(track.permalink),
+      streamUrl:
+        track.stream?.url ??
+        `${AUDIUS_API_URL}/tracks/${encodeURIComponent(track.id)}/stream`,
+      genre: track.genre ?? null,
       geniusUrl,
       geniusMatchScore,
-      durationMs: track.durationMs,
+      durationMs: Math.max(0, Math.round(track.duration * 1000)),
     };
+  }
+
+  private pickArtwork(track: AudiusTrack): string | null {
+    const artwork = track.artwork;
+    return (
+      artwork?.['_1000x1000'] ?? artwork?.['1000x1000'] ??
+      artwork?.['_480x480'] ?? artwork?.['480x480'] ??
+      artwork?.['_150x150'] ?? artwork?.['150x150'] ?? null
+    );
+  }
+
+  private buildAudiusUrl(permalink?: string): string {
+    if (!permalink) return AUDIUS_WEB_URL;
+    if (/^https?:\/\//i.test(permalink)) return permalink;
+    return `${AUDIUS_WEB_URL}/${permalink.replace(/^\/+/, '')}`;
   }
 }

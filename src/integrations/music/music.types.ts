@@ -12,7 +12,7 @@ export class MusicArtist {
 @ObjectType()
 export class MusicTrack {
   @Field(() => ID)
-  youtubeId: string;
+  audiusId: string;
 
   @Field()
   title: string;
@@ -24,7 +24,13 @@ export class MusicTrack {
   imageUrl: string | null;
 
   @Field()
-  youtubeUrl: string;
+  audiusUrl: string;
+
+  @Field()
+  streamUrl: string;
+
+  @Field(() => String, { nullable: true })
+  genre: string | null;
 
   @Field(() => String, { nullable: true })
   geniusUrl: string | null;
