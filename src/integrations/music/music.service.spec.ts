@@ -2,12 +2,18 @@ import { BadRequestException } from '@nestjs/common';
 import { MusicService } from './music.service';
 import { AudiusService } from '../audius/audius.service';
 import { GeniusService } from '../genius/genius.service';
+import { SpotifyService } from '../spotify/spotify.service';
+import { YouTubeService } from '../youtube/youtube.service';
+import { ConfigService } from '@nestjs/config';
 import type { AudiusTrack } from '../audius/audius.types';
 
 describe('MusicService', () => {
   let service: MusicService;
   let audiusService: { searchTracks: jest.Mock };
   let geniusService: { searchBestSong: jest.Mock };
+  let spotifyService: { searchTracks: jest.Mock };
+  let youtubeService: { searchMusic: jest.Mock };
+  let configService: { get: jest.Mock };
 
   const track = (id: string, name: string): AudiusTrack => ({
     id,
@@ -23,9 +29,15 @@ describe('MusicService', () => {
   beforeEach(() => {
     audiusService = { searchTracks: jest.fn() };
     geniusService = { searchBestSong: jest.fn() };
+    spotifyService = { searchTracks: jest.fn() };
+    youtubeService = { searchMusic: jest.fn() };
+    configService = { get: jest.fn() };
     service = new MusicService(
       audiusService as unknown as AudiusService,
+      spotifyService as unknown as SpotifyService,
+      youtubeService as unknown as YouTubeService,
       geniusService as unknown as GeniusService,
+      configService as unknown as ConfigService,
     );
   });
 
@@ -56,6 +68,33 @@ describe('MusicService', () => {
     expect(result.tracks[0].streamUrl).toBe(
       'https://api.audius.co/v1/tracks/1/stream',
     );
+    expect(result.provider).toBe('AUDIUS');
+  });
+
+  it('selects YouTube from MUSIC_PROVIDER case-insensitively', async () => {
+    configService.get.mockReturnValue(' youtube ');
+    youtubeService.searchMusic.mockResolvedValue({
+      videos: [{ id: 'video', title: 'Song', channelId: 'channel', channelTitle: 'Artist', thumbnailUrl: null, durationMs: 1000 }],
+      total: 1,
+    });
+    geniusService.searchBestSong.mockResolvedValue(null);
+
+    const result = await service.searchMusic('query', 10);
+
+    expect(youtubeService.searchMusic).toHaveBeenCalledWith('query', 10);
+    expect(audiusService.searchTracks).not.toHaveBeenCalled();
+    expect(result.provider).toBe('YOUTUBE');
+    expect(result.tracks[0].provider).toBe('YOUTUBE');
+  });
+
+  it('falls back to Audius for an unsupported provider', async () => {
+    configService.get.mockReturnValue('unknown');
+    audiusService.searchTracks.mockResolvedValue({ tracks: [], total: 0 });
+
+    const result = await service.searchMusic('query', 10);
+
+    expect(audiusService.searchTracks).toHaveBeenCalledWith('query', 10);
+    expect(result.provider).toBe('AUDIUS');
   });
 
   it('preserves Audius order and deduplicates', async () => {

@@ -7,7 +7,7 @@ import { MusicResolver } from './music.resolver';
 import { MusicService } from './music.service';
 
 @Module({
-  // Previous providers stay registered; Audius is the active search source.
+  // MusicService selects the active provider through MUSIC_PROVIDER.
   imports: [AudiusModule, SpotifyModule, YouTubeModule, GeniusModule],
   providers: [MusicService, MusicResolver],
   exports: [MusicService],

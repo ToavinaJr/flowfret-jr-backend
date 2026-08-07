@@ -11,6 +11,9 @@ export class MusicArtist {
 
 @ObjectType()
 export class MusicTrack {
+  @Field()
+  provider: string;
+
   @Field(() => ID)
   audiusId: string;
 
@@ -44,6 +47,9 @@ export class MusicTrack {
 
 @ObjectType()
 export class MusicSearchResult {
+  @Field()
+  provider: string;
+
   @Field(() => [MusicTrack])
   tracks: MusicTrack[];
 

@@ -23,6 +23,10 @@ See `.env.example`. Active music search and streaming require:
 - `AUDIUS_API_SECRET`
 - `AUDIUS_ACCESS_TOKEN`
 
+Set `MUSIC_PROVIDER` to `AUDIUS`, `YOUTUBE`, or `SPOTIFY` to select the
+search/player source. The value is case-insensitive. When the variable is
+missing, empty, or unsupported, the backend uses `AUDIUS`.
+
 The inactive YouTube provider is retained for possible future use and accepts:
 
 - `YOUTUBE_API_KEY`
