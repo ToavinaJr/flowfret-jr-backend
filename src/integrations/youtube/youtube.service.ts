@@ -36,7 +36,10 @@ export class YouTubeService {
     private readonly configService: ConfigService,
   ) {}
 
-  async searchMusic(query: string, limit: number): Promise<YouTubeSearchResult> {
+  async searchMusic(
+    query: string,
+    limit: number,
+  ): Promise<YouTubeSearchResult> {
     const apiKey = getRequiredConfig(this.configService, YOUTUBE_API_KEY_KEY);
     const maxResults = Math.min(
       YOUTUBE_SEARCH_MAX_LIMIT,
@@ -74,7 +77,8 @@ export class YouTubeService {
           title: this.decodeHtml(item.snippet.title),
           channelId: item.snippet.channelId,
           channelTitle: this.decodeHtml(item.snippet.channelTitle),
-          thumbnailUrl: this.pickThumbnail(item.snippet.thumbnails)?.url ?? null,
+          thumbnailUrl:
+            this.pickThumbnail(item.snippet.thumbnails)?.url ?? null,
           durationMs: durations.get(item.id.videoId as string) ?? 0,
         })),
         total: searchResponse.data.pageInfo?.totalResults ?? items.length,
@@ -149,14 +153,22 @@ export class YouTubeService {
       lt: '<',
       quot: '"',
     };
-    return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (entity, code: string) => {
-      if (code.startsWith('#')) {
-        const hexadecimal = code[1]?.toLowerCase() === 'x';
-        const parsed = Number.parseInt(code.slice(hexadecimal ? 2 : 1), hexadecimal ? 16 : 10);
-        return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : entity;
-      }
-      return named[code.toLowerCase()] ?? entity;
-    });
+    return value.replace(
+      /&(#x?[0-9a-f]+|[a-z]+);/gi,
+      (entity, code: string) => {
+        if (code.startsWith('#')) {
+          const hexadecimal = code[1]?.toLowerCase() === 'x';
+          const parsed = Number.parseInt(
+            code.slice(hexadecimal ? 2 : 1),
+            hexadecimal ? 16 : 10,
+          );
+          return Number.isFinite(parsed)
+            ? String.fromCodePoint(parsed)
+            : entity;
+        }
+        return named[code.toLowerCase()] ?? entity;
+      },
+    );
   }
 
   private mapHttpError(error: unknown): HttpException {
@@ -194,4 +206,3 @@ export class YouTubeService {
     return typeof reason === 'string' ? reason : undefined;
   }
 }
-

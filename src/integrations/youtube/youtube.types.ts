@@ -41,4 +41,3 @@ export interface YouTubeSearchResult {
   videos: YouTubeVideo[];
   total: number;
 }
-

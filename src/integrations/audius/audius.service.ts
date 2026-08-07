@@ -17,10 +17,12 @@ import {
   AUDIUS_SEARCH_MAX_LIMIT,
   AUDIUS_SEARCH_MIN_LIMIT,
   AUDIUS_SEARCH_PATH,
+  AUDIUS_TRACKS_PATH,
 } from './audius.constants';
 import type {
   AudiusSearchResponse,
   AudiusSearchResult,
+  AudiusTrackResponse,
 } from './audius.types';
 
 @Injectable()
@@ -32,7 +34,10 @@ export class AudiusService {
     private readonly configService: ConfigService,
   ) {}
 
-  async searchTracks(query: string, limit: number): Promise<AudiusSearchResult> {
+  async searchTracks(
+    query: string,
+    limit: number,
+  ): Promise<AudiusSearchResult> {
     const accessToken = getRequiredConfig(
       this.configService,
       AUDIUS_ACCESS_TOKEN_KEY,
@@ -66,6 +71,34 @@ export class AudiusService {
     }
   }
 
+  async getFreshStreamUrl(
+    trackId: string,
+    currentUrl?: string,
+  ): Promise<string> {
+    const accessToken = getRequiredConfig(
+      this.configService,
+      AUDIUS_ACCESS_TOKEN_KEY,
+    );
+    try {
+      const response = await firstValueFrom(
+        this.httpService.get<AudiusTrackResponse>(
+          `${AUDIUS_API_URL}${AUDIUS_TRACKS_PATH}/${encodeURIComponent(trackId)}`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            timeout: AUDIUS_HTTP_TIMEOUT_MS,
+          },
+        ),
+      );
+      const url = response.data.data?.stream?.url;
+      if (url) return url;
+      if (currentUrl) return currentUrl;
+      throw new BadGatewayException('Audius stream is unavailable');
+    } catch (error) {
+      if (currentUrl) return currentUrl;
+      throw this.mapHttpError(error);
+    }
+  }
+
   private isStreamable(camel?: boolean | string, snake?: boolean): boolean {
     const value = camel ?? snake;
     return value !== false && value !== 'false';
@@ -88,4 +121,3 @@ export class AudiusService {
     return new BadGatewayException('Audius search failed');
   }
 }
-

@@ -16,7 +16,7 @@ describe('MusicService', () => {
     genre: 'Rock',
     permalink: `/artist/${id}`,
     user: { id: `artist-${id}`, name: 'Artist' },
-    artwork: { '_480x480': 'https://img.test/cover.jpg' },
+    artwork: { _480x480: 'https://img.test/cover.jpg' },
     stream: { url: `https://audio.test/${id}.mp3` },
   });
 

@@ -82,6 +82,44 @@ enum AttachmentKind {
   OTHER
 }
 
+enum TranscriptionStatus {
+  PENDING
+  DOWNLOADING
+  PROCESSING
+  READY_TO_PLAY
+  COMPLETED
+  FAILED
+}
+
+model Transcription {
+  id                String              @id @default(uuid()) @db.Uuid
+  trackId           String              @map("track_id") @db.VarChar(255)
+  title             String?             @db.VarChar(500)
+  artist            String?             @db.VarChar(500)
+  requestedLanguage String              @default("auto") @map("requested_language") @db.VarChar(16)
+  detectedLanguage  String?             @map("detected_language") @db.VarChar(16)
+  model             String              @db.VarChar(32)
+  engineVersion     String              @map("engine_version") @db.VarChar(32)
+  status            TranscriptionStatus @default(PENDING)
+  progress          Int                 @default(0)
+  bufferedUntil     Float               @default(0) @map("buffered_until")
+  duration          Float?
+  readyToPlay       Boolean             @default(false) @map("ready_to_play")
+  segments          Json?               @db.JsonB
+  lrcContent        String?             @map("lrc_content") @db.Text
+  errorCode         String?             @map("error_code") @db.VarChar(64)
+  errorMessage      String?             @map("error_message") @db.Text
+  attempts          Int                 @default(0)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt       DateTime?           @map("completed_at") @db.Timestamptz(6)
+
+  @@unique([trackId, requestedLanguage, model, engineVersion], map: "transcriptions_cache_key_unique")
+  @@index([trackId])
+  @@index([status])
+  @@map("transcriptions")
+}
+
 model User {
   id                   String                 @id @default(uuid()) @db.Uuid
   email                String                 @unique @db.VarChar(255)

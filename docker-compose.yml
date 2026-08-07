@@ -1,21 +1,64 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: guitare-app-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin123
       POSTGRES_DB: guitare_app
-    ports:
-      - "5434:5432"
-    volumes:
-      - guitare_pg_data:/var/lib/postgresql/data
+    ports: ['5434:5432']
+    volumes: [guitare_pg_data:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d guitare_app"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d guitare_app']
       interval: 5s
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes: [guitare_redis_data:/data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:admin123@db:5432/guitare_app?schema=public
+      REDIS_HOST: redis
+    ports: ['3000:3000']
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  transcription-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:admin123@db:5432/guitare_app?schema=public
+      REDIS_HOST: redis
+      HF_HOME: /models
+      TRANSCRIPTION_TEMP_DIR: /transcription-tmp
+    volumes:
+      - whisper_models:/models
+      - transcription_tmp:/transcription-tmp
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
 volumes:
   guitare_pg_data:
+  guitare_redis_data:
+  whisper_models:
+  transcription_tmp:

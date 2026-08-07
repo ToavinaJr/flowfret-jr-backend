@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Streaming JSON-lines bridge for faster-whisper. Logs go to stderr only."""
+from __future__ import annotations
+
+import json
+import ipaddress
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+from typing import Any, Iterator
+
+DEFAULT_AUDIUS_SUFFIXES = (".audius.co", ".audius.work", ".audiuscontent.co", ".theblueprint.xyz")
+
+
+def emit(payload: dict[str, Any]) -> None:
+    print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), flush=True)
+
+
+def fail(code: str, message: str) -> None:
+    emit({"type": "failed", "errorCode": code, "message": message})
+
+
+def validate_public_https_url(url: str, allowed_hosts: list[str]) -> None:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise WorkerError("INVALID_AUDIO_URL", "Audio URL must be a valid HTTPS URL")
+    hostname = parsed.hostname.lower().rstrip(".")
+    suffixes = tuple(host.lower().lstrip("*") for host in allowed_hosts) or DEFAULT_AUDIUS_SUFFIXES
+    if not any(hostname == suffix.lstrip(".") or hostname.endswith(suffix) for suffix in suffixes):
+        raise WorkerError("AUDIO_HOST_NOT_ALLOWED", "Audio host is not allowed")
+    try:
+        addresses = {item[4][0] for item in socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)}
+    except socket.gaierror as error:
+        raise WorkerError("AUDIO_DOWNLOAD_FAILED", "Audio host could not be resolved") from error
+    if not addresses:
+        raise WorkerError("AUDIO_DOWNLOAD_FAILED", "Audio host has no address")
+    for address in addresses:
+        ip = ipaddress.ip_address(address)
+        if not ip.is_global:
+            raise WorkerError("AUDIO_HOST_NOT_ALLOWED", "Audio host resolves to a non-public address")
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req: urllib.request.Request, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> None:
+        return None
+
+
+class WorkerError(Exception):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+def download_audio(url: str, destination: Path, options: dict[str, Any]) -> None:
+    max_bytes = int(options.get("maxAudioSizeMb", 100)) * 1024 * 1024
+    timeout = max(1.0, float(options.get("downloadTimeoutMs", 120000)) / 1000)
+    max_redirects = int(options.get("maxRedirects", 3))
+    allowed_hosts = [str(value) for value in options.get("allowedHosts", [])]
+    opener = urllib.request.build_opener(NoRedirect)
+    current = url
+    for redirect_count in range(max_redirects + 1):
+        validate_public_https_url(current, allowed_hosts)
+        request = urllib.request.Request(current, headers={"User-Agent": "FretFlow-Transcription/1.0", "Accept": "audio/*"})
+        try:
+            response = opener.open(request, timeout=timeout)
+        except urllib.error.HTTPError as error:
+            if error.code in (301, 302, 303, 307, 308):
+                if redirect_count >= max_redirects:
+                    raise WorkerError("AUDIO_DOWNLOAD_FAILED", "Too many audio redirects") from error
+                location = error.headers.get("Location")
+                if not location:
+                    raise WorkerError("AUDIO_DOWNLOAD_FAILED", "Invalid audio redirect") from error
+                current = urllib.parse.urljoin(current, location)
+                continue
+            if error.code in (401, 403):
+                raise WorkerError("AUDIO_URL_EXPIRED", "Audius audio URL expired") from error
+            raise WorkerError("AUDIO_DOWNLOAD_FAILED", "Audio download failed") from error
+        content_type = response.headers.get_content_type()
+        if not (content_type.startswith("audio/") or content_type in ("application/octet-stream", "video/mp4")):
+            response.close()
+            raise WorkerError("UNSUPPORTED_AUDIO_FORMAT", "Unsupported audio content type")
+        declared = response.headers.get("Content-Length")
+        if declared and int(declared) > max_bytes:
+            response.close()
+            raise WorkerError("AUDIO_TOO_LARGE", "Audio exceeds configured size limit")
+        total = 0
+        with response, destination.open("wb") as output:
+            while True:
+                chunk = response.read(64 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_bytes:
+                    raise WorkerError("AUDIO_TOO_LARGE", "Audio exceeds configured size limit")
+                output.write(chunk)
+        return
+    raise WorkerError("AUDIO_DOWNLOAD_FAILED", "Audio download failed")
+
+
+def probe_duration(path: Path) -> float:
+    result = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(path)], capture_output=True, text=True, timeout=30, check=True)
+    return max(0.0, float(result.stdout.strip()))
+
+
+def convert_audio(source: Path, destination: Path) -> None:
+    try:
+        subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source), "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(destination)], capture_output=True, timeout=300, check=True)
+    except (subprocess.SubprocessError, FileNotFoundError) as error:
+        raise WorkerError("UNSUPPORTED_AUDIO_FORMAT", "FFmpeg could not prepare the audio") from error
+
+
+def lrc_timestamp(seconds: float) -> str:
+    centiseconds = max(0, round(seconds * 100))
+    minutes, remainder = divmod(centiseconds, 6000)
+    whole_seconds, fraction = divmod(remainder, 100)
+    return f"{minutes:02d}:{whole_seconds:02d}.{fraction:02d}"
+
+
+def clean_lrc_text(text: str) -> str:
+    return " ".join(text.replace("[", "(").replace("]", ")").split())
+
+
+def generate_lrc(title: str | None, artist: str | None, language: str, segments: list[dict[str, Any]]) -> str:
+    header = [f"[ti:{title or 'Unknown'}]", f"[ar:{artist or 'Unknown'}]", f"[la:{language}]", "[re:faster-whisper]", ""]
+    lines = [f"[{lrc_timestamp(float(segment['start']))}]{clean_lrc_text(str(segment['text']))}" for segment in segments]
+    return "\n".join(header + lines) + "\n"
+
+
+MODEL_CACHE: dict[tuple[str, str, str], Any] = {}
+
+
+def process_request(request: dict[str, Any]) -> int:
+    temp_root: Path | None = None
+    try:
+        options = request.get("options", {})
+        temp_root = Path(tempfile.mkdtemp(prefix="fretflow-transcription-", dir=options.get("tempDir") or None))
+        downloaded = temp_root / "source.audio"
+        prepared = temp_root / "prepared.wav"
+        download_audio(str(request["audioUrl"]), downloaded, options)
+        duration = probe_duration(downloaded)
+        emit({"type": "started", "duration": duration})
+        convert_audio(downloaded, prepared)
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError as error:
+            raise WorkerError("WHISPER_FAILED", "faster-whisper is not installed") from error
+        model_key = (str(request.get("model", "small")), str(options.get("device", "cpu")), str(options.get("computeType", "int8")))
+        model = MODEL_CACHE.get(model_key)
+        if model is None:
+            model = WhisperModel(model_key[0], device=model_key[1], compute_type=model_key[2])
+            MODEL_CACHE[model_key] = model
+        whisper_segments, info = model.transcribe(str(prepared), language=request.get("language"), vad_filter=True, word_timestamps=True, beam_size=5)
+        collected: list[dict[str, Any]] = []
+        ready_sent = False
+        initial_buffer = float(options.get("initialBufferSeconds", 45))
+        for index, item in enumerate(whisper_segments):
+            segment = {"id": f"segment-{index + 1}", "start": float(item.start), "end": float(item.end), "text": str(item.text).strip(), "words": [{"start": float(word.start), "end": float(word.end), "text": str(word.word), "probability": float(word.probability)} for word in (item.words or []) if word.start is not None and word.end is not None]}
+            collected.append(segment)
+            emit({"type": "segment", "segment": segment})
+            progress = min(99, round((segment["end"] / duration) * 100)) if duration else 0
+            emit({"type": "progress", "progress": progress, "bufferedUntil": segment["end"]})
+            if not ready_sent and (segment["end"] >= initial_buffer or segment["end"] >= duration - 0.25):
+                ready_sent = True
+                emit({"type": "ready-to-play", "bufferedUntil": segment["end"]})
+        detected = str(getattr(info, "language", None) or request.get("language") or "und")
+        emit({"type": "completed", "duration": duration, "detectedLanguage": detected, "lrc": generate_lrc(request.get("title"), request.get("artist"), detected, collected)})
+        return 0
+    except WorkerError as error:
+        fail(error.code, str(error))
+        print(f"worker error: {error.code}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        fail("WHISPER_FAILED", "Transcription worker failed")
+        print(f"worker error: {type(error).__name__}: {error}", file=sys.stderr)
+        return 1
+    finally:
+        if temp_root:
+            shutil.rmtree(temp_root, ignore_errors=True)
+
+
+def main() -> int:
+    if "--server" in sys.argv:
+        for line in sys.stdin:
+            if line.strip():
+                process_request(json.loads(line))
+        return 0
+    return process_request(json.loads(sys.stdin.read()))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

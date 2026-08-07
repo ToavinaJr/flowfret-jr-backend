@@ -6,4 +6,3 @@ export const YOUTUBE_HTTP_TIMEOUT_MS = 10_000;
 export const YOUTUBE_SEARCH_MIN_LIMIT = 1;
 export const YOUTUBE_SEARCH_MAX_LIMIT = 10;
 export const YOUTUBE_MUSIC_TOPIC_ID = '/m/04rlf';
-

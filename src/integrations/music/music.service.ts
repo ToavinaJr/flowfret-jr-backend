@@ -50,9 +50,7 @@ export class MusicService {
     return unique;
   }
 
-  private async enrichWithGenius(
-    tracks: AudiusTrack[],
-  ): Promise<MusicTrack[]> {
+  private async enrichWithGenius(tracks: AudiusTrack[]): Promise<MusicTrack[]> {
     const results: MusicTrack[] = [];
 
     for (
@@ -109,9 +107,13 @@ export class MusicService {
   private pickArtwork(track: AudiusTrack): string | null {
     const artwork = track.artwork;
     return (
-      artwork?.['_1000x1000'] ?? artwork?.['1000x1000'] ??
-      artwork?.['_480x480'] ?? artwork?.['480x480'] ??
-      artwork?.['_150x150'] ?? artwork?.['150x150'] ?? null
+      artwork?.['_1000x1000'] ??
+      artwork?.['1000x1000'] ??
+      artwork?.['_480x480'] ??
+      artwork?.['480x480'] ??
+      artwork?.['_150x150'] ??
+      artwork?.['150x150'] ??
+      null
     );
   }
 

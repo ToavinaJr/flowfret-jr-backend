@@ -24,11 +24,14 @@ import { TagsResolver } from './tags/tags.resolver';
 import { UsersResolver } from './users/users.resolver';
 import { formatGraphQLError } from './common/format-graphql-error';
 import { MusicModule } from './integrations/music/music.module';
+import { TranscriptionsModule } from './transcriptions/transcriptions.module';
+import { validateEnvironment } from './common/validate-environment';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: validateEnvironment,
       envFilePath: [
         `.env.${process.env.NODE_ENV ?? 'development'}.local`,
         `.env.${process.env.NODE_ENV ?? 'development'}`,
@@ -39,6 +42,7 @@ import { MusicModule } from './integrations/music/music.module';
     PrismaModule,
     AuthModule,
     MusicModule,
+    TranscriptionsModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: true,

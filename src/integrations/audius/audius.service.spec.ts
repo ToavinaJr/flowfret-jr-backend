@@ -5,10 +5,30 @@ import { AudiusService } from './audius.service';
 
 describe('AudiusService', () => {
   it('searches and keeps streamable tracks', async () => {
-    const httpService = { get: jest.fn().mockReturnValue(of({ data: { data: [
-      { id: '1', title: 'Playable', duration: 60, user: { id: 'u1', name: 'Artist' }, is_streamable: true },
-      { id: '2', title: 'Locked', duration: 60, user: { id: 'u2', name: 'Artist' }, is_streamable: false },
-    ] } })) };
+    const httpService = {
+      get: jest.fn().mockReturnValue(
+        of({
+          data: {
+            data: [
+              {
+                id: '1',
+                title: 'Playable',
+                duration: 60,
+                user: { id: 'u1', name: 'Artist' },
+                is_streamable: true,
+              },
+              {
+                id: '2',
+                title: 'Locked',
+                duration: 60,
+                user: { id: 'u2', name: 'Artist' },
+                is_streamable: false,
+              },
+            ],
+          },
+        }),
+      ),
+    };
     const configService = { get: jest.fn(() => 'access-token') };
     const service = new AudiusService(
       httpService as unknown as HttpService,
@@ -23,5 +43,11 @@ describe('AudiusService', () => {
         headers: { Authorization: 'Bearer access-token' },
       }),
     );
+  });
+
+  it('renews a stream URL from the Audius track id', async () => {
+    const httpService = { get: jest.fn().mockReturnValue(of({ data: { data: { stream: { url: 'https://fresh.audius.co/audio.mp3' } } } })) };
+    const service = new AudiusService(httpService as unknown as HttpService, { get: jest.fn(() => 'access-token') } as unknown as ConfigService);
+    await expect(service.getFreshStreamUrl('track-id', 'https://expired.audius.co/audio.mp3')).resolves.toBe('https://fresh.audius.co/audio.mp3');
   });
 });

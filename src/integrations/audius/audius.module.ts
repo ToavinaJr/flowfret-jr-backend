@@ -9,4 +9,3 @@ import { AudiusService } from './audius.service';
   exports: [AudiusService],
 })
 export class AudiusModule {}
-

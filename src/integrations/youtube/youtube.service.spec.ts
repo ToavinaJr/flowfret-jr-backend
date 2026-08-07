@@ -8,20 +8,33 @@ describe('YouTubeService', () => {
     const httpService = {
       get: jest
         .fn()
-        .mockReturnValueOnce(of({ data: {
-          pageInfo: { totalResults: 42 },
-          items: [{
-            id: { videoId: 'video-1' },
-            snippet: {
-              title: 'Song &amp; More', channelId: 'channel-1',
-              channelTitle: 'Artist',
-              thumbnails: { high: { url: 'https://img.test/video.jpg' } },
+        .mockReturnValueOnce(
+          of({
+            data: {
+              pageInfo: { totalResults: 42 },
+              items: [
+                {
+                  id: { videoId: 'video-1' },
+                  snippet: {
+                    title: 'Song &amp; More',
+                    channelId: 'channel-1',
+                    channelTitle: 'Artist',
+                    thumbnails: { high: { url: 'https://img.test/video.jpg' } },
+                  },
+                },
+              ],
             },
-          }],
-        } }))
-        .mockReturnValueOnce(of({ data: {
-          items: [{ id: 'video-1', contentDetails: { duration: 'PT3M12S' } }],
-        } })),
+          }),
+        )
+        .mockReturnValueOnce(
+          of({
+            data: {
+              items: [
+                { id: 'video-1', contentDetails: { duration: 'PT3M12S' } },
+              ],
+            },
+          }),
+        ),
     };
     const configService = { get: jest.fn(() => 'youtube-key') };
     const service = new YouTubeService(
@@ -31,11 +44,16 @@ describe('YouTubeService', () => {
 
     await expect(service.searchMusic('song', 10)).resolves.toEqual({
       total: 42,
-      videos: [{
-        id: 'video-1', title: 'Song & More', channelId: 'channel-1',
-        channelTitle: 'Artist', thumbnailUrl: 'https://img.test/video.jpg',
-        durationMs: 192000,
-      }],
+      videos: [
+        {
+          id: 'video-1',
+          title: 'Song & More',
+          channelId: 'channel-1',
+          channelTitle: 'Artist',
+          thumbnailUrl: 'https://img.test/video.jpg',
+          durationMs: 192000,
+        },
+      ],
     });
   });
 });

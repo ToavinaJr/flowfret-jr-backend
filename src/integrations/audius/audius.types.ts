@@ -1,7 +1,7 @@
 export interface AudiusArtwork {
-  '_150x150'?: string;
-  '_480x480'?: string;
-  '_1000x1000'?: string;
+  _150x150?: string;
+  _480x480?: string;
+  _1000x1000?: string;
   '150x150'?: string;
   '480x480'?: string;
   '1000x1000'?: string;
@@ -31,6 +31,10 @@ export interface AudiusTrack {
 
 export interface AudiusSearchResponse {
   data?: AudiusTrack[];
+}
+
+export interface AudiusTrackResponse {
+  data?: AudiusTrack;
 }
 
 export interface AudiusSearchResult {
