@@ -62,7 +62,12 @@ export class TranscriptionsProcessor extends WorkerHost {
       try {
         await run(freshUrl);
       } catch (error) {
-        if (this.errorCode(error) !== 'AUDIO_URL_EXPIRED') throw error;
+        const retryableDownloadErrors = [
+          'AUDIO_URL_EXPIRED',
+          'AUDIO_DOWNLOAD_FAILED',
+        ];
+        if (!retryableDownloadErrors.includes(this.errorCode(error)))
+          throw error;
         await run(await this.audius.getFreshStreamUrl(trackId));
       }
       this.logger.log(

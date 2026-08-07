@@ -53,7 +53,9 @@ describe('MusicService', () => {
     expect(result.tracks[0].geniusUrl).toBeNull();
     expect(result.tracks[1].geniusUrl).toBe('https://genius.com/two');
     expect(result.tracks.map((item) => item.audiusId)).toEqual(['1', '2']);
-    expect(result.tracks[0].streamUrl).toBe('https://audio.test/1.mp3');
+    expect(result.tracks[0].streamUrl).toBe(
+      'https://api.audius.co/v1/tracks/1/stream',
+    );
   });
 
   it('preserves Audius order and deduplicates', async () => {

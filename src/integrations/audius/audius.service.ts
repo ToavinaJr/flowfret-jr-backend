@@ -73,7 +73,7 @@ export class AudiusService {
 
   async getFreshStreamUrl(
     trackId: string,
-    currentUrl?: string,
+    _currentUrl?: string,
   ): Promise<string> {
     const accessToken = getRequiredConfig(
       this.configService,
@@ -89,12 +89,14 @@ export class AudiusService {
           },
         ),
       );
-      const url = response.data.data?.stream?.url;
-      if (url) return url;
-      if (currentUrl) return currentUrl;
-      throw new BadGatewayException('Audius stream is unavailable');
+      if (!response.data.data) {
+        throw new BadGatewayException('Audius stream is unavailable');
+      }
+      // A stream.url points at one signed storage node and can already be dead
+      // when the queued job starts. The canonical endpoint redirects to a
+      // freshly selected node when the download actually begins.
+      return `${AUDIUS_API_URL}${AUDIUS_TRACKS_PATH}/${encodeURIComponent(trackId)}/stream`;
     } catch (error) {
-      if (currentUrl) return currentUrl;
       throw this.mapHttpError(error);
     }
   }

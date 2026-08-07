@@ -16,7 +16,13 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Iterator
 
-DEFAULT_AUDIUS_SUFFIXES = (".audius.co", ".audius.work", ".audiuscontent.co", ".theblueprint.xyz")
+DEFAULT_AUDIUS_SUFFIXES = (
+    ".audius.co",
+    ".audius.work",
+    ".audiuscontent.co",
+    ".theblueprint.xyz",
+    ".zeogrid.com",
+)
 
 
 def emit(payload: dict[str, Any]) -> None:
@@ -82,6 +88,8 @@ def download_audio(url: str, destination: Path, options: dict[str, Any]) -> None
             if error.code in (401, 403):
                 raise WorkerError("AUDIO_URL_EXPIRED", "Audius audio URL expired") from error
             raise WorkerError("AUDIO_DOWNLOAD_FAILED", "Audio download failed") from error
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+            raise WorkerError("AUDIO_DOWNLOAD_FAILED", "Audius audio node is unreachable") from error
         content_type = response.headers.get_content_type()
         if not (content_type.startswith("audio/") or content_type in ("application/octet-stream", "video/mp4")):
             response.close()

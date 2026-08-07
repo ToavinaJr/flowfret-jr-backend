@@ -46,8 +46,24 @@ describe('AudiusService', () => {
   });
 
   it('renews a stream URL from the Audius track id', async () => {
-    const httpService = { get: jest.fn().mockReturnValue(of({ data: { data: { stream: { url: 'https://fresh.audius.co/audio.mp3' } } } })) };
-    const service = new AudiusService(httpService as unknown as HttpService, { get: jest.fn(() => 'access-token') } as unknown as ConfigService);
-    await expect(service.getFreshStreamUrl('track-id', 'https://expired.audius.co/audio.mp3')).resolves.toBe('https://fresh.audius.co/audio.mp3');
+    const httpService = {
+      get: jest.fn().mockReturnValue(
+        of({
+          data: {
+            data: { stream: { url: 'https://fresh.audius.co/audio.mp3' } },
+          },
+        }),
+      ),
+    };
+    const service = new AudiusService(
+      httpService as unknown as HttpService,
+      { get: jest.fn(() => 'access-token') } as unknown as ConfigService,
+    );
+    await expect(
+      service.getFreshStreamUrl(
+        'track-id',
+        'https://expired.audius.co/audio.mp3',
+      ),
+    ).resolves.toBe('https://api.audius.co/v1/tracks/track-id/stream');
   });
 });

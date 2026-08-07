@@ -1,0 +1,46 @@
+services:
+  # The existing web service only enqueues jobs. This continuously running
+  # service is required to consume them and execute faster-whisper.
+  - type: worker
+    name: backend-guitare-transcription-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile.worker
+    dockerContext: .
+    plan: standard
+    autoDeployTrigger: commit
+    maxShutdownDelaySeconds: 300
+    disk:
+      name: whisper-model-cache
+      mountPath: /models
+      sizeGB: 10
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        sync: false
+      - key: REDIS_USERNAME
+        sync: false
+      - key: REDIS_PASSWORD
+        sync: false
+      - key: REDIS_TLS
+        value: 'true'
+      - key: AUDIUS_ACCESS_TOKEN
+        sync: false
+      - key: AUDIUS_API_KEY
+        sync: false
+      - key: AUDIUS_API_SECRET
+        sync: false
+      - key: HF_HOME
+        value: /models
+      - key: TRANSCRIPTION_TEMP_DIR
+        value: /tmp/fretflow-transcriptions
+      - key: TRANSCRIPTION_CONCURRENCY
+        value: '1'
+      - key: WHISPER_MODEL
+        value: small
+      - key: WHISPER_DEVICE
+        value: cpu
+      - key: WHISPER_COMPUTE_TYPE
+        value: int8

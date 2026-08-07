@@ -94,9 +94,10 @@ export class MusicService {
       artists: [{ id: track.user.id, name: track.user.name }],
       imageUrl: this.pickArtwork(track),
       audiusUrl: this.buildAudiusUrl(track.permalink),
-      streamUrl:
-        track.stream?.url ??
-        `${AUDIUS_API_URL}/tracks/${encodeURIComponent(track.id)}/stream`,
+      // Keep the public API endpoint in the browser instead of a short-lived
+      // signed storage-node URL. Audius can then select a fresh node on every
+      // load/retry.
+      streamUrl: `${AUDIUS_API_URL}/tracks/${encodeURIComponent(track.id)}/stream`,
       genre: track.genre ?? null,
       geniusUrl,
       geniusMatchScore,
