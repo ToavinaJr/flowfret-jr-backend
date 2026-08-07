@@ -12,7 +12,7 @@ export class MusicArtist {
 @ObjectType()
 export class MusicTrack {
   @Field(() => ID)
-  spotifyId: string;
+  youtubeId: string;
 
   @Field()
   title: string;
@@ -20,20 +20,11 @@ export class MusicTrack {
   @Field(() => [MusicArtist])
   artists: MusicArtist[];
 
-  @Field(() => ID)
-  albumId: string;
-
-  @Field()
-  albumName: string;
-
   @Field(() => String, { nullable: true })
   imageUrl: string | null;
 
   @Field()
-  spotifyUrl: string;
-
-  @Field(() => String, { nullable: true })
-  previewUrl: string | null;
+  youtubeUrl: string;
 
   @Field(() => String, { nullable: true })
   geniusUrl: string | null;

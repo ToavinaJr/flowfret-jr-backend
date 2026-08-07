@@ -6,7 +6,7 @@ NestJS GraphQL API for FretFlow (auth, social CRUD, music search).
 
 ```bash
 cp .env.example .env.development
-# fill DATABASE_URL, JWT_SECRET, SPOTIFY_*, GENIUS_*
+# fill DATABASE_URL, JWT_SECRET, YOUTUBE_API_KEY, GENIUS_ACCESS_TOKEN
 npm install
 docker compose up -d
 npm run prisma:deploy
@@ -17,17 +17,21 @@ Package manager in use: **npm** (`package-lock.json`).
 
 ## Environment
 
-See `.env.example`. Music search requires:
+See `.env.example`. Active music search requires:
+
+- `YOUTUBE_API_KEY`
+- `GENIUS_ACCESS_TOKEN`
+
+The inactive Spotify provider is retained for possible future use and accepts:
 
 - `SPOTIFY_CLIENT_ID`
 - `SPOTIFY_CLIENT_SECRET`
-- `GENIUS_ACCESS_TOKEN`
 
 Never commit real secrets.
 
 ## Music search
 
-- Spotify Client Credentials → cached app token → `/v1/search?type=track`
+- YouTube Data API v3 `search.list` → `videos.list` for durations
 - Genius `/search` enriches each track when the match score is high enough
 - No Prisma persistence in V1
 
@@ -38,12 +42,10 @@ query SearchMusic($query: String!, $limit: Int!) {
   searchMusic(query: $query, limit: $limit) {
     total
     tracks {
-      spotifyId
+      youtubeId
       title
-      albumName
       imageUrl
-      spotifyUrl
-      previewUrl
+      youtubeUrl
       geniusUrl
       geniusMatchScore
       durationMs
@@ -62,13 +64,13 @@ Variables:
 ### Tests
 
 ```bash
-npm test -- spotify.service.spec genius.service.spec music.service.spec
+npm test -- spotify.service.spec youtube.service.spec genius.service.spec music.service.spec
 npm run lint
 npm run build
 ```
 
 ## Known limitations
 
-- Spotify Dev Mode search `limit` max is 10.
-- `preview_url` may be null.
+- Search results are limited to 10 per request to control YouTube quota use.
+- YouTube does not expose direct audio preview URLs; results link to YouTube.
 - Genius matching is heuristic and optional.

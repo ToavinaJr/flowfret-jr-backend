@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { GENIUS_MAX_CONCURRENCY } from '../genius/genius.constants';
 import { GeniusService } from '../genius/genius.service';
-import { SpotifyService } from '../spotify/spotify.service';
-import type { SpotifyTrack } from '../spotify/spotify.types';
+import { YouTubeService } from '../youtube/youtube.service';
+import type { YouTubeVideo } from '../youtube/youtube.types';
 import type { MusicSearchResult, MusicTrack } from './music.types';
 
 @Injectable()
@@ -10,7 +10,7 @@ export class MusicService {
   private readonly logger = new Logger(MusicService.name);
 
   constructor(
-    private readonly spotifyService: SpotifyService,
+    private readonly youtubeService: YouTubeService,
     private readonly geniusService: GeniusService,
   ) {}
 
@@ -20,23 +20,23 @@ export class MusicService {
       throw new BadRequestException('Search query cannot be empty');
     }
 
-    const spotifyResult = await this.spotifyService.searchTracks(
+    const youtubeResult = await this.youtubeService.searchMusic(
       normalizedQuery,
       limit,
     );
 
-    const uniqueTracks = this.dedupeTracks(spotifyResult.tracks);
+    const uniqueTracks = this.dedupeTracks(youtubeResult.videos);
     const enrichedTracks = await this.enrichWithGenius(uniqueTracks);
 
     return {
       tracks: enrichedTracks,
-      total: spotifyResult.total,
+      total: youtubeResult.total,
     };
   }
 
-  private dedupeTracks(tracks: SpotifyTrack[]): SpotifyTrack[] {
+  private dedupeTracks(tracks: YouTubeVideo[]): YouTubeVideo[] {
     const seen = new Set<string>();
-    const unique: SpotifyTrack[] = [];
+    const unique: YouTubeVideo[] = [];
 
     for (const track of tracks) {
       if (seen.has(track.id)) {
@@ -50,7 +50,7 @@ export class MusicService {
   }
 
   private async enrichWithGenius(
-    tracks: SpotifyTrack[],
+    tracks: YouTubeVideo[],
   ): Promise<MusicTrack[]> {
     const results: MusicTrack[] = [];
 
@@ -69,14 +69,14 @@ export class MusicService {
     return results;
   }
 
-  private async mapTrack(track: SpotifyTrack): Promise<MusicTrack> {
-    const primaryArtist = track.artists[0]?.name ?? '';
+  private async mapTrack(track: YouTubeVideo): Promise<MusicTrack> {
+    const primaryArtist = track.channelTitle;
     let geniusUrl: string | null = null;
     let geniusMatchScore: number | null = null;
 
     try {
       const geniusMatch = await this.geniusService.searchBestSong(
-        track.name,
+        track.title,
         primaryArtist,
       );
       if (geniusMatch) {
@@ -89,24 +89,15 @@ export class MusicService {
       );
     }
 
-    const bestImage =
-      track.album.images.find((image) => Boolean(image.url))?.url ?? null;
-
     return {
-      spotifyId: track.id,
-      title: track.name,
-      artists: track.artists.map((artist) => ({
-        id: artist.id,
-        name: artist.name,
-      })),
-      albumId: track.album.id,
-      albumName: track.album.name,
-      imageUrl: bestImage,
-      spotifyUrl: track.external_urls.spotify,
-      previewUrl: track.preview_url,
+      youtubeId: track.id,
+      title: track.title,
+      artists: [{ id: track.channelId, name: track.channelTitle }],
+      imageUrl: track.thumbnailUrl,
+      youtubeUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(track.id)}`,
       geniusUrl,
       geniusMatchScore,
-      durationMs: track.duration_ms,
+      durationMs: track.durationMs,
     };
   }
 }

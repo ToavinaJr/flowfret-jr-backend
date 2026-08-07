@@ -1,33 +1,28 @@
 import { BadRequestException } from '@nestjs/common';
 import { MusicService } from './music.service';
-import { SpotifyService } from '../spotify/spotify.service';
+import { YouTubeService } from '../youtube/youtube.service';
 import { GeniusService } from '../genius/genius.service';
-import type { SpotifyTrack } from '../spotify/spotify.types';
+import type { YouTubeVideo } from '../youtube/youtube.types';
 
 describe('MusicService', () => {
   let service: MusicService;
-  let spotifyService: { searchTracks: jest.Mock };
+  let youtubeService: { searchMusic: jest.Mock };
   let geniusService: { searchBestSong: jest.Mock };
 
-  const track = (id: string, name: string): SpotifyTrack => ({
+  const track = (id: string, name: string): YouTubeVideo => ({
     id,
-    name,
-    duration_ms: 120000,
-    preview_url: null,
-    external_urls: { spotify: `https://open.spotify.com/track/${id}` },
-    artists: [{ id: `a-${id}`, name: 'Artist' }],
-    album: {
-      id: `al-${id}`,
-      name: 'Album',
-      images: [{ url: 'https://img.test/cover.jpg', height: 300, width: 300 }],
-    },
+    title: name,
+    durationMs: 120000,
+    channelId: `channel-${id}`,
+    channelTitle: 'Artist',
+    thumbnailUrl: 'https://img.test/cover.jpg',
   });
 
   beforeEach(() => {
-    spotifyService = { searchTracks: jest.fn() };
+    youtubeService = { searchMusic: jest.fn() };
     geniusService = { searchBestSong: jest.fn() };
     service = new MusicService(
-      spotifyService as unknown as SpotifyService,
+      youtubeService as unknown as YouTubeService,
       geniusService as unknown as GeniusService,
     );
   });
@@ -38,9 +33,9 @@ describe('MusicService', () => {
     );
   });
 
-  it('keeps Spotify results when Genius fails', async () => {
-    spotifyService.searchTracks.mockResolvedValue({
-      tracks: [track('1', 'One'), track('2', 'Two')],
+  it('keeps YouTube results when Genius fails', async () => {
+    youtubeService.searchMusic.mockResolvedValue({
+      videos: [track('1', 'One'), track('2', 'Two')],
       total: 2,
     });
     geniusService.searchBestSong
@@ -55,18 +50,18 @@ describe('MusicService', () => {
     expect(result.tracks).toHaveLength(2);
     expect(result.tracks[0].geniusUrl).toBeNull();
     expect(result.tracks[1].geniusUrl).toBe('https://genius.com/two');
-    expect(result.tracks.map((item) => item.spotifyId)).toEqual(['1', '2']);
+    expect(result.tracks.map((item) => item.youtubeId)).toEqual(['1', '2']);
   });
 
-  it('preserves Spotify order and deduplicates', async () => {
-    spotifyService.searchTracks.mockResolvedValue({
-      tracks: [track('1', 'One'), track('1', 'One'), track('2', 'Two')],
+  it('preserves YouTube order and deduplicates', async () => {
+    youtubeService.searchMusic.mockResolvedValue({
+      videos: [track('1', 'One'), track('1', 'One'), track('2', 'Two')],
       total: 3,
     });
     geniusService.searchBestSong.mockResolvedValue(null);
 
     const result = await service.searchMusic('query', 10);
-    expect(result.tracks.map((item) => item.spotifyId)).toEqual(['1', '2']);
+    expect(result.tracks.map((item) => item.youtubeId)).toEqual(['1', '2']);
     expect(result.total).toBe(3);
   });
 });
