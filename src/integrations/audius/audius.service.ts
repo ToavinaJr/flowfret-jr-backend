@@ -75,6 +75,9 @@ export class AudiusService {
     trackId: string,
     _currentUrl?: string,
   ): Promise<string> {
+    this.logger.log(
+      JSON.stringify({ event: 'audius.stream_refresh_started', trackId }),
+    );
     const accessToken = getRequiredConfig(
       this.configService,
       AUDIUS_ACCESS_TOKEN_KEY,
@@ -95,7 +98,15 @@ export class AudiusService {
       // A stream.url points at one signed storage node and can already be dead
       // when the queued job starts. The canonical endpoint redirects to a
       // freshly selected node when the download actually begins.
-      return `${AUDIUS_API_URL}${AUDIUS_TRACKS_PATH}/${encodeURIComponent(trackId)}/stream`;
+      const streamUrl = `${AUDIUS_API_URL}${AUDIUS_TRACKS_PATH}/${encodeURIComponent(trackId)}/stream`;
+      this.logger.log(
+        JSON.stringify({
+          event: 'audius.stream_refresh_completed',
+          trackId,
+          streamHost: new URL(streamUrl).hostname,
+        }),
+      );
+      return streamUrl;
     } catch (error) {
       throw this.mapHttpError(error);
     }

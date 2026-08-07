@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -13,9 +13,11 @@ type WorkerInput = TranscriptionJobData & { title?: string; artist?: string };
 
 @Injectable()
 export class WhisperBridgeService implements OnModuleDestroy {
+  private readonly logger = new Logger(WhisperBridgeService.name);
   private child: ChildProcessWithoutNullStreams | null = null;
   private active: {
     onMessage: (message: WorkerMessage) => Promise<void>;
+    transcriptionId: string;
     resolve: () => void;
     reject: (error: Error) => void;
     timer: ReturnType<typeof setTimeout>;
@@ -27,7 +29,16 @@ export class WhisperBridgeService implements OnModuleDestroy {
     data: WorkerInput,
     onMessage: (message: WorkerMessage) => Promise<void>,
   ): Promise<void> {
-    if (this.active) return Promise.reject(new Error('Whisper bridge is busy'));
+    if (this.active) {
+      this.logger.error(
+        JSON.stringify({
+          event: 'whisper.bridge_busy',
+          transcriptionId: data.transcriptionId,
+          activeTranscriptionId: this.active.transcriptionId,
+        }),
+      );
+      return Promise.reject(new Error('Whisper bridge is busy'));
+    }
     const child = this.ensureChild();
     return new Promise<void>((resolvePromise, reject) => {
       const timer = setTimeout(
@@ -43,7 +54,22 @@ export class WhisperBridgeService implements OnModuleDestroy {
         },
         this.numberConfig('TRANSCRIPTION_TIMEOUT_MS', 900_000),
       );
-      this.active = { onMessage, resolve: resolvePromise, reject, timer };
+      this.active = {
+        onMessage,
+        transcriptionId: data.transcriptionId,
+        resolve: resolvePromise,
+        reject,
+        timer,
+      };
+      this.logger.log(
+        JSON.stringify({
+          event: 'whisper.job_sent',
+          transcriptionId: data.transcriptionId,
+          trackId: data.trackId,
+          model: data.model,
+          pythonPid: child.pid,
+        }),
+      );
       child.stdin.write(
         `${JSON.stringify({ ...data, options: this.workerOptions() })}\n`,
       );
@@ -67,6 +93,14 @@ export class WhisperBridgeService implements OnModuleDestroy {
       windowsHide: true,
       env: { ...process.env, PYTHONUNBUFFERED: '1' },
     });
+    this.logger.log(
+      JSON.stringify({
+        event: 'whisper.process_spawned',
+        python,
+        script,
+        pythonPid: child.pid,
+      }),
+    );
     this.child = child;
     createInterface({ input: child.stdout }).on('line', (line) => {
       if (!line.trim() || !this.active) return;
@@ -74,6 +108,16 @@ export class WhisperBridgeService implements OnModuleDestroy {
         .then(async () => {
           if (!this.active) return;
           const message = parseWorkerMessage(line);
+          if (message.type !== 'segment')
+            this.logger.log(
+              JSON.stringify({
+                event: 'whisper.message',
+                transcriptionId: this.active.transcriptionId,
+                type: message.type,
+                progress:
+                  message.type === 'progress' ? message.progress : undefined,
+              }),
+            );
           await this.active.onMessage(message);
           if (message.type === 'completed') this.finish();
         })
@@ -85,9 +129,38 @@ export class WhisperBridgeService implements OnModuleDestroy {
           ),
         );
     });
-    child.stderr.on('data', () => undefined);
-    child.on('error', (error) => this.fail(error));
+    child.stderr.on('data', (chunk: Buffer) => {
+      const output = chunk
+        .toString('utf8')
+        .replace(/https?:\/\/\S+/gi, '[redacted-url]')
+        .trim()
+        .slice(0, 2000);
+      if (output)
+        this.logger.warn(
+          JSON.stringify({
+            event: 'whisper.stderr',
+            transcriptionId: this.active?.transcriptionId,
+            output,
+          }),
+        );
+    });
+    child.on('error', (error) => {
+      this.logger.error(
+        JSON.stringify({
+          event: 'whisper.process_error',
+          error: error.message,
+        }),
+      );
+      this.fail(error);
+    });
     child.on('close', (code) => {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'whisper.process_closed',
+          transcriptionId: this.active?.transcriptionId,
+          code,
+        }),
+      );
       this.child = null;
       if (this.active)
         this.fail(

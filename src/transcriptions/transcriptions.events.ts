@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis, { RedisOptions } from 'ioredis';
 import { Observable } from 'rxjs';
@@ -6,6 +6,7 @@ import type { TranscriptionEvent } from './entities/transcription.types';
 
 @Injectable()
 export class TranscriptionEvents implements OnModuleDestroy {
+  private readonly logger = new Logger(TranscriptionEvents.name);
   private readonly publisher: Redis;
   private readonly options: RedisOptions;
 
@@ -20,7 +21,14 @@ export class TranscriptionEvents implements OnModuleDestroy {
       lazyConnect: true,
     };
     this.publisher = new Redis(this.options);
-    this.publisher.on('error', () => undefined);
+    this.publisher.on('error', (error) =>
+      this.logger.error(
+        JSON.stringify({
+          event: 'redis.publisher_error',
+          error: error.message,
+        }),
+      ),
+    );
   }
 
   emit(event: TranscriptionEvent): void {
@@ -31,7 +39,26 @@ export class TranscriptionEvents implements OnModuleDestroy {
           JSON.stringify(event),
         ),
       )
-      .catch(() => undefined);
+      .then((subscribers) =>
+        this.logger.debug(
+          JSON.stringify({
+            event: 'transcription.event_published',
+            transcriptionId: event.transcriptionId,
+            type: event.type,
+            subscribers,
+          }),
+        ),
+      )
+      .catch((error: unknown) =>
+        this.logger.error(
+          JSON.stringify({
+            event: 'transcription.event_publish_failed',
+            transcriptionId: event.transcriptionId,
+            type: event.type,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        ),
+      );
   }
 
   subscribe(
@@ -39,6 +66,13 @@ export class TranscriptionEvents implements OnModuleDestroy {
     initial: TranscriptionEvent,
   ): Observable<TranscriptionEvent> {
     return new Observable<TranscriptionEvent>((subscriber) => {
+      this.logger.log(
+        JSON.stringify({
+          event: 'transcription.sse_opened',
+          transcriptionId,
+          initialType: initial.type,
+        }),
+      );
       subscriber.next(initial);
       if (this.isTerminal(initial)) {
         subscriber.complete();
@@ -66,8 +100,22 @@ export class TranscriptionEvents implements OnModuleDestroy {
       });
       void this.ensureConnected(redis)
         .then(() => redis.subscribe(this.channel(transcriptionId)))
+        .then(() =>
+          this.logger.log(
+            JSON.stringify({
+              event: 'transcription.sse_subscribed',
+              transcriptionId,
+            }),
+          ),
+        )
         .catch((error: unknown) => subscriber.error(error));
       return () => {
+        this.logger.log(
+          JSON.stringify({
+            event: 'transcription.sse_closed',
+            transcriptionId,
+          }),
+        );
         clearInterval(heartbeat);
         void redis
           .unsubscribe(this.channel(transcriptionId))

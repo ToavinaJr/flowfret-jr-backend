@@ -32,6 +32,16 @@ export class TranscriptionsProcessor extends WorkerHost {
     const { transcriptionId, trackId } = job.data;
     const startedAt = Date.now();
     const segments: TranscriptionSegment[] = [];
+    this.logger.log(
+      JSON.stringify({
+        event: 'transcription.job_started',
+        transcriptionId,
+        trackId,
+        jobId: job.id,
+        attemptsMade: job.attemptsMade,
+        configuredAttempts: job.opts.attempts,
+      }),
+    );
     const transcription = await this.repository.findById(transcriptionId);
     await this.repository.update(transcriptionId, {
       status: TranscriptionStatus.DOWNLOADING,
@@ -47,6 +57,14 @@ export class TranscriptionsProcessor extends WorkerHost {
       const freshUrl = await this.audius.getFreshStreamUrl(
         trackId,
         job.data.audioUrl,
+      );
+      this.logger.log(
+        JSON.stringify({
+          event: 'transcription.audius_stream_resolved',
+          transcriptionId,
+          trackId,
+          streamHost: new URL(freshUrl).hostname,
+        }),
       );
       const run = (audioUrl: string) =>
         this.whisper.run(
@@ -68,6 +86,15 @@ export class TranscriptionsProcessor extends WorkerHost {
         ];
         if (!retryableDownloadErrors.includes(this.errorCode(error)))
           throw error;
+        this.logger.warn(
+          JSON.stringify({
+            event: 'transcription.audio_download_retry',
+            transcriptionId,
+            trackId,
+            errorCode: this.errorCode(error),
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
         await run(await this.audius.getFreshStreamUrl(trackId));
       }
       this.logger.log(
@@ -86,6 +113,17 @@ export class TranscriptionsProcessor extends WorkerHost {
       const finalAttempt =
         job.attemptsMade + 1 >= Number(job.opts.attempts ?? 1);
       if (!finalAttempt) {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'transcription.job_retry_scheduled',
+            transcriptionId,
+            jobId: job.id,
+            trackId,
+            errorCode: this.errorCode(error),
+            error: message,
+            nextAttempt: job.attemptsMade + 2,
+          }),
+        );
         await this.repository.update(transcriptionId, {
           status: TranscriptionStatus.PENDING,
           errorCode: null,
@@ -111,6 +149,8 @@ export class TranscriptionsProcessor extends WorkerHost {
           trackId,
           status: 'FAILED',
           errorCode: this.errorCode(error),
+          error: message,
+          elapsedMs: Date.now() - startedAt,
         }),
       );
       throw error;
@@ -125,6 +165,14 @@ export class TranscriptionsProcessor extends WorkerHost {
   ): Promise<void> {
     switch (message.type) {
       case 'started':
+        this.logger.log(
+          JSON.stringify({
+            event: 'transcription.whisper_started',
+            transcriptionId: id,
+            jobId: job.id,
+            duration: message.duration,
+          }),
+        );
         await this.repository.update(id, {
           status: TranscriptionStatus.PROCESSING,
           duration: message.duration,
@@ -162,6 +210,15 @@ export class TranscriptionsProcessor extends WorkerHost {
         });
         return;
       case 'ready-to-play':
+        this.logger.log(
+          JSON.stringify({
+            event: 'transcription.ready_to_play',
+            transcriptionId: id,
+            jobId: job.id,
+            bufferedUntil: message.bufferedUntil,
+            segmentCount: segments.length,
+          }),
+        );
         await this.repository.update(id, {
           status: TranscriptionStatus.READY_TO_PLAY,
           readyToPlay: true,
@@ -176,6 +233,16 @@ export class TranscriptionsProcessor extends WorkerHost {
         });
         return;
       case 'completed':
+        this.logger.log(
+          JSON.stringify({
+            event: 'transcription.whisper_completed',
+            transcriptionId: id,
+            jobId: job.id,
+            duration: message.duration,
+            detectedLanguage: message.detectedLanguage,
+            segmentCount: segments.length,
+          }),
+        );
         await this.repository.update(id, {
           status: TranscriptionStatus.COMPLETED,
           progress: 100,

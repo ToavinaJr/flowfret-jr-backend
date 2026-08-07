@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -41,6 +42,7 @@ export interface TranscriptionResponse {
 
 @Injectable()
 export class TranscriptionsService {
+  private readonly logger = new Logger(TranscriptionsService.name);
   private readonly engineVersion: string;
   constructor(
     private readonly repository: TranscriptionsRepository,
@@ -58,6 +60,14 @@ export class TranscriptionsService {
     dto: CreateTranscriptionDto,
   ): Promise<TranscriptionResponse> {
     const language = dto.language ?? 'auto';
+    this.logger.log(
+      JSON.stringify({
+        event: 'transcription.requested',
+        trackId: dto.trackId,
+        language,
+        model: dto.model,
+      }),
+    );
     let transcription = await this.repository.findCompatible(
       dto.trackId,
       language,
@@ -92,9 +102,26 @@ export class TranscriptionsService {
       }
     }
     if (transcription.status === TranscriptionStatus.FAILED)
+      this.logger.warn(
+        JSON.stringify({
+          event: 'transcription.reused_failed',
+          transcriptionId: transcription.id,
+          trackId: dto.trackId,
+          errorCode: transcription.errorCode,
+        }),
+      );
+    if (transcription.status === TranscriptionStatus.FAILED)
       return this.toResponse(transcription, null, false);
-    if (transcription.status === TranscriptionStatus.COMPLETED)
+    if (transcription.status === TranscriptionStatus.COMPLETED) {
+      this.logger.log(
+        JSON.stringify({
+          event: 'transcription.cache_hit',
+          transcriptionId: transcription.id,
+          trackId: dto.trackId,
+        }),
+      );
       return this.toResponse(transcription, null, true);
+    }
 
     const jobId = buildTranscriptionJobId(
       dto.trackId,
@@ -122,13 +149,44 @@ export class TranscriptionsService {
             removeOnFail: { age: 86_400, count: 500 },
           },
         );
-      } catch {
+        this.logger.log(
+          JSON.stringify({
+            event: 'transcription.enqueued',
+            transcriptionId: transcription.id,
+            trackId: dto.trackId,
+            jobId,
+          }),
+        );
+      } catch (error) {
+        this.logger.error(
+          JSON.stringify({
+            event: 'transcription.enqueue_failed',
+            transcriptionId: transcription.id,
+            trackId: dto.trackId,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
         throw new ServiceUnavailableException({
           code: 'REDIS_UNAVAILABLE',
           message: 'Transcription queue is unavailable',
         });
       }
+    } else {
+      const jobState =
+        typeof existingJob.getState === 'function'
+          ? await existingJob.getState()
+          : 'unknown';
+      this.logger.log(
+        JSON.stringify({
+          event: 'transcription.job_reused',
+          transcriptionId: transcription.id,
+          trackId: dto.trackId,
+          jobId,
+          jobState,
+        }),
+      );
     }
+    await this.logQueueDiagnostics(transcription.id);
     if (created)
       this.events.emit({
         type: 'transcription.pending',
@@ -228,7 +286,81 @@ export class TranscriptionsService {
       },
       { jobId, attempts: 1, removeOnComplete: true },
     );
+    this.logger.log(
+      JSON.stringify({
+        event: 'transcription.retry_enqueued',
+        transcriptionId: id,
+        trackId: item.trackId,
+        jobId,
+      }),
+    );
+    await this.logQueueDiagnostics(id);
     return this.toResponse(reset, jobId, false);
+  }
+
+  async diagnostics(): Promise<Record<string, unknown>> {
+    const diagnosticQueue = this.queue as Queue<TranscriptionJobData> & {
+      getJobCounts?: Queue<TranscriptionJobData>['getJobCounts'];
+      getWorkers?: Queue<TranscriptionJobData>['getWorkers'];
+    };
+    if (
+      typeof diagnosticQueue.getJobCounts !== 'function' ||
+      typeof diagnosticQueue.getWorkers !== 'function'
+    ) {
+      return {
+        queue: TRANSCRIPTION_QUEUE,
+        available: false,
+        workerCount: null,
+        checkedAt: new Date().toISOString(),
+      };
+    }
+    const [counts, workers] = await Promise.all([
+      diagnosticQueue.getJobCounts(
+        'waiting',
+        'active',
+        'delayed',
+        'completed',
+        'failed',
+        'paused',
+      ),
+      diagnosticQueue.getWorkers(),
+    ]);
+    return {
+      queue: TRANSCRIPTION_QUEUE,
+      counts,
+      workerCount: workers.length,
+      workers: workers.map((worker) => ({
+        id: worker.id,
+        name: worker.name,
+        addr: worker.addr,
+      })),
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  private async logQueueDiagnostics(transcriptionId: string): Promise<void> {
+    try {
+      const diagnostics = await this.diagnostics();
+      const workerCount =
+        typeof diagnostics.workerCount === 'number'
+          ? diagnostics.workerCount
+          : null;
+      const payload = JSON.stringify({
+        event: 'transcription.queue_diagnostics',
+        transcriptionId,
+        ...diagnostics,
+      });
+      if (workerCount === 0) this.logger.warn(payload);
+      else this.logger.log(payload);
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: 'transcription.queue_diagnostics_failed',
+          transcriptionId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
   }
 
   private async requireOne(id: string): Promise<Transcription> {

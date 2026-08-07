@@ -32,6 +32,11 @@ export class TranscriptionsController {
     return this.service.createOrGet(dto);
   }
 
+  @Get('diagnostics/queue')
+  diagnostics() {
+    return this.service.diagnostics();
+  }
+
   @Get(':id')
   get(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.get(id);
