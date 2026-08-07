@@ -15,8 +15,19 @@ export class PrismaService
       );
     }
 
+    const databaseTimeoutMs = Number(
+      process.env.TRANSCRIPTION_DATABASE_TIMEOUT_MS ?? 15_000,
+    );
     super({
-      adapter: new PrismaPg({ connectionString: databaseUrl }),
+      adapter: new PrismaPg({
+        connectionString: databaseUrl,
+        max: Number(process.env.DATABASE_POOL_MAX ?? 5),
+        connectionTimeoutMillis: databaseTimeoutMs,
+        idleTimeoutMillis: 30_000,
+        query_timeout: databaseTimeoutMs,
+        statement_timeout: databaseTimeoutMs,
+        keepAlive: true,
+      }),
     });
   }
 

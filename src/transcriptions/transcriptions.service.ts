@@ -129,25 +129,31 @@ export class TranscriptionsService {
       dto.model,
       this.engineVersion,
     );
-    const existingJob = await this.queue.getJob(jobId);
+    const existingJob = await this.queueOperation(
+      'getJob',
+      this.queue.getJob(jobId),
+    );
     if (!existingJob) {
       try {
-        await this.queue.add(
-          TRANSCRIPTION_JOB,
-          {
-            transcriptionId: transcription.id,
-            trackId: dto.trackId,
-            audioUrl: dto.audioUrl,
-            language: dto.language,
-            model: dto.model,
-          },
-          {
-            jobId,
-            attempts: this.numberConfig('TRANSCRIPTION_ATTEMPTS', 3),
-            backoff: { type: 'exponential', delay: 5_000 },
-            removeOnComplete: { age: 3600, count: 100 },
-            removeOnFail: { age: 86_400, count: 500 },
-          },
+        await this.queueOperation(
+          'add',
+          this.queue.add(
+            TRANSCRIPTION_JOB,
+            {
+              transcriptionId: transcription.id,
+              trackId: dto.trackId,
+              audioUrl: dto.audioUrl,
+              language: dto.language,
+              model: dto.model,
+            },
+            {
+              jobId,
+              attempts: this.numberConfig('TRANSCRIPTION_ATTEMPTS', 3),
+              backoff: { type: 'exponential', delay: 5_000 },
+              removeOnComplete: { age: 3600, count: 100 },
+              removeOnFail: { age: 86_400, count: 500 },
+            },
+          ),
         );
         this.logger.log(
           JSON.stringify({
@@ -406,5 +412,41 @@ export class TranscriptionsService {
   private numberConfig(key: string, fallback: number): number {
     const value = Number(this.config.get(key));
     return Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  private async queueOperation<T>(
+    operation: string,
+    promise: Promise<T>,
+  ): Promise<T> {
+    const timeoutMs = this.numberConfig(
+      'TRANSCRIPTION_QUEUE_TIMEOUT_MS',
+      10_000,
+    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`Redis ${operation} timed out`)),
+            timeoutMs,
+          );
+        }),
+      ]);
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: 'transcription.queue_operation_failed',
+          operation,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      throw new ServiceUnavailableException({
+        code: 'REDIS_UNAVAILABLE',
+        message: 'Transcription queue is unavailable',
+      });
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 }
