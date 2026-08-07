@@ -3,6 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import Redis, { RedisOptions } from 'ioredis';
 import { Observable } from 'rxjs';
 import type { TranscriptionEvent } from './entities/transcription.types';
+import {
+  getRedisConnectionSummary,
+  getRedisOptions,
+} from '../common/redis-config';
 
 @Injectable()
 export class TranscriptionEvents implements OnModuleDestroy {
@@ -11,15 +15,13 @@ export class TranscriptionEvents implements OnModuleDestroy {
   private readonly options: RedisOptions;
 
   constructor(config: ConfigService) {
-    this.options = {
-      host: config.get<string>('REDIS_HOST') ?? 'localhost',
-      port: Number(config.get('REDIS_PORT') ?? 6379),
-      username: config.get<string>('REDIS_USERNAME') || undefined,
-      password: config.get<string>('REDIS_PASSWORD') || undefined,
-      tls: config.get<string>('REDIS_TLS') === 'true' ? {} : undefined,
-      maxRetriesPerRequest: null,
-      lazyConnect: true,
-    };
+    this.options = getRedisOptions(config);
+    this.logger.log(
+      JSON.stringify({
+        event: 'redis.configuration',
+        ...getRedisConnectionSummary(this.options),
+      }),
+    );
     this.publisher = new Redis(this.options);
     this.publisher.on('error', (error) =>
       this.logger.error(

@@ -54,6 +54,15 @@ export class TranscriptionsService {
     this.engineVersion =
       this.config.get<string>('WHISPER_ENGINE_VERSION') ??
       DEFAULT_ENGINE_VERSION;
+    if (typeof this.queue.on === 'function')
+      this.queue.on('error', (error) =>
+        this.logger.error(
+          JSON.stringify({
+            event: 'transcription.queue_error',
+            error: error.message,
+          }),
+        ),
+      );
   }
 
   async createOrGet(
@@ -321,15 +330,18 @@ export class TranscriptionsService {
       };
     }
     const [counts, workers] = await Promise.all([
-      diagnosticQueue.getJobCounts(
-        'waiting',
-        'active',
-        'delayed',
-        'completed',
-        'failed',
-        'paused',
+      this.queueOperation(
+        'diagnosticJobCounts',
+        diagnosticQueue.getJobCounts(
+          'waiting',
+          'active',
+          'delayed',
+          'completed',
+          'failed',
+          'paused',
+        ),
       ),
-      diagnosticQueue.getWorkers(),
+      this.queueOperation('diagnosticWorkers', diagnosticQueue.getWorkers()),
     ]);
     return {
       queue: TRANSCRIPTION_QUEUE,

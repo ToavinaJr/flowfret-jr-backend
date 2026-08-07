@@ -9,6 +9,7 @@ import { TranscriptionsProcessor } from './transcriptions.processor';
 import { TranscriptionsRepository } from './transcriptions.repository';
 import { WhisperBridgeService } from './whisper-bridge.service';
 import { validateEnvironment } from '../common/validate-environment';
+import { getRedisOptions } from '../common/redis-config';
 
 @Module({
   imports: [
@@ -27,14 +28,7 @@ import { validateEnvironment } from '../common/validate-environment';
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        connection: {
-          host: config.get<string>('REDIS_HOST') ?? 'localhost',
-          port: Number(config.get('REDIS_PORT') ?? 6379),
-          username: config.get<string>('REDIS_USERNAME') || undefined,
-          password: config.get<string>('REDIS_PASSWORD') || undefined,
-          tls: config.get<string>('REDIS_TLS') === 'true' ? {} : undefined,
-          maxRetriesPerRequest: null,
-        },
+        connection: getRedisOptions(config),
       }),
     }),
     BullModule.registerQueue({ name: TRANSCRIPTION_QUEUE }),

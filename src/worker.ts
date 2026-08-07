@@ -9,6 +9,9 @@ async function bootstrap(): Promise<void> {
       event: 'worker.starting',
       nodeEnv: process.env.NODE_ENV,
       redisHostConfigured: Boolean(process.env.REDIS_HOST),
+      redisUrlConfigured: Boolean(
+        process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL,
+      ),
       databaseConfigured: Boolean(process.env.DATABASE_URL),
       audiusConfigured: Boolean(process.env.AUDIUS_ACCESS_TOKEN),
       model: process.env.WHISPER_MODEL ?? 'small',
