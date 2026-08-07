@@ -171,22 +171,64 @@ export class SpotifyService {
 
     const status = error.response?.status;
     const retryAfter = this.readRetryAfterHeader(error.response?.headers);
+    const spotifyDetail = this.readSpotifyErrorDetail(error.response?.data);
+    const detailSuffix = spotifyDetail ? ` detail="${spotifyDetail}"` : '';
 
     if (status === 401) {
+      this.logger.error(
+        `Spotify authentication failed (status=401)${detailSuffix}`,
+      );
       return new UnauthorizedException('Spotify authentication failed');
     }
 
     if (status === 429) {
       const suffix = retryAfter ? ` Retry after ${retryAfter}s.` : '';
-      this.logger.warn(`Spotify rate limited.${suffix}`);
+      this.logger.warn(`Spotify rate limited.${suffix}${detailSuffix}`);
       return new HttpException(
         `Spotify rate limit exceeded.${suffix}`,
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
 
-    this.logger.error(`${fallbackMessage} (status=${status ?? 'network'})`);
+    this.logger.error(
+      `${fallbackMessage} (status=${status ?? 'network'})${detailSuffix}`,
+    );
     return new BadGatewayException(fallbackMessage);
+  }
+
+  private readSpotifyErrorDetail(data: unknown): string | undefined {
+    if (!data || typeof data !== 'object') {
+      return undefined;
+    }
+
+    const body = data as Record<string, unknown>;
+    const apiError = body.error;
+
+    if (apiError && typeof apiError === 'object') {
+      const err = apiError as Record<string, unknown>;
+      const parts: string[] = [];
+
+      if (typeof err.message === 'string') {
+        parts.push(err.message);
+      }
+      if (typeof err.reason === 'string') {
+        parts.push(`reason=${err.reason}`);
+      }
+
+      if (parts.length > 0) {
+        return parts.join(', ');
+      }
+    }
+
+    if (typeof body.error === 'string') {
+      const parts = [body.error];
+      if (typeof body.error_description === 'string') {
+        parts.push(body.error_description);
+      }
+      return parts.join(': ');
+    }
+
+    return undefined;
   }
 
   private readRetryAfterHeader(headers: unknown): string | undefined {

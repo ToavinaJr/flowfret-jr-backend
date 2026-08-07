@@ -50,3 +50,18 @@ export interface CachedSpotifyToken {
   accessToken: string;
   expiresAtMs: number;
 }
+
+export interface SpotifyApiErrorBody {
+  status: number;
+  message: string;
+  reason?: string;
+}
+
+export interface SpotifyApiErrorResponse {
+  error: SpotifyApiErrorBody;
+}
+
+export interface SpotifyOAuthErrorResponse {
+  error: string;
+  error_description?: string;
+}
