@@ -6,6 +6,8 @@ import {
   LoginInput,
   RegisterInput,
   RegisterPendingPayload,
+  RequestPasswordResetInput,
+  ResetPasswordInput,
   VerifyEmailInput,
 } from '../graphql/graphql.types';
 import { AuthService } from './auth.service';
@@ -85,5 +87,23 @@ export class AuthResolver {
     @Args('token') token: string,
   ): Promise<RegisterPendingPayload> {
     return this.authService.resendVerificationEmail(token);
+  }
+
+  @Public()
+  @Mutation(() => Boolean)
+  async requestPasswordReset(
+    @Args('data') data: RequestPasswordResetInput,
+  ): Promise<boolean> {
+    await this.authService.requestPasswordReset(data.email);
+    return true;
+  }
+
+  @Public()
+  @Mutation(() => Boolean)
+  async resetPassword(
+    @Args('data') data: ResetPasswordInput,
+  ): Promise<boolean> {
+    await this.authService.resetPassword(data.token, data.password);
+    return true;
   }
 }

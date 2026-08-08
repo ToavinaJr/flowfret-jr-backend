@@ -10,6 +10,13 @@ interface OtpEmailPayload {
   expiresInMinutes: number;
 }
 
+interface PasswordResetEmailPayload {
+  to: string;
+  username: string;
+  resetLink: string;
+  expiresInMinutes: number;
+}
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -71,6 +78,45 @@ export class MailService {
     if (!this.isConfigured) {
       this.logger.log(
         `[DEV OTP] to=${payload.to} code=${payload.otpCode} link=${payload.verificationLink}`,
+      );
+      return;
+    }
+
+    await sgMail.send({
+      to: payload.to,
+      from: this.fromEmail,
+      subject,
+      text,
+      html,
+    });
+  }
+
+  async sendPasswordResetEmail(
+    payload: PasswordResetEmailPayload,
+  ): Promise<void> {
+    const subject = 'FretFlow — Réinitialisez votre mot de passe';
+    const text = [
+      `Bonjour ${payload.username},`,
+      '',
+      'Vous avez demandé la réinitialisation de votre mot de passe.',
+      `Ouvrez ce lien dans les ${payload.expiresInMinutes} prochaines minutes :`,
+      payload.resetLink,
+      '',
+      "Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.",
+    ].join('\n');
+    const html = `
+      <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2>FretFlow</h2>
+        <p>Bonjour <strong>${payload.username}</strong>,</p>
+        <p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
+        <p><a href="${payload.resetLink}" style="display:inline-block;padding:12px 20px;background:#e11d48;color:#fff;text-decoration:none;border-radius:8px;">Choisir un nouveau mot de passe</a></p>
+        <p>Ce lien expire dans ${payload.expiresInMinutes} minutes.</p>
+        <p style="color:#666;font-size:13px;">Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.</p>
+      </div>`;
+
+    if (!this.isConfigured) {
+      this.logger.log(
+        `[DEV PASSWORD RESET] to=${payload.to} link=${payload.resetLink}`,
       );
       return;
     }

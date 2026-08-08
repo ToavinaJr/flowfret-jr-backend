@@ -852,6 +852,29 @@ export class GoogleAuthInput {
   accessToken!: string;
 }
 
+@InputType()
+export class RequestPasswordResetInput {
+  @Field()
+  @IsEmail()
+  @MaxLength(255)
+  email!: string;
+}
+
+@InputType()
+export class ResetPasswordInput {
+  @Field()
+  @IsString()
+  @MinLength(64)
+  @MaxLength(64)
+  token!: string;
+
+  @Field()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  password!: string;
+}
+
 @ObjectType()
 export class AuthPayload {
   @Field()

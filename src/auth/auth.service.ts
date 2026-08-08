@@ -3,12 +3,13 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { UserStatus } from '@prisma/client';
-import { randomBytes, randomInt } from 'crypto';
+import { createHash, randomBytes, randomInt } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -21,10 +22,12 @@ import {
   UserModel,
   VerifyEmailInput,
 } from '../graphql/graphql.types';
+import { errorDetails } from '../common/debug';
 
 const OTP_LENGTH = 4;
 const OTP_TTL_MINUTES = 15;
 const TOKEN_BYTES = 32;
+const PASSWORD_RESET_TTL_MINUTES = 60;
 
 interface GoogleUserInfo {
   sub: string;
@@ -37,6 +40,8 @@ interface GoogleUserInfo {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -254,6 +259,82 @@ export class AuthService {
       expiresAt: verification.expiresAt,
       message: 'Un nouveau code OTP a été envoyé par e-mail.',
     };
+  }
+
+  async requestPasswordReset(rawEmail: string): Promise<void> {
+    const email = rawEmail.trim().toLowerCase();
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    });
+
+    // Always return the same response to avoid revealing registered addresses.
+    if (!user || !user.passwordHash) return;
+
+    const token = randomBytes(TOKEN_BYTES).toString('hex');
+    const tokenHash = this.hashResetToken(token);
+    const expiresAt = new Date(
+      Date.now() + PASSWORD_RESET_TTL_MINUTES * 60 * 1000,
+    );
+
+    await this.prisma.$transaction([
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.passwordResetToken.create({
+        data: { userId: user.id, tokenHash, expiresAt },
+      }),
+    ]);
+
+    const appUrl =
+      this.configService.get<string>('APP_URL') ?? 'http://localhost:5173';
+    const resetLink = `${appUrl.replace(/\/$/, '')}/reset-password?token=${token}`;
+
+    try {
+      await this.mailService.sendPasswordResetEmail({
+        to: user.email,
+        username: user.username,
+        resetLink,
+        expiresInMinutes: PASSWORD_RESET_TTL_MINUTES,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Unable to send password reset email for user ${user.id}`,
+        errorDetails(error),
+      );
+    }
+  }
+
+  async resetPassword(token: string, password: string): Promise<void> {
+    const tokenHash = this.hashResetToken(token);
+    const record = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!record || record.usedAt || record.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('Invalid or expired password reset link.');
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const usedAt = new Date();
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: { passwordHash },
+      }),
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId: record.userId, usedAt: null },
+        data: { usedAt },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: usedAt },
+      }),
+    ]);
+  }
+
+  private hashResetToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 
   private async fetchGoogleProfile(
