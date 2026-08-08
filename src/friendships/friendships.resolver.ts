@@ -20,12 +20,12 @@ export class FriendshipsResolver {
 
   @Query(() => [FriendshipModel], { name: 'friendships' })
   async friendships(): Promise<FriendshipModel[]> {
-    return this.prisma.friendship.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.prisma.friendship.findMany({ where: { isDeleted: false }, orderBy: { createdAt: 'desc' } });
   }
 
   @Query(() => FriendshipModel, { name: 'friendship', nullable: true })
   async friendship(@Args('id') id: string): Promise<FriendshipModel | null> {
-    return this.prisma.friendship.findUnique({ where: { id } });
+    return this.prisma.friendship.findFirst({ where: { id, isDeleted: false } });
   }
 
   @Mutation(() => FriendshipModel)
@@ -45,7 +45,7 @@ export class FriendshipsResolver {
 
   @Mutation(() => FriendshipModel)
   async deleteFriendship(@Args('id') id: string): Promise<FriendshipModel> {
-    return this.prisma.friendship.delete({ where: { id } });
+    return this.prisma.friendship.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
   }
 
   @ResolveField(() => UserModel, { name: 'requester' })

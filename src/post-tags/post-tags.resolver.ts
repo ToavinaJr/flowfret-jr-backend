@@ -48,8 +48,9 @@ export class PostTagsResolver {
     @Args('postId') postId: string,
     @Args('tagId') tagId: string,
   ): Promise<PostTagModel> {
-    return this.prisma.postTag.delete({
+    return this.prisma.postTag.update({
       where: { postId_tagId: { postId, tagId } },
+      data: { isDeleted: true, deletedAt: new Date() },
     });
   }
 

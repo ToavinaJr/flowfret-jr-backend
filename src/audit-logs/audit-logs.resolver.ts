@@ -20,12 +20,12 @@ export class AuditLogsResolver {
 
   @Query(() => [AuditLogModel], { name: 'auditLogs' })
   async auditLogs(): Promise<AuditLogModel[]> {
-    return this.prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.prisma.auditLog.findMany({ where: { isDeleted: false }, orderBy: { createdAt: 'desc' } });
   }
 
   @Query(() => AuditLogModel, { name: 'auditLog', nullable: true })
   async auditLog(@Args('id') id: string): Promise<AuditLogModel | null> {
-    return this.prisma.auditLog.findUnique({ where: { id } });
+    return this.prisma.auditLog.findFirst({ where: { id, isDeleted: false } });
   }
 
   @Mutation(() => AuditLogModel)
@@ -45,7 +45,7 @@ export class AuditLogsResolver {
 
   @Mutation(() => AuditLogModel)
   async deleteAuditLog(@Args('id') id: string): Promise<AuditLogModel> {
-    return this.prisma.auditLog.delete({ where: { id } });
+    return this.prisma.auditLog.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
   }
 
   @ResolveField(() => UserModel, { name: 'actor' })

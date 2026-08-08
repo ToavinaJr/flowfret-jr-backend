@@ -1,11 +1,13 @@
 import {
   Args,
+  Context,
   Mutation,
   Parent,
   ResolveField,
   Resolver,
   Query,
 } from '@nestjs/graphql';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import {
   CommentModel,
   CreatePostInput,
@@ -25,30 +27,39 @@ export class PostsResolver {
 
   @Query(() => [PostModel], { name: 'posts' })
   async posts(): Promise<PostModel[]> {
-    return this.prisma.post.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.prisma.post.findMany({ where: { isDeleted: false }, orderBy: { createdAt: 'desc' } });
   }
 
   @Query(() => PostModel, { name: 'post', nullable: true })
   async post(@Args('id') id: string): Promise<PostModel | null> {
-    return this.prisma.post.findUnique({ where: { id } });
+    return this.prisma.post.findFirst({ where: { id, isDeleted: false } });
   }
 
   @Mutation(() => PostModel)
-  async createPost(@Args('data') data: CreatePostInput): Promise<PostModel> {
-    return this.prisma.post.create({ data });
+  async createPost(@Args('data') data: CreatePostInput, @Context() context: { req: { user: { sub: string } } }): Promise<PostModel> {
+    if (data.authorId !== context.req.user.sub) throw new ForbiddenException('Vous ne pouvez publier qu’en votre nom.');
+    return this.prisma.post.create({ data: { ...data, authorId: context.req.user.sub } });
   }
 
   @Mutation(() => PostModel)
   async updatePost(
     @Args('id') id: string,
     @Args('data') data: UpdatePostInput,
+    @Context() context: { req: { user: { sub: string } } },
   ): Promise<PostModel> {
-    return this.prisma.post.update({ where: { id }, data });
+    const post = await this.prisma.post.findFirst({ where: { id, isDeleted: false } });
+    if (!post) throw new NotFoundException('Publication introuvable.');
+    if (post.authorId !== context.req.user.sub) throw new ForbiddenException('Seul le propriétaire peut modifier cette publication.');
+    const { authorId: _authorId, ...safeData } = data;
+    return this.prisma.post.update({ where: { id }, data: safeData });
   }
 
   @Mutation(() => PostModel)
-  async deletePost(@Args('id') id: string): Promise<PostModel> {
-    return this.prisma.post.delete({ where: { id } });
+  async deletePost(@Args('id') id: string, @Context() context: { req: { user: { sub: string } } }): Promise<PostModel> {
+    const post = await this.prisma.post.findFirst({ where: { id, isDeleted: false } });
+    if (!post) throw new NotFoundException('Publication introuvable.');
+    if (post.authorId !== context.req.user.sub) throw new ForbiddenException('Seul le propriétaire peut supprimer cette publication.');
+    return this.prisma.post.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' } });
   }
 
   @ResolveField(() => UserModel, { name: 'author' })
@@ -59,7 +70,7 @@ export class PostsResolver {
   @ResolveField(() => [CommentModel], { name: 'comments' })
   async comments(@Parent() post: PostModel): Promise<CommentModel[]> {
     return this.prisma.comment.findMany({
-      where: { postId: post.id },
+      where: { postId: post.id, isDeleted: false },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -67,7 +78,7 @@ export class PostsResolver {
   @ResolveField(() => [PostLikeModel], { name: 'likes' })
   async likes(@Parent() post: PostModel): Promise<PostLikeModel[]> {
     return this.prisma.postLike.findMany({
-      where: { postId: post.id },
+      where: { postId: post.id, isDeleted: false },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -75,7 +86,7 @@ export class PostsResolver {
   @ResolveField(() => [PostReportModel], { name: 'reports' })
   async reports(@Parent() post: PostModel): Promise<PostReportModel[]> {
     return this.prisma.postReport.findMany({
-      where: { postId: post.id },
+      where: { postId: post.id, isDeleted: false },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -83,13 +94,13 @@ export class PostsResolver {
   @ResolveField(() => [PostAttachmentModel], { name: 'attachments' })
   async attachments(@Parent() post: PostModel): Promise<PostAttachmentModel[]> {
     return this.prisma.postAttachment.findMany({
-      where: { postId: post.id },
+      where: { postId: post.id, isDeleted: false },
       orderBy: { position: 'asc' },
     });
   }
 
   @ResolveField(() => [PostTagModel], { name: 'tags' })
   async tags(@Parent() post: PostModel): Promise<PostTagModel[]> {
-    return this.prisma.postTag.findMany({ where: { postId: post.id } });
+    return this.prisma.postTag.findMany({ where: { postId: post.id, isDeleted: false } });
   }
 }

@@ -30,12 +30,12 @@ export class UsersResolver {
 
   @Query(() => [UserModel], { name: 'users' })
   async users(): Promise<UserModel[]> {
-    return this.prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.prisma.user.findMany({ where: { isDeleted: false }, orderBy: { createdAt: 'desc' } });
   }
 
   @Query(() => UserModel, { name: 'user', nullable: true })
   async user(@Args('id') id: string): Promise<UserModel | null> {
-    return this.prisma.user.findUnique({ where: { id } });
+    return this.prisma.user.findFirst({ where: { id, isDeleted: false } });
   }
 
   @Mutation(() => UserModel)
@@ -53,7 +53,7 @@ export class UsersResolver {
 
   @Mutation(() => UserModel)
   async deleteUser(@Args('id') id: string): Promise<UserModel> {
-    return this.prisma.user.delete({ where: { id } });
+    return this.prisma.user.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' } });
   }
 
   @ResolveField(() => ProfileModel, { name: 'profile', nullable: true })

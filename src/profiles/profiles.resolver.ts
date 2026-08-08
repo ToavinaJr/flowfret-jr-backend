@@ -20,12 +20,12 @@ export class ProfilesResolver {
 
   @Query(() => [ProfileModel], { name: 'profiles' })
   async profiles(): Promise<ProfileModel[]> {
-    return this.prisma.profile.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.prisma.profile.findMany({ where: { isDeleted: false }, orderBy: { createdAt: 'desc' } });
   }
 
   @Query(() => ProfileModel, { name: 'profile', nullable: true })
   async profile(@Args('id') id: string): Promise<ProfileModel | null> {
-    return this.prisma.profile.findUnique({ where: { id } });
+    return this.prisma.profile.findFirst({ where: { id, isDeleted: false } });
   }
 
   @Query(() => ProfileModel, { name: 'profileByUserId', nullable: true })
@@ -52,7 +52,7 @@ export class ProfilesResolver {
 
   @Mutation(() => ProfileModel)
   async deleteProfile(@Args('id') id: string): Promise<ProfileModel> {
-    return this.prisma.profile.delete({ where: { id } });
+    return this.prisma.profile.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
   }
 
   @ResolveField(() => UserModel, { name: 'user' })

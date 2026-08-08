@@ -28,22 +28,22 @@ export class PostInteractionsResolver {
 
   @Query(() => [PostLikeModel], { name: 'postLikes' })
   async postLikes(): Promise<PostLikeModel[]> {
-    return this.prisma.postLike.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.prisma.postLike.findMany({ where: { isDeleted: false }, orderBy: { createdAt: 'desc' } });
   }
 
   @Query(() => PostLikeModel, { name: 'postLike', nullable: true })
   async postLike(@Args('id') id: string): Promise<PostLikeModel | null> {
-    return this.prisma.postLike.findUnique({ where: { id } });
+    return this.prisma.postLike.findFirst({ where: { id, isDeleted: false } });
   }
 
   @Query(() => [PostReportModel], { name: 'postReports' })
   async postReports(): Promise<PostReportModel[]> {
-    return this.prisma.postReport.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.prisma.postReport.findMany({ where: { isDeleted: false }, orderBy: { createdAt: 'desc' } });
   }
 
   @Query(() => PostReportModel, { name: 'postReport', nullable: true })
   async postReport(@Args('id') id: string): Promise<PostReportModel | null> {
-    return this.prisma.postReport.findUnique({ where: { id } });
+    return this.prisma.postReport.findFirst({ where: { id, isDeleted: false } });
   }
 
   @Query(() => [PostAttachmentModel], { name: 'postAttachments' })
@@ -57,7 +57,7 @@ export class PostInteractionsResolver {
   async postAttachment(
     @Args('id') id: string,
   ): Promise<PostAttachmentModel | null> {
-    return this.prisma.postAttachment.findUnique({ where: { id } });
+    return this.prisma.postAttachment.findFirst({ where: { id, isDeleted: false } });
   }
 
   @Mutation(() => PostLikeModel)
@@ -77,7 +77,7 @@ export class PostInteractionsResolver {
 
   @Mutation(() => PostLikeModel)
   async deletePostLike(@Args('id') id: string): Promise<PostLikeModel> {
-    return this.prisma.postLike.delete({ where: { id } });
+    return this.prisma.postLike.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
   }
 
   @Mutation(() => PostReportModel)
@@ -97,7 +97,7 @@ export class PostInteractionsResolver {
 
   @Mutation(() => PostReportModel)
   async deletePostReport(@Args('id') id: string): Promise<PostReportModel> {
-    return this.prisma.postReport.delete({ where: { id } });
+    return this.prisma.postReport.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
   }
 
   @Mutation(() => PostAttachmentModel)
@@ -119,7 +119,7 @@ export class PostInteractionsResolver {
   async deletePostAttachment(
     @Args('id') id: string,
   ): Promise<PostAttachmentModel> {
-    return this.prisma.postAttachment.delete({ where: { id } });
+    return this.prisma.postAttachment.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
   }
 
   @ResolveField(() => PostModel, { name: 'post' })

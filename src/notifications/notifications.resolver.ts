@@ -29,7 +29,7 @@ export class NotificationsResolver {
   async notification(
     @Args('id') id: string,
   ): Promise<NotificationModel | null> {
-    return this.prisma.notification.findUnique({ where: { id } });
+    return this.prisma.notification.findFirst({ where: { id, isDeleted: false } });
   }
 
   @Mutation(() => NotificationModel)
@@ -49,7 +49,7 @@ export class NotificationsResolver {
 
   @Mutation(() => NotificationModel)
   async deleteNotification(@Args('id') id: string): Promise<NotificationModel> {
-    return this.prisma.notification.delete({ where: { id } });
+    return this.prisma.notification.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
   }
 
   @ResolveField(() => UserModel, { name: 'user' })

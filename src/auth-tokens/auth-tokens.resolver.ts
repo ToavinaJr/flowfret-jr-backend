@@ -69,7 +69,7 @@ export class AuthTokensResolver {
 
   @Mutation(() => RefreshTokenModel)
   async deleteRefreshToken(@Args('id') id: string): Promise<RefreshTokenModel> {
-    return this.prisma.refreshToken.delete({ where: { id } });
+    return this.prisma.refreshToken.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
   }
 
   @Mutation(() => PasswordResetTokenModel)
@@ -91,7 +91,7 @@ export class AuthTokensResolver {
   async deletePasswordResetToken(
     @Args('id') id: string,
   ): Promise<PasswordResetTokenModel> {
-    return this.prisma.passwordResetToken.delete({ where: { id } });
+    return this.prisma.passwordResetToken.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
   }
 
   @ResolveField(() => UserModel, { name: 'user' })
