@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Args, Mutation, Resolver } from '@nestjs/graphql';
 import {
   AuthPayload,
@@ -9,9 +10,12 @@ import {
 } from '../graphql/graphql.types';
 import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
+import { errorDetails, isDebugEnabled } from '../common/debug';
 
 @Resolver()
 export class AuthResolver {
+  private readonly logger = new Logger(AuthResolver.name);
+
   constructor(private readonly authService: AuthService) {}
 
   @Public()
@@ -19,7 +23,38 @@ export class AuthResolver {
   async register(
     @Args('data') data: RegisterInput,
   ): Promise<RegisterPendingPayload> {
-    return this.authService.register(data);
+    const startedAt = Date.now();
+    const details = { email: data.email, username: data.username };
+    if (isDebugEnabled()) {
+      this.logger.debug(
+        JSON.stringify({ event: 'register.started', ...details }),
+      );
+    }
+    try {
+      const result = await this.authService.register(data);
+      if (isDebugEnabled()) {
+        this.logger.debug(
+          JSON.stringify({
+            event: 'register.completed',
+            ...details,
+            durationMs: Date.now() - startedAt,
+          }),
+        );
+      }
+      return result;
+    } catch (error) {
+      if (isDebugEnabled()) {
+        this.logger.error(
+          JSON.stringify({
+            event: 'register.failed',
+            ...details,
+            durationMs: Date.now() - startedAt,
+          }),
+          errorDetails(error),
+        );
+      }
+      throw error;
+    }
   }
 
   @Public()

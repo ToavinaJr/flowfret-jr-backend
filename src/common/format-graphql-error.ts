@@ -1,5 +1,6 @@
 import type { GraphQLFormattedError } from 'graphql';
 import { HttpException, Logger } from '@nestjs/common';
+import { errorDetails, isDebugEnabled } from './debug';
 
 const logger = new Logger('GraphQLFormatError');
 
@@ -45,6 +46,18 @@ export function formatGraphQLError(
   error: unknown,
 ): GraphQLFormattedError {
   const original = getOriginalException(error);
+
+  if (isDebugEnabled()) {
+    logger.error(
+      JSON.stringify({
+        event: 'graphql.request_failed',
+        message: formattedError.message,
+        path: formattedError.path,
+        code: formattedError.extensions?.code,
+      }),
+      errorDetails(original),
+    );
+  }
 
   if (isHttpException(original)) {
     const response = original.getResponse();
