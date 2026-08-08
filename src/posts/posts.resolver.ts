@@ -57,6 +57,11 @@ export class PostsResolver {
     if (!post) throw new NotFoundException('Publication introuvable.');
     if (post.authorId !== context.req.user.sub) throw new ForbiddenException('Seul le propriétaire peut modifier cette publication.');
     const { authorId: _authorId, imageUploadIds: _imageUploadIds, ...safeData } = data;
+    if (safeData.content !== undefined && !safeData.content?.trim()) {
+      const imageCount = await this.prisma.postAttachment.count({ where: { postId: id, kind: 'IMAGE', isDeleted: false } });
+      if (imageCount === 0) throw new BadRequestException('Une publication doit contenir du texte ou une image.');
+      safeData.content = null;
+    }
     return this.prisma.post.update({ where: { id }, data: safeData });
   }
 
