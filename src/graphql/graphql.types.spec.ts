@@ -2,6 +2,7 @@ import { validate } from 'class-validator';
 import {
   GoogleAuthInput,
   LoginInput,
+  CreatePostInput,
   RegisterInput,
   VerifyEmailInput,
 } from './graphql.types';
@@ -48,5 +49,20 @@ describe('auth GraphQL input validation', () => {
     expect(errors.map((error) => error.property)).toEqual(
       expect.arrayContaining(['email', 'username', 'password']),
     );
+  });
+
+  it('accepts a valid post payload with the global whitelist enabled', async () => {
+    const input = Object.assign(new CreatePostInput(), {
+      authorId: 'd9428888-122b-11e1-b85c-61cd3cbb3210',
+      content: 'Mon nouveau morceau',
+    });
+
+    await expect(
+      validate(input, { whitelist: true, forbidNonWhitelisted: true }),
+    ).resolves.toEqual([]);
+    expect(input).toMatchObject({
+      authorId: 'd9428888-122b-11e1-b85c-61cd3cbb3210',
+      content: 'Mon nouveau morceau',
+    });
   });
 });
