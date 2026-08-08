@@ -52,7 +52,7 @@ export class CreatePostInput {
   @Field(() => [String], { nullable: true })
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(6)
+  @ArrayMaxSize(12)
   @IsUUID('4', { each: true })
   imageUploadIds?: string[];
 }

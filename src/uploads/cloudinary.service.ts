@@ -4,7 +4,7 @@ import { createHash } from 'crypto';
 import { getRequiredConfig } from '../common/required-config';
 
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-export const MAX_POST_IMAGES = 6;
+export const MAX_POST_IMAGES = 12;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 export interface UploadedImage { buffer: Buffer; mimetype: string; size: number; originalname: string }
 
