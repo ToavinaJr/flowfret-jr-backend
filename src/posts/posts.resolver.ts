@@ -7,7 +7,7 @@ import {
   Resolver,
   Query,
 } from '@nestjs/graphql';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import {
   CommentModel,
   CreatePostInput,
@@ -38,7 +38,13 @@ export class PostsResolver {
   @Mutation(() => PostModel)
   async createPost(@Args('data') data: CreatePostInput, @Context() context: { req: { user: { sub: string } } }): Promise<PostModel> {
     if (data.authorId !== context.req.user.sub) throw new ForbiddenException('Vous ne pouvez publier qu’en votre nom.');
-    return this.prisma.post.create({ data: { ...data, authorId: context.req.user.sub } });
+    const content = data.content?.trim() || null;
+    const imageUploadIds = data.imageUploadIds ?? [];
+    if (!content && imageUploadIds.length === 0) throw new BadRequestException('Ajoutez un texte ou au moins une image.');
+    const uploads = imageUploadIds.length ? await this.prisma.upload.findMany({ where: { id: { in: imageUploadIds }, userId: context.req.user.sub, isDeleted: false, fileType: { startsWith: 'image/' } } }) : [];
+    if (uploads.length !== imageUploadIds.length) throw new BadRequestException('Une ou plusieurs images sont invalides.');
+    const { imageUploadIds: _imageUploadIds, ...postData } = data;
+    return this.prisma.post.create({ data: { ...postData, content, authorId: context.req.user.sub, attachments: imageUploadIds.length ? { create: imageUploadIds.map((uploadId, position) => ({ uploadId, position, kind: 'IMAGE' })) } : undefined } });
   }
 
   @Mutation(() => PostModel)
@@ -50,7 +56,7 @@ export class PostsResolver {
     const post = await this.prisma.post.findFirst({ where: { id, isDeleted: false } });
     if (!post) throw new NotFoundException('Publication introuvable.');
     if (post.authorId !== context.req.user.sub) throw new ForbiddenException('Seul le propriétaire peut modifier cette publication.');
-    const { authorId: _authorId, ...safeData } = data;
+    const { authorId: _authorId, imageUploadIds: _imageUploadIds, ...safeData } = data;
     return this.prisma.post.update({ where: { id }, data: safeData });
   }
 

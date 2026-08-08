@@ -14,6 +14,8 @@ import {
 } from '@prisma/client';
 import {
   IsEnum,
+  ArrayMaxSize,
+  IsArray,
   IsOptional,
   IsString,
   IsUrl,
@@ -47,6 +49,12 @@ export class CreatePostInput {
   @IsOptional()
   @IsEnum(PostStatus)
   status?: PostStatus;
+  @Field(() => [String], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(6)
+  @IsUUID('4', { each: true })
+  imageUploadIds?: string[];
 }
 @InputType()
 export class UpdatePostInput extends PartialType(CreatePostInput) {}

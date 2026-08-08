@@ -1,11 +1,13 @@
 import {
   Args,
+  Context,
   Mutation,
   Parent,
   ResolveField,
   Query,
   Resolver,
 } from '@nestjs/graphql';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import {
   CreatePostAttachmentInput,
   CreatePostLikeInput,
@@ -63,8 +65,20 @@ export class PostInteractionsResolver {
   @Mutation(() => PostLikeModel)
   async createPostLike(
     @Args('data') data: CreatePostLikeInput,
+    @Context() context: { req: { user: { sub: string } } },
   ): Promise<PostLikeModel> {
-    return this.prisma.postLike.create({ data });
+    if (data.userId !== context.req.user.sub) throw new ForbiddenException('Action interdite.');
+    return this.prisma.$transaction(async (tx) => {
+      const post = await tx.post.findFirst({ where: { id: data.postId, isDeleted: false } });
+      if (!post) throw new NotFoundException('Publication introuvable.');
+      const previous = await tx.postLike.findUnique({ where: { postId_userId: { postId: data.postId, userId: context.req.user.sub } } });
+      if (previous && !previous.isDeleted) return previous;
+      const like = previous
+        ? await tx.postLike.update({ where: { id: previous.id }, data: { isDeleted: false, deletedAt: null } })
+        : await tx.postLike.create({ data: { postId: data.postId, userId: context.req.user.sub } });
+      await tx.post.update({ where: { id: data.postId }, data: { likeCount: { increment: 1 } } });
+      return like;
+    });
   }
 
   @Mutation(() => PostLikeModel)
@@ -76,8 +90,15 @@ export class PostInteractionsResolver {
   }
 
   @Mutation(() => PostLikeModel)
-  async deletePostLike(@Args('id') id: string): Promise<PostLikeModel> {
-    return this.prisma.postLike.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
+  async deletePostLike(@Args('id') id: string, @Context() context: { req: { user: { sub: string } } }): Promise<PostLikeModel> {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.postLike.findFirst({ where: { id, isDeleted: false } });
+      if (!existing) throw new NotFoundException('Like introuvable.');
+      if (existing.userId !== context.req.user.sub) throw new ForbiddenException('Action interdite.');
+      const like = await tx.postLike.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
+      await tx.post.updateMany({ where: { id: existing.postId, likeCount: { gt: 0 } }, data: { likeCount: { decrement: 1 } } });
+      return like;
+    });
   }
 
   @Mutation(() => PostReportModel)

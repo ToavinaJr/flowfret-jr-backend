@@ -7,6 +7,7 @@ import {
   Resolver,
   Query,
 } from '@nestjs/graphql';
+import { Int } from '@nestjs/graphql';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import {
   CommentModel,
@@ -29,6 +30,20 @@ export class CommentsResolver {
   @Query(() => CommentModel, { name: 'comment', nullable: true })
   async comment(@Args('id') id: string): Promise<CommentModel | null> {
     return this.prisma.comment.findFirst({ where: { id, isDeleted: false } });
+  }
+
+  @Query(() => [CommentModel], { name: 'commentsByPost' })
+  async commentsByPost(
+    @Args('postId') postId: string,
+    @Args('skip', { type: () => Int, defaultValue: 0 }) skip: number,
+    @Args('take', { type: () => Int, defaultValue: 20 }) take: number,
+  ): Promise<CommentModel[]> {
+    return this.prisma.comment.findMany({
+      where: { postId, isDeleted: false },
+      orderBy: { createdAt: 'desc' },
+      skip: Math.max(0, skip),
+      take: Math.min(50, Math.max(1, take)),
+    });
   }
 
   @Mutation(() => CommentModel)

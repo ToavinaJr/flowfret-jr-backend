@@ -26,6 +26,7 @@ import { formatGraphQLError } from './common/format-graphql-error';
 import { MusicModule } from './integrations/music/music.module';
 import { TranscriptionsModule } from './transcriptions/transcriptions.module';
 import { validateEnvironment } from './common/validate-environment';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { validateEnvironment } from './common/validate-environment';
     AuthModule,
     MusicModule,
     TranscriptionsModule,
+    UploadsModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: true,

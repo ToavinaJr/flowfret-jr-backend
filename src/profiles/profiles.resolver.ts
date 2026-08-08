@@ -1,11 +1,13 @@
 import {
   Args,
+  Context,
   Mutation,
   Parent,
   ResolveField,
   Resolver,
   Query,
 } from '@nestjs/graphql';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import {
   CreateProfileInput,
   ProfileModel,
@@ -32,13 +34,15 @@ export class ProfilesResolver {
   async profileByUserId(
     @Args('userId') userId: string,
   ): Promise<ProfileModel | null> {
-    return this.prisma.profile.findUnique({ where: { userId } });
+    return this.prisma.profile.findFirst({ where: { userId, isDeleted: false } });
   }
 
   @Mutation(() => ProfileModel)
   async createProfile(
     @Args('data') data: CreateProfileInput,
+    @Context() context: { req: { user: { sub: string } } },
   ): Promise<ProfileModel> {
+    if (data.userId !== context.req.user.sub) throw new ForbiddenException('Action interdite.');
     return this.prisma.profile.create({ data });
   }
 
@@ -46,8 +50,13 @@ export class ProfilesResolver {
   async updateProfile(
     @Args('id') id: string,
     @Args('data') data: UpdateProfileInput,
+    @Context() context: { req: { user: { sub: string } } },
   ): Promise<ProfileModel> {
-    return this.prisma.profile.update({ where: { id }, data });
+    const profile = await this.prisma.profile.findFirst({ where: { id, isDeleted: false } });
+    if (!profile) throw new NotFoundException('Profil introuvable.');
+    if (profile.userId !== context.req.user.sub) throw new ForbiddenException('Action interdite.');
+    const { userId: _userId, ...safeData } = data;
+    return this.prisma.profile.update({ where: { id }, data: safeData });
   }
 
   @Mutation(() => ProfileModel)
