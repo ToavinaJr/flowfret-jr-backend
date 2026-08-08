@@ -23,6 +23,7 @@ import {
   UserStatus,
 } from '@prisma/client';
 import { GraphQLJSON } from 'graphql-type-json';
+import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
 
 registerEnumType(UserStatus, { name: 'UserStatus' });
 registerEnumType(ProfileVisibility, { name: 'ProfileVisibility' });
@@ -797,36 +798,57 @@ export class UpdatePostTagInput extends PartialType(CreatePostTagInput) {}
 @InputType()
 export class RegisterInput {
   @Field()
+  @IsEmail()
+  @MaxLength(255)
   email!: string;
 
   @Field()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(50)
   username!: string;
 
   @Field()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
   password!: string;
 }
 
 @InputType()
 export class LoginInput {
   @Field()
+  @IsEmail()
+  @MaxLength(255)
   email!: string;
 
   @Field()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(72)
   password!: string;
 }
 
 @InputType()
 export class VerifyEmailInput {
   @Field()
+  @IsString()
+  @MinLength(64)
+  @MaxLength(64)
   token!: string;
 
   @Field()
+  @IsString()
+  @MinLength(4)
+  @MaxLength(4)
   code!: string;
 }
 
 @InputType()
 export class GoogleAuthInput {
   @Field()
+  @IsString()
+  @MinLength(1)
   accessToken!: string;
 }
 
