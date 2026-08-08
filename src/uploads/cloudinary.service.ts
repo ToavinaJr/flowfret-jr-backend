@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { getRequiredConfig } from '../common/required-config';
@@ -17,6 +17,7 @@ function hasValidSignature(buffer: Buffer, type: string): boolean {
 
 @Injectable()
 export class CloudinaryService {
+  private readonly logger = new Logger(CloudinaryService.name);
   constructor(private readonly config: ConfigService) {}
 
   async uploadImage(file: UploadedImage): Promise<{ url: string; publicId: string }> {
@@ -28,6 +29,7 @@ export class CloudinaryService {
     const apiSecret = getRequiredConfig(this.config, 'CLOUDINARY_API_SECRET');
     const folder = getRequiredConfig(this.config, 'CLOUDINARY_FOLDER');
     const timestamp = Math.floor(Date.now() / 1000);
+    this.logger.log(`Uploading validated image to Cloudinary (type=${file.mimetype}, size=${file.size}, folder=${folder})`);
     const signature = createHash('sha1').update(`folder=${folder}&timestamp=${timestamp}${apiSecret}`).digest('hex');
     const body = new FormData();
     body.append('file', new Blob([Uint8Array.from(file.buffer)], { type: file.mimetype }), file.originalname);
@@ -37,7 +39,11 @@ export class CloudinaryService {
     body.append('signature', signature);
     const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body });
     const result = (await response.json()) as { secure_url?: string; public_id?: string; error?: { message?: string } };
-    if (!response.ok || !result.secure_url || !result.public_id) throw new BadRequestException(result.error?.message ?? 'Échec de l’upload Cloudinary.');
+    if (!response.ok || !result.secure_url || !result.public_id) {
+      this.logger.error(`Cloudinary rejected image upload (status=${response.status}, reason=${result.error?.message ?? 'unknown'})`);
+      throw new BadRequestException(result.error?.message ?? 'Échec de l’upload Cloudinary.');
+    }
+    this.logger.log(`Cloudinary image uploaded (publicId=${result.public_id})`);
     return { url: result.secure_url, publicId: result.public_id };
   }
 }
