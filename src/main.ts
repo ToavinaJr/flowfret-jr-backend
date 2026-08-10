@@ -6,8 +6,29 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
+  const allowedOrigins = new Set(
+    [
+      process.env.APP_URL,
+      ...(process.env.CORS_ORIGINS ?? '').split(','),
+      ...(process.env.NODE_ENV === 'production'
+        ? []
+        : ['http://localhost:5173']),
+    ]
+      .map((value) => value?.trim())
+      .filter((value): value is string => Boolean(value))
+      .map((value) => {
+        try {
+          return new URL(value).origin;
+        } catch {
+          throw new Error(`Invalid CORS origin: ${value}`);
+        }
+      }),
+  );
   app.enableCors({
-    origin: true,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+      return callback(new Error(`Origin not allowed by CORS: ${origin}`), false);
+    },
     credentials: true,
   });
   app.useGlobalPipes(

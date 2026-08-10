@@ -5,12 +5,10 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuditLogsResolver } from './audit-logs/audit-logs.resolver';
-import { AuthTokensResolver } from './auth-tokens/auth-tokens.resolver';
 import { CommentsResolver } from './comments/comments.resolver';
 import { FriendshipsResolver } from './friendships/friendships.resolver';
 import { PrismaModule } from './prisma/prisma.module';
 import { AppResolver } from './app.resolver';
-import { PasswordResetTokensResolver } from './auth-tokens/auth-tokens.resolver';
 import { PostInteractionsResolver } from './post-interactions/post-interactions.resolver';
 import { PostAttachmentsResolver } from './post-interactions/post-interactions.resolver';
 import { PostReportsResolver } from './post-interactions/post-interactions.resolver';
@@ -49,7 +47,7 @@ import { UploadsModule } from './uploads/uploads.module';
       driver: ApolloDriver,
       autoSchemaFile: true,
       sortSchema: true,
-      context: ({ req }) => ({ req }),
+      context: ({ req, res }) => ({ req, res }),
       formatError: formatGraphQLError,
     }),
   ],
@@ -65,8 +63,6 @@ import { UploadsModule } from './uploads/uploads.module';
     UploadsResolver,
     NotificationsResolver,
     AuditLogsResolver,
-    AuthTokensResolver,
-    PasswordResetTokensResolver,
     PostInteractionsResolver,
     PostReportsResolver,
     PostAttachmentsResolver,

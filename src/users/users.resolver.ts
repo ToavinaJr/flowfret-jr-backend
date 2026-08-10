@@ -12,14 +12,12 @@ import {
   CreateUserInput,
   FriendshipModel,
   NotificationModel,
-  PasswordResetTokenModel,
   PostLikeModel,
   PostModel,
   PostReportModel,
   ProfileModel,
   UpdateUserInput,
   UploadModel,
-  RefreshTokenModel,
   UserModel,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -102,26 +100,6 @@ export class UsersResolver {
   async auditLogs(@Parent() user: UserModel): Promise<AuditLogModel[]> {
     return this.prisma.auditLog.findMany({
       where: { actorId: user.id },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  @ResolveField(() => [RefreshTokenModel], { name: 'refreshTokens' })
-  async refreshTokens(@Parent() user: UserModel): Promise<RefreshTokenModel[]> {
-    return this.prisma.refreshToken.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  @ResolveField(() => [PasswordResetTokenModel], {
-    name: 'passwordResetTokens',
-  })
-  async passwordResetTokens(
-    @Parent() user: UserModel,
-  ): Promise<PasswordResetTokenModel[]> {
-    return this.prisma.passwordResetToken.findMany({
-      where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
     });
   }

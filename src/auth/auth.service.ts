@@ -28,6 +28,7 @@ const OTP_LENGTH = 4;
 const OTP_TTL_MINUTES = 15;
 const TOKEN_BYTES = 32;
 const PASSWORD_RESET_TTL_MINUTES = 60;
+const DEFAULT_REFRESH_TOKEN_TTL_DAYS = 30;
 
 interface GoogleUserInfo {
   sub: string;
@@ -36,6 +37,10 @@ interface GoogleUserInfo {
   name?: string;
   given_name?: string;
   picture?: string;
+}
+
+export interface AuthSessionPayload extends AuthPayload {
+  refreshToken: string;
 }
 
 @Injectable()
@@ -82,7 +87,7 @@ export class AuthService {
     };
   }
 
-  async login(input: LoginInput): Promise<AuthPayload> {
+  async login(input: LoginInput): Promise<AuthSessionPayload> {
     const user = await this.prisma.user.findUnique({
       where: { email: input.email },
     });
@@ -117,7 +122,7 @@ export class AuthService {
     return this.createAuthPayload(user);
   }
 
-  async loginWithGoogle(input: GoogleAuthInput): Promise<AuthPayload> {
+  async loginWithGoogle(input: GoogleAuthInput): Promise<AuthSessionPayload> {
     const profile = await this.fetchGoogleProfile(input.accessToken);
     const emailVerified =
       profile.email_verified === true || profile.email_verified === 'true';
@@ -179,7 +184,7 @@ export class AuthService {
     return this.createAuthPayload(user);
   }
 
-  async verifyEmail(input: VerifyEmailInput): Promise<AuthPayload> {
+  async verifyEmail(input: VerifyEmailInput): Promise<AuthSessionPayload> {
     const code = input.code.trim();
     if (!/^\d{4}$/.test(code)) {
       throw new BadRequestException('OTP must be a 4-digit code.');
@@ -333,6 +338,60 @@ export class AuthService {
     ]);
   }
 
+  async refreshSession(refreshToken: string): Promise<AuthSessionPayload> {
+    const tokenHash = this.hashRefreshToken(refreshToken);
+    const existing = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (
+      !existing ||
+      existing.revokedAt ||
+      existing.isDeleted ||
+      existing.expiresAt.getTime() <= Date.now() ||
+      existing.user.isDeleted ||
+      existing.user.status !== UserStatus.ACTIVE
+    ) {
+      throw new UnauthorizedException('Invalid or expired refresh token.');
+    }
+
+    const nextToken = this.generateRefreshToken();
+    const nextTokenHash = this.hashRefreshToken(nextToken);
+    const now = new Date();
+    const expiresAt = this.refreshTokenExpiresAt();
+
+    await this.prisma.$transaction(async (tx) => {
+      const revoked = await tx.refreshToken.updateMany({
+        where: { id: existing.id, revokedAt: null, isDeleted: false },
+        data: { revokedAt: now },
+      });
+      if (revoked.count !== 1) {
+        throw new UnauthorizedException('Refresh token has already been used.');
+      }
+      await tx.refreshToken.create({
+        data: {
+          userId: existing.userId,
+          tokenHash: nextTokenHash,
+          expiresAt,
+        },
+      });
+    });
+
+    return this.createAuthPayload(existing.user, nextToken);
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        tokenHash: this.hashRefreshToken(refreshToken),
+        revokedAt: null,
+        isDeleted: false,
+      },
+      data: { revokedAt: new Date() },
+    });
+  }
+
   private hashResetToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }
@@ -429,16 +488,50 @@ export class AuthService {
     return { token, expiresAt };
   }
 
-  private createAuthPayload(user: UserModel): AuthPayload {
+  private async createAuthPayload(
+    user: UserModel,
+    rotatedRefreshToken?: string,
+  ): Promise<AuthSessionPayload> {
     const accessToken = this.jwtService.sign({
       sub: user.id,
       email: user.email,
       username: user.username,
     });
 
+    const refreshToken = rotatedRefreshToken ?? this.generateRefreshToken();
+    if (!rotatedRefreshToken) {
+      await this.prisma.refreshToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: this.hashRefreshToken(refreshToken),
+          expiresAt: this.refreshTokenExpiresAt(),
+        },
+      });
+    }
+
     return {
       accessToken,
+      refreshToken,
       user,
     };
+  }
+
+  private generateRefreshToken(): string {
+    return randomBytes(TOKEN_BYTES).toString('hex');
+  }
+
+  private hashRefreshToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  private refreshTokenExpiresAt(): Date {
+    const configured = Number(
+      this.configService.get<string>('REFRESH_TOKEN_TTL_DAYS') ??
+        DEFAULT_REFRESH_TOKEN_TTL_DAYS,
+    );
+    const days = Number.isInteger(configured) && configured > 0
+      ? configured
+      : DEFAULT_REFRESH_TOKEN_TTL_DAYS;
+    return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   }
 }
