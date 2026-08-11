@@ -25,7 +25,7 @@ export class AuditLogsResolver {
   async recordActivity(
     @Args('action') action: string,
     @Args('entityType') entityType: string,
-    @Args('entityId', { nullable: true }) entityId: string | undefined,
+    @Args('entityId', { type: () => String, nullable: true }) entityId: string | undefined,
     @Context() context: { req: { user: { sub: string } } },
   ): Promise<AuditLogModel> {
     const allowed = new Set(['TRACK_LISTENED']);
