@@ -21,6 +21,7 @@ export class UploadsController {
       userId: req.user.sub, fileName: files[index].originalname, fileType: files[index].mimetype,
       fileSize: BigInt(files[index].size), storagePath: result.url, status: 'AVAILABLE', sourceType: 'POST',
     }, select: { id: true, storagePath: true } })));
+    await this.prisma.auditLog.create({ data: { actorId: req.user.sub, action: 'FILES_UPLOADED', entityType: 'upload', metadata: { uploadIds: uploads.map(({ id }) => id), count: uploads.length } } });
     this.logger.log(`Image upload metadata saved (userId=${req.user.sub}, count=${uploads.length})`);
     return uploads;
   }

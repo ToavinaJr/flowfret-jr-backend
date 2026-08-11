@@ -44,7 +44,11 @@ export class PostsResolver {
     const uploads = imageUploadIds.length ? await this.prisma.upload.findMany({ where: { id: { in: imageUploadIds }, userId: context.req.user.sub, isDeleted: false, fileType: { startsWith: 'image/' } } }) : [];
     if (uploads.length !== imageUploadIds.length) throw new BadRequestException('Une ou plusieurs images sont invalides.');
     const { imageUploadIds: _imageUploadIds, ...postData } = data;
-    return this.prisma.post.create({ data: { ...postData, content, authorId: context.req.user.sub, attachments: imageUploadIds.length ? { create: imageUploadIds.map((uploadId, position) => ({ uploadId, position, kind: 'IMAGE' })) } : undefined } });
+    return this.prisma.$transaction(async tx => {
+      const post = await tx.post.create({ data: { ...postData, content, authorId: context.req.user.sub, attachments: imageUploadIds.length ? { create: imageUploadIds.map((uploadId, position) => ({ uploadId, position, kind: 'IMAGE' })) } : undefined } });
+      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'POST_CREATED', entityType: 'post', entityId: post.id, metadata: { imageCount: imageUploadIds.length } } });
+      return post;
+    });
   }
 
   @Mutation(() => PostModel)
@@ -62,7 +66,11 @@ export class PostsResolver {
       if (imageCount === 0) throw new BadRequestException('Une publication doit contenir du texte ou une image.');
       safeData.content = null;
     }
-    return this.prisma.post.update({ where: { id }, data: safeData });
+    return this.prisma.$transaction(async tx => {
+      const updated = await tx.post.update({ where: { id }, data: safeData });
+      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'POST_UPDATED', entityType: 'post', entityId: id, metadata: {} } });
+      return updated;
+    });
   }
 
   @Mutation(() => PostModel)
@@ -70,7 +78,11 @@ export class PostsResolver {
     const post = await this.prisma.post.findFirst({ where: { id, isDeleted: false } });
     if (!post) throw new NotFoundException('Publication introuvable.');
     if (post.authorId !== context.req.user.sub) throw new ForbiddenException('Seul le propriétaire peut supprimer cette publication.');
-    return this.prisma.post.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' } });
+    return this.prisma.$transaction(async tx => {
+      const deleted = await tx.post.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' } });
+      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'POST_DELETED', entityType: 'post', entityId: id, metadata: {} } });
+      return deleted;
+    });
   }
 
   @ResolveField(() => UserModel, { name: 'author' })

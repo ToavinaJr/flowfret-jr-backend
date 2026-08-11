@@ -25,6 +25,8 @@ import { MusicModule } from './integrations/music/music.module';
 import { TranscriptionsModule } from './transcriptions/transcriptions.module';
 import { validateEnvironment } from './common/validate-environment';
 import { UploadsModule } from './uploads/uploads.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { AuditInterceptor } from './audit-logs/audit.interceptor';
 
 @Module({
   imports: [
@@ -68,6 +70,7 @@ import { UploadsModule } from './uploads/uploads.module';
     PostAttachmentsResolver,
     PostTagsResolver,
     TagsResolver,
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
 export class AppModule {}

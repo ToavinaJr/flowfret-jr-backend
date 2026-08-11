@@ -77,6 +77,7 @@ export class PostInteractionsResolver {
         ? await tx.postLike.update({ where: { id: previous.id }, data: { isDeleted: false, deletedAt: null } })
         : await tx.postLike.create({ data: { postId: data.postId, userId: context.req.user.sub } });
       await tx.post.update({ where: { id: data.postId }, data: { likeCount: { increment: 1 } } });
+      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'POST_LIKED', entityType: 'post', entityId: data.postId, metadata: { likeId: like.id } } });
       return like;
     });
   }
@@ -97,6 +98,7 @@ export class PostInteractionsResolver {
       if (existing.userId !== context.req.user.sub) throw new ForbiddenException('Action interdite.');
       const like = await tx.postLike.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
       await tx.post.updateMany({ where: { id: existing.postId, likeCount: { gt: 0 } }, data: { likeCount: { decrement: 1 } } });
+      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'POST_UNLIKED', entityType: 'post', entityId: existing.postId, metadata: { likeId: id } } });
       return like;
     });
   }

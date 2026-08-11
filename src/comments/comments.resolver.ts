@@ -66,6 +66,8 @@ export class CommentsResolver {
         },
       });
 
+      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'COMMENT_CREATED', entityType: 'comment', entityId: comment.id, metadata: { postId: data.postId } } });
+
       return comment;
     });
   }
@@ -80,7 +82,11 @@ export class CommentsResolver {
     if (!comment) throw new NotFoundException('Commentaire introuvable.');
     if (comment.authorId !== context.req.user.sub) throw new ForbiddenException('Seul le propriétaire peut modifier ce commentaire.');
     const { authorId: _authorId, postId: _postId, ...safeData } = data;
-    return this.prisma.comment.update({ where: { id }, data: safeData });
+    return this.prisma.$transaction(async tx => {
+      const updated = await tx.comment.update({ where: { id }, data: safeData });
+      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'COMMENT_UPDATED', entityType: 'comment', entityId: id, metadata: { postId: comment.postId } } });
+      return updated;
+    });
   }
 
   @Mutation(() => CommentModel)
@@ -104,6 +110,8 @@ export class CommentsResolver {
           },
         },
       });
+
+      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'COMMENT_DELETED', entityType: 'comment', entityId: id, metadata: { postId: deletedComment.postId } } });
 
       return deletedComment;
     });

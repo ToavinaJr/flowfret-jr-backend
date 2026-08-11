@@ -1,5 +1,6 @@
 import {
   Args,
+  Context,
   Mutation,
   Parent,
   ResolveField,
@@ -21,14 +22,15 @@ import {
   UserModel,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { ForbiddenException } from '@nestjs/common';
 
 @Resolver(() => UserModel)
 export class UsersResolver {
   constructor(private readonly prisma: PrismaService) {}
 
   @Query(() => [UserModel], { name: 'users' })
-  async users(): Promise<UserModel[]> {
-    return this.prisma.user.findMany({ where: { isDeleted: false }, orderBy: { createdAt: 'desc' } });
+  async users(@Context() context: { req: { user: { sub: string } } }): Promise<UserModel[]> {
+    return this.prisma.user.findMany({ where: { id: context.req.user.sub, isDeleted: false } });
   }
 
   @Query(() => UserModel, { name: 'user', nullable: true })
@@ -37,20 +39,24 @@ export class UsersResolver {
   }
 
   @Mutation(() => UserModel)
-  async createUser(@Args('data') data: CreateUserInput): Promise<UserModel> {
-    return this.prisma.user.create({ data });
+  async createUser(@Args('data') _data: CreateUserInput): Promise<UserModel> {
+    throw new ForbiddenException('Utilisez le parcours d’inscription sécurisé.');
   }
 
   @Mutation(() => UserModel)
   async updateUser(
     @Args('id') id: string,
     @Args('data') data: UpdateUserInput,
+    @Context() context: { req: { user: { sub: string } } },
   ): Promise<UserModel> {
-    return this.prisma.user.update({ where: { id }, data });
+    if (id !== context.req.user.sub) throw new ForbiddenException('Action interdite.');
+    const { passwordHash: _passwordHash, status: _status, email: _email, ...safeData } = data;
+    return this.prisma.user.update({ where: { id }, data: safeData });
   }
 
   @Mutation(() => UserModel)
-  async deleteUser(@Args('id') id: string): Promise<UserModel> {
+  async deleteUser(@Args('id') id: string, @Context() context: { req: { user: { sub: string } } }): Promise<UserModel> {
+    if (id !== context.req.user.sub) throw new ForbiddenException('Action interdite.');
     return this.prisma.user.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' } });
   }
 
@@ -60,9 +66,11 @@ export class UsersResolver {
   }
 
   @ResolveField(() => [PostModel], { name: 'authoredPosts' })
-  async authoredPosts(@Parent() user: UserModel): Promise<PostModel[]> {
+  async authoredPosts(@Parent() user: UserModel, @Context() context: { req: { user: { sub: string } } }): Promise<PostModel[]> {
+    const own = user.id === context.req.user.sub;
+    const friend = own ? true : Boolean(await this.prisma.friendship.count({ where: { status: 'ACCEPTED', isDeleted: false, OR: [{ requesterId: user.id, receiverId: context.req.user.sub }, { requesterId: context.req.user.sub, receiverId: user.id }] } }));
     return this.prisma.post.findMany({
-      where: { authorId: user.id },
+      where: { authorId: user.id, isDeleted: false, ...(own ? {} : { visibility: { in: friend ? ['PUBLIC', 'FRIENDS'] : ['PUBLIC'] } }) },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -76,7 +84,8 @@ export class UsersResolver {
   }
 
   @ResolveField(() => [UploadModel], { name: 'uploads' })
-  async uploads(@Parent() user: UserModel): Promise<UploadModel[]> {
+  async uploads(@Parent() user: UserModel, @Context() context: { req: { user: { sub: string } } }): Promise<UploadModel[]> {
+    if (user.id !== context.req.user.sub) throw new ForbiddenException('Action interdite.');
     const uploads = await this.prisma.upload.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
@@ -97,7 +106,8 @@ export class UsersResolver {
   }
 
   @ResolveField(() => [AuditLogModel], { name: 'auditLogs' })
-  async auditLogs(@Parent() user: UserModel): Promise<AuditLogModel[]> {
+  async auditLogs(@Parent() user: UserModel, @Context() context: { req: { user: { sub: string } } }): Promise<AuditLogModel[]> {
+    if (user.id !== context.req.user.sub) throw new ForbiddenException('Action interdite.');
     return this.prisma.auditLog.findMany({
       where: { actorId: user.id },
       orderBy: { createdAt: 'desc' },
