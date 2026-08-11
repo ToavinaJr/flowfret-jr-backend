@@ -1,6 +1,7 @@
 import {
   Args,
   Context,
+  Info,
   Mutation,
   Parent,
   ResolveField,
@@ -23,14 +24,20 @@ import {
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { ForbiddenException } from '@nestjs/common';
+import type { GraphQLResolveInfo } from 'graphql';
 
 @Resolver(() => UserModel)
 export class UsersResolver {
   constructor(private readonly prisma: PrismaService) {}
 
   @ResolveField(() => String, { name: 'email' })
-  email(@Parent() user: UserModel, @Context() context: { req: { user: { sub: string } } }): string {
-    if (user.id !== context.req.user.sub) throw new ForbiddenException('Information privée.');
+  email(@Parent() user: UserModel, @Context() context: { req?: { user?: { sub?: string } } }, @Info() info: GraphQLResolveInfo): string {
+    // Public authentication mutations already prove ownership through Google
+    // or the signed refresh cookie, before returning their AuthPayload.
+    const requesterId = context.req?.user?.sub;
+    const rootField = info.path.prev?.prev?.key;
+    const authenticatedPayloads = new Set(['login', 'loginWithGoogle', 'verifyEmail', 'refreshSession']);
+    if ((!requesterId && !authenticatedPayloads.has(String(rootField))) || (requesterId && user.id !== requesterId)) throw new ForbiddenException('Information privée.');
     return user.email;
   }
 
