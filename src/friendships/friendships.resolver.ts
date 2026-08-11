@@ -2,10 +2,11 @@ import { Args, Context, Int, Mutation, Parent, Query, ResolveField, Resolver } f
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { FriendshipModel, UserModel } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Resolver(() => FriendshipModel)
 export class FriendshipsResolver {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly notifications: NotificationsService) {}
 
   @Query(() => [UserModel], { name: 'searchUsers' })
   async searchUsers(@Args('query') query: string, @Args('take', { type: () => Int, defaultValue: 20 }) take: number, @Context() context: { req: { user: { sub: string } } }): Promise<UserModel[]> {
@@ -50,15 +51,17 @@ export class FriendshipsResolver {
   }
 
   @Mutation(() => FriendshipModel)
-  async respondFriendRequest(@Args('id') id: string, @Args('accept') accept: boolean, @Context() context: { req: { user: { sub: string } } }): Promise<FriendshipModel> {
+  async respondFriendRequest(@Args('id') id: string, @Args('accept') accept: boolean, @Context() context: { req: { user: { sub: string; username: string } } }): Promise<FriendshipModel> {
     const actorId = context.req.user.sub;
     const row = await this.prisma.friendship.findFirst({ where: { id, receiverId: actorId, status: 'PENDING', isDeleted: false } });
     if (!row) throw new NotFoundException('Demande introuvable.');
-    return this.prisma.$transaction(async tx => {
+    const friendship = await this.prisma.$transaction(async tx => {
       const friendship = await tx.friendship.update({ where: { id }, data: { status: accept ? 'ACCEPTED' : 'REJECTED' } });
       await tx.auditLog.create({ data: { actorId, action: accept ? 'FRIEND_ACCEPTED' : 'FRIEND_REJECTED', entityType: 'friendship', entityId: id, metadata: { requesterId: row.requesterId } } });
       return friendship;
     });
+    if (accept) await this.notifications.friendAccepted(actorId, context.req.user.username, row.requesterId);
+    return friendship;
   }
 
   @Mutation(() => FriendshipModel)
