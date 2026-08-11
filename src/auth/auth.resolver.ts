@@ -14,7 +14,7 @@ import {
 } from '../graphql/graphql.types';
 import { AuthService, AuthSessionPayload } from './auth.service';
 import { Public } from './public.decorator';
-import { errorDetails, isDebugEnabled } from '../common/debug';
+import { isDebugEnabled } from '../common/debug';
 
 @Resolver()
 export class AuthResolver {
@@ -31,7 +31,8 @@ export class AuthResolver {
     @Args('data') data: RegisterInput,
   ): Promise<RegisterPendingPayload> {
     const startedAt = Date.now();
-    const details = { email: data.email, username: data.username };
+    // Never write identifiers or credentials to authentication logs.
+    const details = { flow: 'password_registration' };
     if (isDebugEnabled()) {
       this.logger.debug(
         JSON.stringify({ event: 'register.started', ...details }),
@@ -57,7 +58,7 @@ export class AuthResolver {
             ...details,
             durationMs: Date.now() - startedAt,
           }),
-          errorDetails(error),
+          undefined,
         );
       }
       throw error;
@@ -83,6 +84,15 @@ export class AuthResolver {
       await this.authService.loginWithGoogle(data),
       response,
     );
+  }
+
+  @Public()
+  @Mutation(() => AuthPayload)
+  async registerWithGoogle(
+    @Args('data') data: GoogleAuthInput,
+    @Context('res') response: Response,
+  ): Promise<AuthPayload> {
+    return this.setSessionCookie(await this.authService.registerWithGoogle(data), response);
   }
 
   @Public()

@@ -36,7 +36,7 @@ export class UsersResolver {
     // or the signed refresh cookie, before returning their AuthPayload.
     const requesterId = context.req?.user?.sub;
     const rootField = info.path.prev?.prev?.key;
-    const authenticatedPayloads = new Set(['login', 'loginWithGoogle', 'verifyEmail', 'refreshSession']);
+    const authenticatedPayloads = new Set(['login', 'loginWithGoogle', 'registerWithGoogle', 'verifyEmail', 'refreshSession']);
     if ((!requesterId && !authenticatedPayloads.has(String(rootField))) || (requesterId && user.id !== requesterId)) throw new ForbiddenException('Information privée.');
     return user.email;
   }

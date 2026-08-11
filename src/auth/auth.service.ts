@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -29,6 +28,10 @@ const OTP_TTL_MINUTES = 15;
 const TOKEN_BYTES = 32;
 const PASSWORD_RESET_TTL_MINUTES = 60;
 const DEFAULT_REFRESH_TOKEN_TTL_DAYS = 30;
+const GENERIC_CREDENTIALS_ERROR = 'Identifiants invalides ou compte indisponible.';
+const GENERIC_REGISTRATION_ERROR = 'Impossible de créer le compte avec les informations fournies.';
+const GENERIC_GOOGLE_ERROR = 'Impossible de continuer avec Google. Vérifiez le parcours choisi et réessayez.';
+const GENERIC_TOKEN_ERROR = 'Demande invalide ou expirée.';
 
 interface GoogleUserInfo {
   sub: string;
@@ -62,7 +65,8 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException('Email or username already in use');
+      this.logger.warn(JSON.stringify({ event: 'registration.rejected', reason: 'identifier_unavailable' }));
+      throw new ConflictException(GENERIC_REGISTRATION_ERROR);
     }
 
     const passwordHash = await bcrypt.hash(input.password, 10);
@@ -93,7 +97,7 @@ export class AuthService {
     });
 
     if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(GENERIC_CREDENTIALS_ERROR);
     }
 
     const passwordMatches = await bcrypt.compare(
@@ -101,17 +105,17 @@ export class AuthService {
       user.passwordHash,
     );
     if (!passwordMatches) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(GENERIC_CREDENTIALS_ERROR);
     }
 
     if (user.status === UserStatus.PENDING) {
-      throw new ForbiddenException(
-        'Account not verified. Please validate the OTP sent to your email.',
-      );
+      this.logger.warn(JSON.stringify({ event: 'login.rejected', reason: 'account_unavailable' }));
+      throw new UnauthorizedException(GENERIC_CREDENTIALS_ERROR);
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException('Account is not active.');
+      this.logger.warn(JSON.stringify({ event: 'login.rejected', reason: 'account_unavailable' }));
+      throw new UnauthorizedException(GENERIC_CREDENTIALS_ERROR);
     }
 
     await this.prisma.user.update({
@@ -128,30 +132,25 @@ export class AuthService {
       profile.email_verified === true || profile.email_verified === 'true';
 
     if (!profile.email || !emailVerified) {
-      throw new UnauthorizedException('Google email is not verified.');
+      throw new UnauthorizedException(GENERIC_GOOGLE_ERROR);
     }
 
-    const email = profile.email.toLowerCase();
     const googleId = profile.sub;
 
-    let user = await this.prisma.user.findFirst({
-      where: {
-        OR: [{ googleId }, { email }],
-      },
-    });
+    let user = await this.prisma.user.findFirst({ where: { googleId } });
 
     if (user) {
       if (
         user.status === UserStatus.SUSPENDED ||
         user.status === UserStatus.DELETED
       ) {
-        throw new ForbiddenException('Account is not active.');
+        this.logger.warn(JSON.stringify({ event: 'google_login.rejected', reason: 'account_unavailable' }));
+        throw new UnauthorizedException(GENERIC_GOOGLE_ERROR);
       }
 
       user = await this.prisma.user.update({
         where: { id: user.id },
         data: {
-          googleId: user.googleId ?? googleId,
           status: UserStatus.ACTIVE,
           lastLoginAt: new Date(),
         },
@@ -160,11 +159,26 @@ export class AuthService {
       return this.createAuthPayload(user);
     }
 
+    this.logger.warn(JSON.stringify({ event: 'google_login.rejected', reason: 'account_unavailable' }));
+    throw new UnauthorizedException(GENERIC_GOOGLE_ERROR);
+  }
+
+  async registerWithGoogle(input: GoogleAuthInput): Promise<AuthSessionPayload> {
+    const profile = await this.fetchGoogleProfile(input.accessToken);
+    const emailVerified = profile.email_verified === true || profile.email_verified === 'true';
+    if (!profile.email || !emailVerified) throw new UnauthorizedException(GENERIC_GOOGLE_ERROR);
+    const email = profile.email.toLowerCase();
+    const googleId = profile.sub;
+    const existing = await this.prisma.user.findFirst({ where: { OR: [{ googleId }, { email }] } });
+    if (existing) {
+      this.logger.warn(JSON.stringify({ event: 'google_registration.rejected', reason: 'identifier_unavailable' }));
+      throw new ConflictException(GENERIC_GOOGLE_ERROR);
+    }
     const username = await this.allocateUniqueUsername(
       profile.name ?? profile.given_name ?? email.split('@')[0],
     );
 
-    user = await this.prisma.user.create({
+    const user = await this.prisma.user.create({
       data: {
         email,
         username,
@@ -196,18 +210,16 @@ export class AuthService {
     });
 
     if (!record || record.usedAt) {
-      throw new BadRequestException(
-        'Invalid or already used verification link.',
-      );
+      throw new BadRequestException(GENERIC_TOKEN_ERROR);
     }
 
     if (record.expiresAt.getTime() < Date.now()) {
-      throw new BadRequestException('Verification code has expired.');
+      throw new BadRequestException(GENERIC_TOKEN_ERROR);
     }
 
     const codeMatches = await bcrypt.compare(code, record.codeHash);
     if (!codeMatches) {
-      throw new BadRequestException('Invalid verification code.');
+      throw new BadRequestException(GENERIC_TOKEN_ERROR);
     }
 
     if (record.user.status === UserStatus.ACTIVE) {
@@ -249,11 +261,11 @@ export class AuthService {
     });
 
     if (!existing) {
-      throw new BadRequestException('Invalid verification link.');
+      throw new BadRequestException(GENERIC_TOKEN_ERROR);
     }
 
     if (existing.user.status === UserStatus.ACTIVE) {
-      throw new BadRequestException('Account is already verified.');
+      throw new BadRequestException(GENERIC_TOKEN_ERROR);
     }
 
     const verification = await this.createAndSendOtp(existing.user);
