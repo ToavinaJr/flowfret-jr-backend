@@ -17,10 +17,11 @@ import {
   UserModel,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Resolver(() => CommentModel)
 export class CommentsResolver {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly notifications: NotificationsService) {}
 
   @Query(() => [CommentModel], { name: 'comments' })
   async comments(): Promise<CommentModel[]> {
@@ -49,12 +50,12 @@ export class CommentsResolver {
   @Mutation(() => CommentModel)
   async createComment(
     @Args('data') data: CreateCommentInput,
-    @Context() context: { req: { user: { sub: string } } },
+    @Context() context: { req: { user: { sub: string; username: string } } },
   ): Promise<CommentModel> {
     if (data.authorId !== context.req.user.sub) throw new ForbiddenException('Vous ne pouvez commenter qu’en votre nom.');
     const post = await this.prisma.post.findFirst({ where: { id: data.postId, isDeleted: false } });
     if (!post) throw new NotFoundException('Publication introuvable.');
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const comment = await tx.comment.create({ data });
 
       await tx.post.update({
@@ -70,6 +71,8 @@ export class CommentsResolver {
 
       return comment;
     });
+    await this.notifications.postCommented(context.req.user.sub, context.req.user.username, data.postId, created.id, post.authorId);
+    return created;
   }
 
   @Mutation(() => CommentModel)

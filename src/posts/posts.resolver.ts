@@ -20,10 +20,11 @@ import {
   UserModel,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Resolver(() => PostModel)
 export class PostsResolver {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly notifications: NotificationsService) {}
 
   @Query(() => [PostModel], { name: 'posts' })
   async posts(): Promise<PostModel[]> {
@@ -36,7 +37,7 @@ export class PostsResolver {
   }
 
   @Mutation(() => PostModel)
-  async createPost(@Args('data') data: CreatePostInput, @Context() context: { req: { user: { sub: string } } }): Promise<PostModel> {
+  async createPost(@Args('data') data: CreatePostInput, @Context() context: { req: { user: { sub: string; username: string } } }): Promise<PostModel> {
     if (data.authorId !== context.req.user.sub) throw new ForbiddenException('Vous ne pouvez publier qu’en votre nom.');
     const content = data.content?.trim() || null;
     const imageUploadIds = data.imageUploadIds ?? [];
@@ -44,11 +45,15 @@ export class PostsResolver {
     const uploads = imageUploadIds.length ? await this.prisma.upload.findMany({ where: { id: { in: imageUploadIds }, userId: context.req.user.sub, isDeleted: false, fileType: { startsWith: 'image/' } } }) : [];
     if (uploads.length !== imageUploadIds.length) throw new BadRequestException('Une ou plusieurs images sont invalides.');
     const { imageUploadIds: _imageUploadIds, ...postData } = data;
-    return this.prisma.$transaction(async tx => {
+    const post = await this.prisma.$transaction(async tx => {
       const post = await tx.post.create({ data: { ...postData, content, authorId: context.req.user.sub, attachments: imageUploadIds.length ? { create: imageUploadIds.map((uploadId, position) => ({ uploadId, position, kind: 'IMAGE' })) } : undefined } });
       await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'POST_CREATED', entityType: 'post', entityId: post.id, metadata: { imageCount: imageUploadIds.length } } });
       return post;
     });
+    if (post.visibility !== 'PRIVATE') {
+      await this.notifications.friendPosted(context.req.user.sub, context.req.user.username, post.id);
+    }
+    return post;
   }
 
   @Mutation(() => PostModel)

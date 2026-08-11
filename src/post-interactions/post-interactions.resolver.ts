@@ -23,10 +23,11 @@ import {
   UserModel,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Resolver(() => PostLikeModel)
 export class PostInteractionsResolver {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly notifications: NotificationsService) {}
 
   @Query(() => [PostLikeModel], { name: 'postLikes' })
   async postLikes(): Promise<PostLikeModel[]> {
@@ -65,10 +66,10 @@ export class PostInteractionsResolver {
   @Mutation(() => PostLikeModel)
   async createPostLike(
     @Args('data') data: CreatePostLikeInput,
-    @Context() context: { req: { user: { sub: string } } },
+    @Context() context: { req: { user: { sub: string; username: string } } },
   ): Promise<PostLikeModel> {
     if (data.userId !== context.req.user.sub) throw new ForbiddenException('Action interdite.');
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const post = await tx.post.findFirst({ where: { id: data.postId, isDeleted: false } });
       if (!post) throw new NotFoundException('Publication introuvable.');
       const previous = await tx.postLike.findUnique({ where: { postId_userId: { postId: data.postId, userId: context.req.user.sub } } });
@@ -80,6 +81,9 @@ export class PostInteractionsResolver {
       await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'POST_LIKED', entityType: 'post', entityId: data.postId, metadata: { likeId: like.id } } });
       return like;
     });
+    const post = await this.prisma.post.findUnique({ where: { id: data.postId }, select: { authorId: true } });
+    if (post) await this.notifications.postLiked(context.req.user.sub, context.req.user.username, data.postId, post.authorId);
+    return result;
   }
 
   @Mutation(() => PostLikeModel)

@@ -27,6 +27,7 @@ import { validateEnvironment } from './common/validate-environment';
 import { UploadsModule } from './uploads/uploads.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditInterceptor } from './audit-logs/audit.interceptor';
+import { NotificationsService } from './notifications/notifications.service';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { AuditInterceptor } from './audit-logs/audit.interceptor';
     FriendshipsResolver,
     UploadsResolver,
     NotificationsResolver,
+    NotificationsService,
     AuditLogsResolver,
     PostInteractionsResolver,
     PostReportsResolver,

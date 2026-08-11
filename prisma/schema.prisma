@@ -67,6 +67,9 @@ enum NotificationType {
   POST_CREATED
   UPLOAD_READY
   SYSTEM
+  FRIEND_POST
+  POST_COMMENT
+  FOLLOWED_POST_ACTIVITY
 }
 
 enum ReportStatus {
@@ -141,6 +144,7 @@ model User {
   comments             Comment[]              @relation("UserComments")
   uploads              Upload[]
   notifications        Notification[]
+  notificationPreferences NotificationPreference[]
   auditLogs             AuditLog[]             @relation("UserAuditLogs")
   refreshTokens        RefreshToken[]
   passwordResetTokens   PasswordResetToken[]
@@ -280,6 +284,21 @@ model Notification {
   @@index([userId, readAt, createdAt(sort: Desc)])
   @@index([type, createdAt(sort: Desc)])
   @@map("notifications")
+}
+
+model NotificationPreference {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  enabled   Boolean          @default(true)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type], map: "notification_preferences_user_type_unique")
+  @@index([userId, enabled])
+  @@map("notification_preferences")
 }
 
 model AuditLog {

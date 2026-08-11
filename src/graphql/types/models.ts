@@ -144,6 +144,15 @@ export class NotificationModel {
 }
 
 @ObjectType()
+export class NotificationPreferenceModel {
+  @Field() id!: string;
+  @Field() userId!: string;
+  @Field(() => NotificationType) type!: NotificationType;
+  @Field() enabled!: boolean;
+  @Field(() => GraphQLISODateTime) updatedAt!: Date;
+}
+
+@ObjectType()
 export class AuditLogModel {
   @Field() id!: string;
   @Field() actorId!: string;
