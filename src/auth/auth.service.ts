@@ -175,7 +175,10 @@ export class AuthService {
       where: { OR: [{ googleId }, { email }] },
       include: { profile: true },
     });
-    if (existing?.googleId === googleId && !existing.googleSignupCompleted && !existing.isDeleted) {
+    const hasCompletedGoogleSignup = existing !== null &&
+      'googleSignupCompleted' in existing &&
+      existing.googleSignupCompleted === true;
+    if (existing?.googleId === googleId && !hasCompletedGoogleSignup && !existing.isDeleted) {
       const enrolled = await this.prisma.user.update({
         where: { id: existing.id },
         data: {
