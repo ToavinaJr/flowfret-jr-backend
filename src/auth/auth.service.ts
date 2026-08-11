@@ -137,7 +137,9 @@ export class AuthService {
 
     const googleId = profile.sub;
 
-    let user = await this.prisma.user.findFirst({ where: { googleId } });
+    let user = await this.prisma.user.findFirst({
+      where: { googleId, googleSignupCompleted: true },
+    });
 
     if (user) {
       if (
@@ -169,7 +171,31 @@ export class AuthService {
     if (!profile.email || !emailVerified) throw new UnauthorizedException(GENERIC_GOOGLE_ERROR);
     const email = profile.email.toLowerCase();
     const googleId = profile.sub;
-    const existing = await this.prisma.user.findFirst({ where: { OR: [{ googleId }, { email }] } });
+    const existing = await this.prisma.user.findFirst({
+      where: { OR: [{ googleId }, { email }] },
+      include: { profile: true },
+    });
+    const hasCompletedGoogleSignup = existing !== null &&
+      'googleSignupCompleted' in existing &&
+      existing.googleSignupCompleted === true;
+    if (existing?.googleId === googleId && !hasCompletedGoogleSignup && !existing.isDeleted) {
+      const enrolled = await this.prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          googleSignupCompleted: true,
+          status: UserStatus.ACTIVE,
+          lastLoginAt: new Date(),
+          profile: existing.profile ? undefined : {
+            create: {
+              displayName: profile.name ?? existing.username,
+              avatarUrl: profile.picture ?? null,
+            },
+          },
+        },
+        include: { profile: true },
+      });
+      return this.createAuthPayload(enrolled);
+    }
     if (existing) {
       this.logger.warn(JSON.stringify({ event: 'google_registration.rejected', reason: 'identifier_unavailable' }));
       throw new ConflictException(GENERIC_GOOGLE_ERROR);
@@ -183,6 +209,7 @@ export class AuthService {
         email,
         username,
         googleId,
+        googleSignupCompleted: true,
         passwordHash: null,
         status: UserStatus.ACTIVE,
         lastLoginAt: new Date(),
