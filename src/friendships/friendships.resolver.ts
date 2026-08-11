@@ -10,8 +10,20 @@ export class FriendshipsResolver {
   @Query(() => [UserModel], { name: 'searchUsers' })
   async searchUsers(@Args('query') query: string, @Args('take', { type: () => Int, defaultValue: 20 }) take: number, @Context() context: { req: { user: { sub: string } } }): Promise<UserModel[]> {
     const value = query.trim();
-    if (value.length < 2 || value.length > 50) return [];
-    return this.prisma.user.findMany({ where: { id: { not: context.req.user.sub }, status: 'ACTIVE', isDeleted: false, OR: [{ username: { contains: value, mode: 'insensitive' } }, { profile: { displayName: { contains: value, mode: 'insensitive' }, isDeleted: false, visibility: { not: 'PRIVATE' } } }] }, take: Math.min(30, Math.max(1, take)), orderBy: { username: 'asc' } });
+    if (value.length === 1 || value.length > 50) return [];
+    const actorId = context.req.user.sub;
+    const relations = await this.prisma.friendship.findMany({
+      where: { isDeleted: false, status: { in: ['PENDING', 'ACCEPTED', 'BLOCKED'] }, OR: [{ requesterId: actorId }, { receiverId: actorId }] },
+      select: { requesterId: true, receiverId: true },
+    });
+    const excludedIds = [actorId, ...relations.flatMap(row => [row.requesterId, row.receiverId])];
+    return this.prisma.user.findMany({
+      where: {
+        id: { notIn: excludedIds }, status: 'ACTIVE', isDeleted: false,
+        ...(value ? { OR: [{ username: { contains: value, mode: 'insensitive' as const } }, { profile: { displayName: { contains: value, mode: 'insensitive' as const }, isDeleted: false, visibility: { not: 'PRIVATE' as const } } }] } : {}),
+      },
+      take: Math.min(30, Math.max(1, take)), orderBy: { username: 'asc' },
+    });
   }
 
   @Query(() => [FriendshipModel], { name: 'myFriendships' })
