@@ -28,6 +28,12 @@ import { ForbiddenException } from '@nestjs/common';
 export class UsersResolver {
   constructor(private readonly prisma: PrismaService) {}
 
+  @ResolveField(() => String, { name: 'email' })
+  email(@Parent() user: UserModel, @Context() context: { req: { user: { sub: string } } }): string {
+    if (user.id !== context.req.user.sub) throw new ForbiddenException('Information privée.');
+    return user.email;
+  }
+
   @Query(() => [UserModel], { name: 'users' })
   async users(@Context() context: { req: { user: { sub: string } } }): Promise<UserModel[]> {
     return this.prisma.user.findMany({ where: { id: context.req.user.sub, isDeleted: false } });
@@ -61,8 +67,12 @@ export class UsersResolver {
   }
 
   @ResolveField(() => ProfileModel, { name: 'profile', nullable: true })
-  async profile(@Parent() user: UserModel): Promise<ProfileModel | null> {
-    return this.prisma.profile.findUnique({ where: { userId: user.id } });
+  async profile(@Parent() user: UserModel, @Context() context: { req: { user: { sub: string } } }): Promise<ProfileModel | null> {
+    const profile = await this.prisma.profile.findFirst({ where: { userId: user.id, isDeleted: false } });
+    if (!profile || user.id === context.req.user.sub || profile.visibility === 'PUBLIC') return profile;
+    if (profile.visibility === 'PRIVATE') return null;
+    const friend = await this.prisma.friendship.count({ where: { status: 'ACCEPTED', isDeleted: false, OR: [{ requesterId: user.id, receiverId: context.req.user.sub }, { requesterId: context.req.user.sub, receiverId: user.id }] } });
+    return friend ? profile : null;
   }
 
   @ResolveField(() => [PostModel], { name: 'authoredPosts' })

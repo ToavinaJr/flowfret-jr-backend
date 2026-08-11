@@ -20,13 +20,8 @@ export class GqlJwtAuthGuard extends AuthGuard('jwt') {
       return true;
     }
 
-    const gqlContext = GqlExecutionContext.create(context);
-    const operation = gqlContext.getInfo()?.operation?.operation;
-
-    if (operation !== 'mutation') {
-      return true;
-    }
-
+    // Public operations opt out explicitly. Every other query and mutation
+    // must populate req.user so resolvers never trust a client-provided id.
     return super.canActivate(context);
   }
 
