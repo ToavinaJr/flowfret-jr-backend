@@ -59,7 +59,7 @@ export class TranscriptionsService {
         this.logger.error(
           JSON.stringify({
             event: 'transcription.queue_error',
-            error: error.message,
+            error: this.errorMessage(error),
           }),
         ),
       );
@@ -424,6 +424,14 @@ export class TranscriptionsService {
   private numberConfig(key: string, fallback: number): number {
     const value = Number(this.config.get(key));
     return Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof AggregateError && error.errors.length > 0)
+      return error.errors.map((item) => this.errorMessage(item)).join('; ');
+    if (error instanceof Error)
+      return error.message || error.name || 'Unknown queue error';
+    return String(error) || 'Unknown queue error';
   }
 
   private async queueOperation<T>(

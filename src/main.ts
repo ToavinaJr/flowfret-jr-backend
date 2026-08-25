@@ -6,13 +6,27 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
+  const rawPort = process.env.PORT;
+  const port = rawPort ? Number(rawPort) : 3000;
+
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    throw new Error(`Invalid PORT value: ${rawPort ?? '<empty>'}`);
+  }
+
   const allowedOrigins = new Set(
     [
       process.env.APP_URL,
       ...(process.env.CORS_ORIGINS ?? '').split(','),
       ...(process.env.NODE_ENV === 'production'
         ? []
-        : ['http://localhost:5173']),
+        : [
+            `http://localhost:${port}`,
+            `http://127.0.0.1:${port}`,
+            'http://localhost:5173',
+            'http://127.0.0.1:5173',
+            'http://localhost:8080',
+            'http://127.0.0.1:8080',
+          ]),
     ]
       .map((value) => value?.trim())
       .filter((value): value is string => Boolean(value))
@@ -38,13 +52,6 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
-
-  const rawPort = process.env.PORT;
-  const port = rawPort ? Number(rawPort) : 3000;
-
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    throw new Error(`Invalid PORT value: ${rawPort ?? '<empty>'}`);
-  }
 
   await app.listen(port);
   logger.log(
