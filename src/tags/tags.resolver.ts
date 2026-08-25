@@ -13,7 +13,10 @@ import {
   UpdateTagInput,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { UserRole } from '@prisma/client';
+import { Roles } from '../auth/roles.decorator';
 
+@Roles(UserRole.ADMIN)
 @Resolver(() => TagModel)
 export class TagsResolver {
   constructor(private readonly prisma: PrismaService) {}

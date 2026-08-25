@@ -7,6 +7,7 @@ import { AuthResolver } from './auth.resolver';
 import { AuthService } from './auth.service';
 import { GqlJwtAuthGuard } from './gql-jwt-auth.guard';
 import { JwtStrategy } from './jwt.strategy';
+import { RolesGuard } from './roles.guard';
 import { MailModule } from '../mail/mail.module';
 
 @Module({
@@ -33,6 +34,10 @@ import { MailModule } from '../mail/mail.module';
     {
       provide: APP_GUARD,
       useClass: GqlJwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
   ],
   exports: [AuthService],

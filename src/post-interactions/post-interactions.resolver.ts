@@ -24,6 +24,8 @@ import {
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UserRole } from '@prisma/client';
+import { Roles } from '../auth/roles.decorator';
 
 @Resolver(() => PostLikeModel)
 export class PostInteractionsResolver {
@@ -40,16 +42,19 @@ export class PostInteractionsResolver {
   }
 
   @Query(() => [PostReportModel], { name: 'postReports' })
+  @Roles(UserRole.ADMIN)
   async postReports(): Promise<PostReportModel[]> {
     return this.prisma.postReport.findMany({ where: { isDeleted: false }, orderBy: { createdAt: 'desc' } });
   }
 
   @Query(() => PostReportModel, { name: 'postReport', nullable: true })
+  @Roles(UserRole.ADMIN)
   async postReport(@Args('id') id: string): Promise<PostReportModel | null> {
     return this.prisma.postReport.findFirst({ where: { id, isDeleted: false } });
   }
 
   @Query(() => [PostAttachmentModel], { name: 'postAttachments' })
+  @Roles(UserRole.ADMIN)
   async postAttachments(): Promise<PostAttachmentModel[]> {
     return this.prisma.postAttachment.findMany({
       orderBy: { createdAt: 'desc' },
@@ -57,6 +62,7 @@ export class PostInteractionsResolver {
   }
 
   @Query(() => PostAttachmentModel, { name: 'postAttachment', nullable: true })
+  @Roles(UserRole.ADMIN)
   async postAttachment(
     @Args('id') id: string,
   ): Promise<PostAttachmentModel | null> {
@@ -87,6 +93,7 @@ export class PostInteractionsResolver {
   }
 
   @Mutation(() => PostLikeModel)
+  @Roles(UserRole.ADMIN)
   async updatePostLike(
     @Args('id') id: string,
     @Args('data') data: UpdatePostLikeInput,
@@ -110,11 +117,18 @@ export class PostInteractionsResolver {
   @Mutation(() => PostReportModel)
   async createPostReport(
     @Args('data') data: CreatePostReportInput,
+    @Context() context: { req: { user: { sub: string } } },
   ): Promise<PostReportModel> {
-    return this.prisma.postReport.create({ data });
+    if (data.reporterId !== context.req.user.sub) {
+      throw new ForbiddenException('Action interdite.');
+    }
+    return this.prisma.postReport.create({
+      data: { ...data, reporterId: context.req.user.sub },
+    });
   }
 
   @Mutation(() => PostReportModel)
+  @Roles(UserRole.ADMIN)
   async updatePostReport(
     @Args('id') id: string,
     @Args('data') data: UpdatePostReportInput,
@@ -123,11 +137,13 @@ export class PostInteractionsResolver {
   }
 
   @Mutation(() => PostReportModel)
+  @Roles(UserRole.ADMIN)
   async deletePostReport(@Args('id') id: string): Promise<PostReportModel> {
     return this.prisma.postReport.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
   }
 
   @Mutation(() => PostAttachmentModel)
+  @Roles(UserRole.ADMIN)
   async createPostAttachment(
     @Args('data') data: CreatePostAttachmentInput,
   ): Promise<PostAttachmentModel> {
@@ -135,6 +151,7 @@ export class PostInteractionsResolver {
   }
 
   @Mutation(() => PostAttachmentModel)
+  @Roles(UserRole.ADMIN)
   async updatePostAttachment(
     @Args('id') id: string,
     @Args('data') data: UpdatePostAttachmentInput,
@@ -143,6 +160,7 @@ export class PostInteractionsResolver {
   }
 
   @Mutation(() => PostAttachmentModel)
+  @Roles(UserRole.ADMIN)
   async deletePostAttachment(
     @Args('id') id: string,
   ): Promise<PostAttachmentModel> {

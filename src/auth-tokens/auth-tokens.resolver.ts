@@ -16,7 +16,10 @@ import {
   UserModel,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { UserRole } from '@prisma/client';
+import { Roles } from '../auth/roles.decorator';
 
+@Roles(UserRole.ADMIN)
 @Resolver(() => RefreshTokenModel)
 export class AuthTokensResolver {
   constructor(private readonly prisma: PrismaService) {}
@@ -102,6 +105,7 @@ export class AuthTokensResolver {
   }
 }
 
+@Roles(UserRole.ADMIN)
 @Resolver(() => PasswordResetTokenModel)
 export class PasswordResetTokensResolver {
   constructor(private readonly prisma: PrismaService) {}

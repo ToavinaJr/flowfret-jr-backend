@@ -25,6 +25,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ForbiddenException } from '@nestjs/common';
 import type { GraphQLResolveInfo } from 'graphql';
+import { UserRole } from '@prisma/client';
+import { Roles } from '../auth/roles.decorator';
 
 @Resolver(() => UserModel)
 export class UsersResolver {
@@ -160,6 +162,7 @@ export class UsersResolver {
   }
 
   @ResolveField(() => [PostReportModel], { name: 'reports' })
+  @Roles(UserRole.ADMIN)
   async reports(@Parent() user: UserModel): Promise<PostReportModel[]> {
     return this.prisma.postReport.findMany({
       where: { reporterId: user.id },

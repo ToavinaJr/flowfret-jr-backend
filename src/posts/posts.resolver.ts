@@ -21,6 +21,8 @@ import {
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UserRole } from '@prisma/client';
+import { Roles } from '../auth/roles.decorator';
 
 @Resolver(() => PostModel)
 export class PostsResolver {
@@ -112,6 +114,7 @@ export class PostsResolver {
   }
 
   @ResolveField(() => [PostReportModel], { name: 'reports' })
+  @Roles(UserRole.ADMIN)
   async reports(@Parent() post: PostModel): Promise<PostReportModel[]> {
     return this.prisma.postReport.findMany({
       where: { postId: post.id, isDeleted: false },

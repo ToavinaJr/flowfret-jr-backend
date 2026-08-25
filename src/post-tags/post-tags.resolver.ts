@@ -14,7 +14,10 @@ import {
   UpdatePostTagInput,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { UserRole } from '@prisma/client';
+import { Roles } from '../auth/roles.decorator';
 
+@Roles(UserRole.ADMIN)
 @Resolver(() => PostTagModel)
 export class PostTagsResolver {
   constructor(private readonly prisma: PrismaService) {}

@@ -28,6 +28,10 @@ import { UploadsModule } from './uploads/uploads.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditInterceptor } from './audit-logs/audit.interceptor';
 import { NotificationsService } from './notifications/notifications.service';
+import {
+  AuthTokensResolver,
+  PasswordResetTokensResolver,
+} from './auth-tokens/auth-tokens.resolver';
 
 @Module({
   imports: [
@@ -72,6 +76,8 @@ import { NotificationsService } from './notifications/notifications.service';
     PostAttachmentsResolver,
     PostTagsResolver,
     TagsResolver,
+    AuthTokensResolver,
+    PasswordResetTokensResolver,
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })

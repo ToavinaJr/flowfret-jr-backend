@@ -13,6 +13,11 @@ enum UserStatus {
   DELETED
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 enum ProfileVisibility {
   PUBLIC
   FRIENDS
@@ -133,6 +138,7 @@ model User {
   googleSignupCompleted Boolean               @default(false) @map("google_signup_completed")
   username             String                 @unique @db.VarChar(50)
   status               UserStatus             @default(PENDING)
+  role                 UserRole               @default(USER)
   lastLoginAt          DateTime?              @map("last_login_at") @db.Timestamptz(6)
   createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
