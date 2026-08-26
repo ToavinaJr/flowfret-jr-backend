@@ -1,8 +1,10 @@
 import { Controller, Get, NotFoundException, Query } from '@nestjs/common';
 import { GetLyricsDto } from './dto/get-lyrics.dto';
 import { LyricsService } from './lyrics.service';
+import { Public } from '../../auth/public.decorator';
 
 @Controller('api/lyrics')
+@Public()
 export class LyricsController {
   constructor(private readonly lyrics: LyricsService) {}
 

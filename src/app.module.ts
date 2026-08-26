@@ -49,8 +49,8 @@ import {
     PrismaModule,
     AuthModule,
     MusicModule,
-    LyricsModule,
     TranscriptionsModule,
+    LyricsModule,
     UploadsModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
