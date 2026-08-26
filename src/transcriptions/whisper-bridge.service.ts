@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
-import { resolve } from 'node:path';
+import { delimiter, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import type {
   TranscriptionJobData,
@@ -88,10 +88,17 @@ export class WhisperBridgeService implements OnModuleDestroy {
       process.cwd(),
       'workers/transcription/transcribe.py',
     );
+    const ffmpegBinDir = this.config.get<string>('FFMPEG_BIN_DIR')?.trim();
     const child = spawn(python, [script, '--server'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
-      env: { ...process.env, PYTHONUNBUFFERED: '1' },
+      env: {
+        ...process.env,
+        PYTHONUNBUFFERED: '1',
+        ...(ffmpegBinDir
+          ? { PATH: `${ffmpegBinDir}${delimiter}${process.env.PATH ?? ''}` }
+          : {}),
+      },
     });
     this.logger.log(
       JSON.stringify({
