@@ -25,6 +25,7 @@ import { MusicModule } from './integrations/music/music.module';
 import { TranscriptionsModule } from './transcriptions/transcriptions.module';
 import { validateEnvironment } from './common/validate-environment';
 import { UploadsModule } from './uploads/uploads.module';
+import { LyricsModule } from './integrations/lyrics/lyrics.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditInterceptor } from './audit-logs/audit.interceptor';
 import { NotificationsService } from './notifications/notifications.service';
@@ -48,6 +49,7 @@ import {
     PrismaModule,
     AuthModule,
     MusicModule,
+    LyricsModule,
     TranscriptionsModule,
     UploadsModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({

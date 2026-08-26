@@ -10,6 +10,7 @@ const POSITIVE_INTEGER_KEYS = [
   'TRANSCRIPTION_MAX_REDIRECTS',
   'TRANSCRIPTION_DOWNLOAD_TIMEOUT_MS',
   'REFRESH_TOKEN_TTL_DAYS',
+  'LRCLIB_TIMEOUT_MS',
 ] as const;
 
 export function validateEnvironment(

@@ -15,6 +15,9 @@ export class MusicTrack {
   provider: string;
 
   @Field(() => ID)
+  id: string;
+
+  @Field(() => ID)
   audiusId: string;
 
   @Field()
@@ -28,6 +31,15 @@ export class MusicTrack {
 
   @Field()
   audiusUrl: string;
+
+  @Field()
+  externalUrl: string;
+
+  @Field(() => String, { nullable: true })
+  album: string | null;
+
+  @Field(() => String, { nullable: true })
+  isrc: string | null;
 
   @Field()
   streamUrl: string;

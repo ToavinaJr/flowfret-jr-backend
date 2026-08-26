@@ -31,6 +31,9 @@ export interface SpotifyTrack {
   };
   artists: SpotifyArtist[];
   album: SpotifyAlbum;
+  external_ids?: {
+    isrc?: string;
+  };
 }
 
 export interface SpotifySearchTracksResponse {
