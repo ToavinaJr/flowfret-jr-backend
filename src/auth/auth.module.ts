@@ -9,6 +9,7 @@ import { GqlJwtAuthGuard } from './gql-jwt-auth.guard';
 import { JwtStrategy } from './jwt.strategy';
 import { RolesGuard } from './roles.guard';
 import { MailModule } from '../mail/mail.module';
+import { RateLimitGuard } from './rate-limit.guard';
 
 @Module({
   imports: [
@@ -38,6 +39,10 @@ import { MailModule } from '../mail/mail.module';
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
     },
   ],
   exports: [AuthService],

@@ -1,10 +1,12 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
   app.enableShutdownHooks();
   const rawPort = process.env.PORT;
   const port = rawPort ? Number(rawPort) : 3000;
@@ -41,7 +43,10 @@ async function bootstrap() {
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin || allowedOrigins.has(origin)) return callback(null, true);
-      return callback(new Error(`Origin not allowed by CORS: ${origin}`), false);
+      return callback(
+        new Error(`Origin not allowed by CORS: ${origin}`),
+        false,
+      );
     },
     credentials: true,
   });

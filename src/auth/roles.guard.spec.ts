@@ -8,6 +8,7 @@ describe('RolesGuard', () => {
   const executionContext = {
     getHandler: () => undefined,
     getClass: () => undefined,
+    getType: () => 'graphql',
   } as unknown as ExecutionContext;
 
   afterEach(() => jest.restoreAllMocks());
@@ -31,16 +32,35 @@ describe('RolesGuard', () => {
 
   it('allows an administrator on an admin operation', () => {
     mockRequest(UserRole.ADMIN);
-    expect(createGuard([UserRole.ADMIN]).canActivate(executionContext)).toBe(true);
+    expect(createGuard([UserRole.ADMIN]).canActivate(executionContext)).toBe(
+      true,
+    );
   });
 
   it('rejects a regular user on an admin operation', () => {
     mockRequest(UserRole.USER);
-    expect(createGuard([UserRole.ADMIN]).canActivate(executionContext)).toBe(false);
+    expect(createGuard([UserRole.ADMIN]).canActivate(executionContext)).toBe(
+      false,
+    );
   });
 
   it('rejects a request without an authenticated role', () => {
     mockRequest();
-    expect(createGuard([UserRole.ADMIN]).canActivate(executionContext)).toBe(false);
+    expect(createGuard([UserRole.ADMIN]).canActivate(executionContext)).toBe(
+      false,
+    );
+  });
+
+  it('reads the authenticated user from a REST request', () => {
+    const httpContext = {
+      getHandler: () => undefined,
+      getClass: () => undefined,
+      getType: () => 'http',
+      switchToHttp: () => ({
+        getRequest: () => ({ user: { role: UserRole.ADMIN } }),
+      }),
+    } as unknown as ExecutionContext;
+
+    expect(createGuard([UserRole.ADMIN]).canActivate(httpContext)).toBe(true);
   });
 });

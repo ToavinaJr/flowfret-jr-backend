@@ -123,6 +123,7 @@ model Transcription {
   completedAt       DateTime?           @map("completed_at") @db.Timestamptz(6)
   isDeleted         Boolean             @default(false) @map("is_deleted")
   deletedAt         DateTime?           @map("deleted_at") @db.Timestamptz(6)
+  accessors         TranscriptionAccess[]
 
   @@unique([trackId, requestedLanguage, model, engineVersion], map: "transcriptions_cache_key_unique")
   @@index([trackId])
@@ -159,8 +160,22 @@ model User {
   friendshipsReceived  Friendship[]           @relation("FriendshipReceiver")
   likes                PostLike[]
   reports              PostReport[]           @relation("PostReportsByReporter")
+  transcriptionAccess  TranscriptionAccess[]
 
   @@map("users")
+}
+
+model TranscriptionAccess {
+  userId          String   @map("user_id") @db.Uuid
+  transcriptionId String  @map("transcription_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transcription Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, transcriptionId])
+  @@index([transcriptionId])
+  @@map("transcription_access")
 }
 
 model Profile {

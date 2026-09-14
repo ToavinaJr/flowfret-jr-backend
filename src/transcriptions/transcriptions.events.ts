@@ -65,23 +65,14 @@ export class TranscriptionEvents implements OnModuleDestroy {
 
   subscribe(
     transcriptionId: string,
-    initial: TranscriptionEvent,
+    getInitial: () => Promise<TranscriptionEvent>,
   ): Observable<TranscriptionEvent> {
     return new Observable<TranscriptionEvent>((subscriber) => {
-      this.logger.log(
-        JSON.stringify({
-          event: 'transcription.sse_opened',
-          transcriptionId,
-          initialType: initial.type,
-        }),
-      );
-      subscriber.next(initial);
-      if (this.isTerminal(initial)) {
-        subscriber.complete();
-        return undefined;
-      }
       const redis = new Redis(this.options);
       redis.on('error', (error) => subscriber.error(error));
+      let initialSent = false;
+      let closed = false;
+      const bufferedEvents: TranscriptionEvent[] = [];
       const heartbeat = setInterval(
         () =>
           subscriber.next({
@@ -94,6 +85,10 @@ export class TranscriptionEvents implements OnModuleDestroy {
       redis.on('message', (_channel, payload) => {
         try {
           const event = JSON.parse(payload) as TranscriptionEvent;
+          if (!initialSent) {
+            bufferedEvents.push(event);
+            return;
+          }
           subscriber.next(event);
           if (this.isTerminal(event)) subscriber.complete();
         } catch {
@@ -102,16 +97,33 @@ export class TranscriptionEvents implements OnModuleDestroy {
       });
       void this.ensureConnected(redis)
         .then(() => redis.subscribe(this.channel(transcriptionId)))
-        .then(() =>
+        .then(async () => {
+          const initial = await getInitial();
+          if (closed) return;
           this.logger.log(
             JSON.stringify({
-              event: 'transcription.sse_subscribed',
+              event: 'transcription.sse_opened',
               transcriptionId,
+              initialType: initial.type,
             }),
-          ),
-        )
+          );
+          subscriber.next(initial);
+          initialSent = true;
+          if (this.isTerminal(initial)) {
+            subscriber.complete();
+            return;
+          }
+          for (const event of bufferedEvents) {
+            subscriber.next(event);
+            if (this.isTerminal(event)) {
+              subscriber.complete();
+              break;
+            }
+          }
+        })
         .catch((error: unknown) => subscriber.error(error));
       return () => {
+        closed = true;
         this.logger.log(
           JSON.stringify({
             event: 'transcription.sse_closed',

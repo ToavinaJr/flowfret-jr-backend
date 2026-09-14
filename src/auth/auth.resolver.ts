@@ -15,6 +15,7 @@ import {
 import { AuthService, AuthSessionPayload } from './auth.service';
 import { Public } from './public.decorator';
 import { isDebugEnabled } from '../common/debug';
+import { RateLimit } from './rate-limit.decorator';
 
 @Resolver()
 export class AuthResolver {
@@ -26,6 +27,7 @@ export class AuthResolver {
   ) {}
 
   @Public()
+  @RateLimit(5, 3600)
   @Mutation(() => RegisterPendingPayload)
   async register(
     @Args('data') data: RegisterInput,
@@ -66,6 +68,7 @@ export class AuthResolver {
   }
 
   @Public()
+  @RateLimit(10, 900)
   @Mutation(() => AuthPayload)
   async login(
     @Args('data') data: LoginInput,
@@ -75,6 +78,7 @@ export class AuthResolver {
   }
 
   @Public()
+  @RateLimit(20, 900)
   @Mutation(() => AuthPayload)
   async loginWithGoogle(
     @Args('data') data: GoogleAuthInput,
@@ -87,15 +91,20 @@ export class AuthResolver {
   }
 
   @Public()
+  @RateLimit(10, 3600)
   @Mutation(() => AuthPayload)
   async registerWithGoogle(
     @Args('data') data: GoogleAuthInput,
     @Context('res') response: Response,
   ): Promise<AuthPayload> {
-    return this.setSessionCookie(await this.authService.registerWithGoogle(data), response);
+    return this.setSessionCookie(
+      await this.authService.registerWithGoogle(data),
+      response,
+    );
   }
 
   @Public()
+  @RateLimit(10, 900)
   @Mutation(() => AuthPayload)
   async verifyEmail(
     @Args('data') data: VerifyEmailInput,
@@ -108,6 +117,7 @@ export class AuthResolver {
   }
 
   @Public()
+  @RateLimit(3, 3600)
   @Mutation(() => RegisterPendingPayload)
   async resendVerificationEmail(
     @Args('token') token: string,
@@ -116,6 +126,7 @@ export class AuthResolver {
   }
 
   @Public()
+  @RateLimit(3, 3600)
   @Mutation(() => Boolean)
   async requestPasswordReset(
     @Args('data') data: RequestPasswordResetInput,
@@ -125,6 +136,7 @@ export class AuthResolver {
   }
 
   @Public()
+  @RateLimit(5, 3600)
   @Mutation(() => Boolean)
   async resetPassword(
     @Args('data') data: ResetPasswordInput,
@@ -134,6 +146,7 @@ export class AuthResolver {
   }
 
   @Public()
+  @RateLimit(60, 900)
   @Mutation(() => AuthPayload)
   async refreshSession(
     @Context('req') request: Request,

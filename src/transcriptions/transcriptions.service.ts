@@ -67,6 +67,7 @@ export class TranscriptionsService {
 
   async createOrGet(
     dto: CreateTranscriptionDto,
+    userId: string,
   ): Promise<TranscriptionResponse> {
     const language = dto.language ?? 'auto';
     this.logger.log(
@@ -119,6 +120,7 @@ export class TranscriptionsService {
           errorCode: transcription.errorCode,
         }),
       );
+    await this.repository.grantAccess(userId, transcription.id);
     if (transcription.status === TranscriptionStatus.FAILED)
       return this.toResponse(transcription, null, false);
     if (transcription.status === TranscriptionStatus.COMPLETED) {
@@ -212,8 +214,8 @@ export class TranscriptionsService {
     return this.toResponse(transcription, jobId, false);
   }
 
-  async get(id: string): Promise<TranscriptionResponse> {
-    const transcription = await this.requireOne(id);
+  async get(id: string, userId: string): Promise<TranscriptionResponse> {
+    const transcription = await this.requireOne(id, userId);
     const jobId = buildTranscriptionJobId(
       transcription.trackId,
       transcription.requestedLanguage === 'auto'
@@ -229,8 +231,11 @@ export class TranscriptionsService {
     );
   }
 
-  async getEventSnapshot(id: string): Promise<TranscriptionEvent> {
-    const item = await this.requireOne(id);
+  async getEventSnapshot(
+    id: string,
+    userId: string,
+  ): Promise<TranscriptionEvent> {
+    const item = await this.requireOne(id, userId);
     const type =
       item.status === TranscriptionStatus.COMPLETED
         ? 'transcription.completed'
@@ -250,8 +255,11 @@ export class TranscriptionsService {
     };
   }
 
-  async getLrc(id: string): Promise<{ content: string; filename: string }> {
-    const item = await this.requireOne(id);
+  async getLrc(
+    id: string,
+    userId: string,
+  ): Promise<{ content: string; filename: string }> {
+    const item = await this.requireOne(id, userId);
     if (!item.lrcContent)
       throw new ConflictException({
         code: 'TRANSCRIPTION_NOT_READY',
@@ -267,8 +275,12 @@ export class TranscriptionsService {
     return { content: item.lrcContent, filename: `${safe}.lrc` };
   }
 
-  async retry(id: string, audioUrl: string): Promise<TranscriptionResponse> {
-    const item = await this.requireOne(id);
+  async retry(
+    id: string,
+    audioUrl: string,
+    userId: string,
+  ): Promise<TranscriptionResponse> {
+    const item = await this.requireOne(id, userId);
     if (item.status !== TranscriptionStatus.FAILED)
       throw new ConflictException({
         code: 'TRANSCRIPTION_ALREADY_RUNNING',
@@ -381,9 +393,9 @@ export class TranscriptionsService {
     }
   }
 
-  private async requireOne(id: string): Promise<Transcription> {
+  private async requireOne(id: string, userId: string): Promise<Transcription> {
     const item = await this.repository.findById(id);
-    if (!item)
+    if (!item || !(await this.repository.hasAccess(userId, id)))
       throw new NotFoundException({
         code: 'TRANSCRIPTION_NOT_FOUND',
         message: 'Transcription not found',

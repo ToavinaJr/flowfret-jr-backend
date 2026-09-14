@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { TranscriptionStatus } from '@prisma/client';
+import { TranscriptionStatus, type Transcription } from '@prisma/client';
 import type { Queue } from 'bullmq';
 import type { TranscriptionJobData } from './entities/transcription.types';
 import { TranscriptionEvents } from './transcriptions.events';
@@ -7,7 +7,7 @@ import { TranscriptionsRepository } from './transcriptions.repository';
 import { TranscriptionsService } from './transcriptions.service';
 
 describe('TranscriptionsService', () => {
-  const record = {
+  const record: Transcription = {
     id: '11111111-1111-4111-8111-111111111111',
     trackId: 'track',
     title: 'Title',
@@ -26,6 +26,8 @@ describe('TranscriptionsService', () => {
     errorCode: null,
     errorMessage: null,
     attempts: 0,
+    isDeleted: false,
+    deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     completedAt: null,
@@ -36,6 +38,8 @@ describe('TranscriptionsService', () => {
       create: jest.fn().mockResolvedValue(record),
       findById: jest.fn().mockResolvedValue(existing ?? record),
       update: jest.fn(),
+      grantAccess: jest.fn().mockResolvedValue(undefined),
+      hasAccess: jest.fn().mockResolvedValue(true),
       saveSegments: jest.fn(),
       markFailed: jest.fn(),
     };
@@ -58,11 +62,14 @@ describe('TranscriptionsService', () => {
   }
   it('creates and enqueues immediately without invoking Whisper', async () => {
     const { service, queue } = setup();
-    const result = await service.createOrGet({
-      trackId: 'track',
-      audioUrl: 'https://api.audius.co/audio',
-      model: 'small',
-    });
+    const result = await service.createOrGet(
+      {
+        trackId: 'track',
+        audioUrl: 'https://api.audius.co/audio',
+        model: 'small',
+      },
+      'user-id',
+    );
     expect(result.status).toBe('PENDING');
     expect(queue.add).toHaveBeenCalledTimes(1);
   });
@@ -74,11 +81,14 @@ describe('TranscriptionsService', () => {
       lrcContent: '[00:00.00]Hi',
     };
     const { service, queue } = setup(completed);
-    const result = await service.createOrGet({
-      trackId: 'track',
-      audioUrl: 'https://api.audius.co/audio',
-      model: 'small',
-    });
+    const result = await service.createOrGet(
+      {
+        trackId: 'track',
+        audioUrl: 'https://api.audius.co/audio',
+        model: 'small',
+      },
+      'user-id',
+    );
     expect(result.cached).toBe(true);
     expect(result.jobId).toBeNull();
     expect(queue.add).not.toHaveBeenCalled();
@@ -86,11 +96,23 @@ describe('TranscriptionsService', () => {
   it('reuses an existing deterministic BullMQ job', async () => {
     const { service, queue } = setup(record);
     queue.getJob.mockResolvedValue({ id: 'existing' });
-    await service.createOrGet({
-      trackId: 'track',
-      audioUrl: 'https://api.audius.co/audio',
-      model: 'small',
-    });
+    await service.createOrGet(
+      {
+        trackId: 'track',
+        audioUrl: 'https://api.audius.co/audio',
+        model: 'small',
+      },
+      'user-id',
+    );
     expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('does not expose a transcription to a user without access', async () => {
+    const { service, repository } = setup(record);
+    repository.hasAccess.mockResolvedValue(false);
+
+    await expect(service.get(record.id, 'another-user')).rejects.toMatchObject({
+      status: 404,
+    });
   });
 });

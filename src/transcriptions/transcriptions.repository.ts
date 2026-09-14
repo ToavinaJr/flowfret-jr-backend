@@ -46,6 +46,25 @@ export class TranscriptionsRepository {
       }),
     );
   }
+  grantAccess(userId: string, transcriptionId: string): Promise<unknown> {
+    return this.execute('grantAccess', () =>
+      this.prisma.transcriptionAccess.upsert({
+        where: { userId_transcriptionId: { userId, transcriptionId } },
+        create: { userId, transcriptionId },
+        update: {},
+      }),
+    );
+  }
+  hasAccess(userId: string, transcriptionId: string): Promise<boolean> {
+    return this.execute('hasAccess', async () =>
+      Boolean(
+        await this.prisma.transcriptionAccess.findUnique({
+          where: { userId_transcriptionId: { userId, transcriptionId } },
+          select: { userId: true },
+        }),
+      ),
+    );
+  }
   create(data: {
     trackId: string;
     title?: string;

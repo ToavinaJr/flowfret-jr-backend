@@ -26,31 +26,57 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
+import { requireVisiblePost, visiblePostWhere } from '../common/post-access';
 
 @Resolver(() => PostLikeModel)
 export class PostInteractionsResolver {
-  constructor(private readonly prisma: PrismaService, private readonly notifications: NotificationsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   @Query(() => [PostLikeModel], { name: 'postLikes' })
-  async postLikes(): Promise<PostLikeModel[]> {
-    return this.prisma.postLike.findMany({ where: { isDeleted: false }, orderBy: { createdAt: 'desc' } });
+  async postLikes(
+    @Context() context: { req: { user: { sub: string } } },
+  ): Promise<PostLikeModel[]> {
+    return this.prisma.postLike.findMany({
+      where: {
+        isDeleted: false,
+        post: await visiblePostWhere(this.prisma, context.req.user.sub),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
   }
 
   @Query(() => PostLikeModel, { name: 'postLike', nullable: true })
-  async postLike(@Args('id') id: string): Promise<PostLikeModel | null> {
-    return this.prisma.postLike.findFirst({ where: { id, isDeleted: false } });
+  async postLike(
+    @Args('id') id: string,
+    @Context() context: { req: { user: { sub: string } } },
+  ): Promise<PostLikeModel | null> {
+    const like = await this.prisma.postLike.findFirst({
+      where: { id, isDeleted: false },
+    });
+    if (like)
+      await requireVisiblePost(this.prisma, like.postId, context.req.user.sub);
+    return like;
   }
 
   @Query(() => [PostReportModel], { name: 'postReports' })
   @Roles(UserRole.ADMIN)
   async postReports(): Promise<PostReportModel[]> {
-    return this.prisma.postReport.findMany({ where: { isDeleted: false }, orderBy: { createdAt: 'desc' } });
+    return this.prisma.postReport.findMany({
+      where: { isDeleted: false },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   @Query(() => PostReportModel, { name: 'postReport', nullable: true })
   @Roles(UserRole.ADMIN)
   async postReport(@Args('id') id: string): Promise<PostReportModel | null> {
-    return this.prisma.postReport.findFirst({ where: { id, isDeleted: false } });
+    return this.prisma.postReport.findFirst({
+      where: { id, isDeleted: false },
+    });
   }
 
   @Query(() => [PostAttachmentModel], { name: 'postAttachments' })
@@ -66,7 +92,9 @@ export class PostInteractionsResolver {
   async postAttachment(
     @Args('id') id: string,
   ): Promise<PostAttachmentModel | null> {
-    return this.prisma.postAttachment.findFirst({ where: { id, isDeleted: false } });
+    return this.prisma.postAttachment.findFirst({
+      where: { id, isDeleted: false },
+    });
   }
 
   @Mutation(() => PostLikeModel)
@@ -74,21 +102,54 @@ export class PostInteractionsResolver {
     @Args('data') data: CreatePostLikeInput,
     @Context() context: { req: { user: { sub: string; username: string } } },
   ): Promise<PostLikeModel> {
-    if (data.userId !== context.req.user.sub) throw new ForbiddenException('Action interdite.');
+    if (data.userId !== context.req.user.sub)
+      throw new ForbiddenException('Action interdite.');
+    await requireVisiblePost(this.prisma, data.postId, context.req.user.sub);
     const result = await this.prisma.$transaction(async (tx) => {
-      const post = await tx.post.findFirst({ where: { id: data.postId, isDeleted: false } });
+      const post = await tx.post.findFirst({
+        where: { id: data.postId, isDeleted: false },
+      });
       if (!post) throw new NotFoundException('Publication introuvable.');
-      const previous = await tx.postLike.findUnique({ where: { postId_userId: { postId: data.postId, userId: context.req.user.sub } } });
+      const previous = await tx.postLike.findUnique({
+        where: {
+          postId_userId: { postId: data.postId, userId: context.req.user.sub },
+        },
+      });
       if (previous && !previous.isDeleted) return previous;
       const like = previous
-        ? await tx.postLike.update({ where: { id: previous.id }, data: { isDeleted: false, deletedAt: null } })
-        : await tx.postLike.create({ data: { postId: data.postId, userId: context.req.user.sub } });
-      await tx.post.update({ where: { id: data.postId }, data: { likeCount: { increment: 1 } } });
-      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'POST_LIKED', entityType: 'post', entityId: data.postId, metadata: { likeId: like.id } } });
+        ? await tx.postLike.update({
+            where: { id: previous.id },
+            data: { isDeleted: false, deletedAt: null },
+          })
+        : await tx.postLike.create({
+            data: { postId: data.postId, userId: context.req.user.sub },
+          });
+      await tx.post.update({
+        where: { id: data.postId },
+        data: { likeCount: { increment: 1 } },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: context.req.user.sub,
+          action: 'POST_LIKED',
+          entityType: 'post',
+          entityId: data.postId,
+          metadata: { likeId: like.id },
+        },
+      });
       return like;
     });
-    const post = await this.prisma.post.findUnique({ where: { id: data.postId }, select: { authorId: true } });
-    if (post) await this.notifications.postLiked(context.req.user.sub, context.req.user.username, data.postId, post.authorId);
+    const post = await this.prisma.post.findUnique({
+      where: { id: data.postId },
+      select: { authorId: true },
+    });
+    if (post)
+      await this.notifications.postLiked(
+        context.req.user.sub,
+        context.req.user.username,
+        data.postId,
+        post.authorId,
+      );
     return result;
   }
 
@@ -102,14 +163,34 @@ export class PostInteractionsResolver {
   }
 
   @Mutation(() => PostLikeModel)
-  async deletePostLike(@Args('id') id: string, @Context() context: { req: { user: { sub: string } } }): Promise<PostLikeModel> {
+  async deletePostLike(
+    @Args('id') id: string,
+    @Context() context: { req: { user: { sub: string } } },
+  ): Promise<PostLikeModel> {
     return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.postLike.findFirst({ where: { id, isDeleted: false } });
+      const existing = await tx.postLike.findFirst({
+        where: { id, isDeleted: false },
+      });
       if (!existing) throw new NotFoundException('Like introuvable.');
-      if (existing.userId !== context.req.user.sub) throw new ForbiddenException('Action interdite.');
-      const like = await tx.postLike.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
-      await tx.post.updateMany({ where: { id: existing.postId, likeCount: { gt: 0 } }, data: { likeCount: { decrement: 1 } } });
-      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'POST_UNLIKED', entityType: 'post', entityId: existing.postId, metadata: { likeId: id } } });
+      if (existing.userId !== context.req.user.sub)
+        throw new ForbiddenException('Action interdite.');
+      const like = await tx.postLike.update({
+        where: { id },
+        data: { isDeleted: true, deletedAt: new Date() },
+      });
+      await tx.post.updateMany({
+        where: { id: existing.postId, likeCount: { gt: 0 } },
+        data: { likeCount: { decrement: 1 } },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: context.req.user.sub,
+          action: 'POST_UNLIKED',
+          entityType: 'post',
+          entityId: existing.postId,
+          metadata: { likeId: id },
+        },
+      });
       return like;
     });
   }
@@ -122,8 +203,13 @@ export class PostInteractionsResolver {
     if (data.reporterId !== context.req.user.sub) {
       throw new ForbiddenException('Action interdite.');
     }
+    await requireVisiblePost(this.prisma, data.postId, context.req.user.sub);
     return this.prisma.postReport.create({
-      data: { ...data, reporterId: context.req.user.sub },
+      data: {
+        postId: data.postId,
+        reporterId: context.req.user.sub,
+        reason: data.reason,
+      },
     });
   }
 
@@ -139,7 +225,10 @@ export class PostInteractionsResolver {
   @Mutation(() => PostReportModel)
   @Roles(UserRole.ADMIN)
   async deletePostReport(@Args('id') id: string): Promise<PostReportModel> {
-    return this.prisma.postReport.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
+    return this.prisma.postReport.update({
+      where: { id },
+      data: { isDeleted: true, deletedAt: new Date() },
+    });
   }
 
   @Mutation(() => PostAttachmentModel)
@@ -164,7 +253,10 @@ export class PostInteractionsResolver {
   async deletePostAttachment(
     @Args('id') id: string,
   ): Promise<PostAttachmentModel> {
-    return this.prisma.postAttachment.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
+    return this.prisma.postAttachment.update({
+      where: { id },
+      data: { isDeleted: true, deletedAt: new Date() },
+    });
   }
 
   @ResolveField(() => PostModel, { name: 'post' })

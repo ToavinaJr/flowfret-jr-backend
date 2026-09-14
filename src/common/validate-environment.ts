@@ -28,5 +28,13 @@ export function validateEnvironment(
     throw new Error('REDIS_TLS must be true or false');
   if (typeof redisTls === 'string' && !['true', 'false'].includes(redisTls))
     throw new Error('REDIS_TLS must be true or false');
+  if (environment.NODE_ENV === 'production') {
+    const jwtSecret = environment.JWT_SECRET;
+    if (typeof jwtSecret !== 'string' || jwtSecret.length < 32) {
+      throw new Error(
+        'JWT_SECRET must contain at least 32 characters in production',
+      );
+    }
+  }
   return environment;
 }

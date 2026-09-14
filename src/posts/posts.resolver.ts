@@ -7,7 +7,11 @@ import {
   Resolver,
   Query,
 } from '@nestjs/graphql';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   CommentModel,
   CreatePostInput,
@@ -23,37 +27,94 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
+import { requireVisiblePost, visiblePostWhere } from '../common/post-access';
 
 @Resolver(() => PostModel)
 export class PostsResolver {
-  constructor(private readonly prisma: PrismaService, private readonly notifications: NotificationsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   @Query(() => [PostModel], { name: 'posts' })
-  async posts(): Promise<PostModel[]> {
-    return this.prisma.post.findMany({ where: { isDeleted: false }, orderBy: { createdAt: 'desc' } });
+  async posts(
+    @Context() context: { req: { user: { sub: string } } },
+  ): Promise<PostModel[]> {
+    return this.prisma.post.findMany({
+      where: await visiblePostWhere(this.prisma, context.req.user.sub),
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
   }
 
   @Query(() => PostModel, { name: 'post', nullable: true })
-  async post(@Args('id') id: string): Promise<PostModel | null> {
-    return this.prisma.post.findFirst({ where: { id, isDeleted: false } });
+  async post(
+    @Args('id') id: string,
+    @Context() context: { req: { user: { sub: string } } },
+  ): Promise<PostModel | null> {
+    return requireVisiblePost(this.prisma, id, context.req.user.sub);
   }
 
   @Mutation(() => PostModel)
-  async createPost(@Args('data') data: CreatePostInput, @Context() context: { req: { user: { sub: string; username: string } } }): Promise<PostModel> {
-    if (data.authorId !== context.req.user.sub) throw new ForbiddenException('Vous ne pouvez publier qu’en votre nom.');
+  async createPost(
+    @Args('data') data: CreatePostInput,
+    @Context() context: { req: { user: { sub: string; username: string } } },
+  ): Promise<PostModel> {
+    if (data.authorId !== context.req.user.sub)
+      throw new ForbiddenException('Vous ne pouvez publier qu’en votre nom.');
     const content = data.content?.trim() || null;
     const imageUploadIds = data.imageUploadIds ?? [];
-    if (!content && imageUploadIds.length === 0) throw new BadRequestException('Ajoutez un texte ou au moins une image.');
-    const uploads = imageUploadIds.length ? await this.prisma.upload.findMany({ where: { id: { in: imageUploadIds }, userId: context.req.user.sub, isDeleted: false, fileType: { startsWith: 'image/' } } }) : [];
-    if (uploads.length !== imageUploadIds.length) throw new BadRequestException('Une ou plusieurs images sont invalides.');
-    const { imageUploadIds: _imageUploadIds, ...postData } = data;
-    const post = await this.prisma.$transaction(async tx => {
-      const post = await tx.post.create({ data: { ...postData, content, authorId: context.req.user.sub, attachments: imageUploadIds.length ? { create: imageUploadIds.map((uploadId, position) => ({ uploadId, position, kind: 'IMAGE' })) } : undefined } });
-      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'POST_CREATED', entityType: 'post', entityId: post.id, metadata: { imageCount: imageUploadIds.length } } });
+    if (!content && imageUploadIds.length === 0)
+      throw new BadRequestException('Ajoutez un texte ou au moins une image.');
+    const uploads = imageUploadIds.length
+      ? await this.prisma.upload.findMany({
+          where: {
+            id: { in: imageUploadIds },
+            userId: context.req.user.sub,
+            isDeleted: false,
+            fileType: { startsWith: 'image/' },
+          },
+        })
+      : [];
+    if (uploads.length !== imageUploadIds.length)
+      throw new BadRequestException('Une ou plusieurs images sont invalides.');
+    const post = await this.prisma.$transaction(async (tx) => {
+      const post = await tx.post.create({
+        data: {
+          content,
+          coverImageUrl: data.coverImageUrl,
+          audioUrl: data.audioUrl,
+          visibility: data.visibility,
+          authorId: context.req.user.sub,
+          status: 'ACTIVE',
+          attachments: imageUploadIds.length
+            ? {
+                create: imageUploadIds.map((uploadId, position) => ({
+                  uploadId,
+                  position,
+                  kind: 'IMAGE',
+                })),
+              }
+            : undefined,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: context.req.user.sub,
+          action: 'POST_CREATED',
+          entityType: 'post',
+          entityId: post.id,
+          metadata: { imageCount: imageUploadIds.length },
+        },
+      });
       return post;
     });
     if (post.visibility !== 'PRIVATE') {
-      await this.notifications.friendPosted(context.req.user.sub, context.req.user.username, post.id);
+      await this.notifications.friendPosted(
+        context.req.user.sub,
+        context.req.user.username,
+        post.id,
+      );
     }
     return post;
   }
@@ -64,30 +125,70 @@ export class PostsResolver {
     @Args('data') data: UpdatePostInput,
     @Context() context: { req: { user: { sub: string } } },
   ): Promise<PostModel> {
-    const post = await this.prisma.post.findFirst({ where: { id, isDeleted: false } });
+    const post = await this.prisma.post.findFirst({
+      where: { id, isDeleted: false },
+    });
     if (!post) throw new NotFoundException('Publication introuvable.');
-    if (post.authorId !== context.req.user.sub) throw new ForbiddenException('Seul le propriétaire peut modifier cette publication.');
-    const { authorId: _authorId, imageUploadIds: _imageUploadIds, ...safeData } = data;
+    if (post.authorId !== context.req.user.sub)
+      throw new ForbiddenException(
+        'Seul le propriétaire peut modifier cette publication.',
+      );
+    const safeData = { ...data };
+    delete safeData.authorId;
+    delete safeData.imageUploadIds;
+    delete safeData.status;
     if (safeData.content !== undefined && !safeData.content?.trim()) {
-      const imageCount = await this.prisma.postAttachment.count({ where: { postId: id, kind: 'IMAGE', isDeleted: false } });
-      if (imageCount === 0) throw new BadRequestException('Une publication doit contenir du texte ou une image.');
+      const imageCount = await this.prisma.postAttachment.count({
+        where: { postId: id, kind: 'IMAGE', isDeleted: false },
+      });
+      if (imageCount === 0)
+        throw new BadRequestException(
+          'Une publication doit contenir du texte ou une image.',
+        );
       safeData.content = null;
     }
-    return this.prisma.$transaction(async tx => {
+    return this.prisma.$transaction(async (tx) => {
       const updated = await tx.post.update({ where: { id }, data: safeData });
-      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'POST_UPDATED', entityType: 'post', entityId: id, metadata: {} } });
+      await tx.auditLog.create({
+        data: {
+          actorId: context.req.user.sub,
+          action: 'POST_UPDATED',
+          entityType: 'post',
+          entityId: id,
+          metadata: {},
+        },
+      });
       return updated;
     });
   }
 
   @Mutation(() => PostModel)
-  async deletePost(@Args('id') id: string, @Context() context: { req: { user: { sub: string } } }): Promise<PostModel> {
-    const post = await this.prisma.post.findFirst({ where: { id, isDeleted: false } });
+  async deletePost(
+    @Args('id') id: string,
+    @Context() context: { req: { user: { sub: string } } },
+  ): Promise<PostModel> {
+    const post = await this.prisma.post.findFirst({
+      where: { id, isDeleted: false },
+    });
     if (!post) throw new NotFoundException('Publication introuvable.');
-    if (post.authorId !== context.req.user.sub) throw new ForbiddenException('Seul le propriétaire peut supprimer cette publication.');
-    return this.prisma.$transaction(async tx => {
-      const deleted = await tx.post.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' } });
-      await tx.auditLog.create({ data: { actorId: context.req.user.sub, action: 'POST_DELETED', entityType: 'post', entityId: id, metadata: {} } });
+    if (post.authorId !== context.req.user.sub)
+      throw new ForbiddenException(
+        'Seul le propriétaire peut supprimer cette publication.',
+      );
+    return this.prisma.$transaction(async (tx) => {
+      const deleted = await tx.post.update({
+        where: { id },
+        data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: context.req.user.sub,
+          action: 'POST_DELETED',
+          entityType: 'post',
+          entityId: id,
+          metadata: {},
+        },
+      });
       return deleted;
     });
   }
@@ -132,6 +233,8 @@ export class PostsResolver {
 
   @ResolveField(() => [PostTagModel], { name: 'tags' })
   async tags(@Parent() post: PostModel): Promise<PostTagModel[]> {
-    return this.prisma.postTag.findMany({ where: { postId: post.id, isDeleted: false } });
+    return this.prisma.postTag.findMany({
+      where: { postId: post.id, isDeleted: false },
+    });
   }
 }

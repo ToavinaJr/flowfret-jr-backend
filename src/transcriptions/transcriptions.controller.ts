@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Req,
   Res,
   Sse,
   UseGuards,
@@ -18,6 +19,9 @@ import { CreateTranscriptionDto } from './dto/create-transcription.dto';
 import { RetryTranscriptionDto } from './dto/retry-transcription.dto';
 import { TranscriptionEvents } from './transcriptions.events';
 import { TranscriptionsService } from './transcriptions.service';
+import { RateLimit } from '../auth/rate-limit.decorator';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '@prisma/client';
 
 @Controller('api/transcriptions')
 @UseGuards(AuthGuard('jwt'))
@@ -28,27 +32,35 @@ export class TranscriptionsController {
   ) {}
 
   @Post()
-  create(@Body() dto: CreateTranscriptionDto) {
-    return this.service.createOrGet(dto);
+  @RateLimit(10, 3600)
+  create(
+    @Body() dto: CreateTranscriptionDto,
+    @Req() req: { user: { sub: string } },
+  ) {
+    return this.service.createOrGet(dto, req.user.sub);
   }
 
   @Get('diagnostics/queue')
+  @Roles(UserRole.ADMIN)
   diagnostics() {
     return this.service.diagnostics();
   }
 
   @Get(':id')
-  get(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.get(id);
+  get(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: { user: { sub: string } },
+  ) {
+    return this.service.get(id, req.user.sub);
   }
 
   @Sse(':id/events')
-  async stream(
+  stream(
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<Observable<MessageEvent>> {
-    const snapshot = await this.service.getEventSnapshot(id);
+    @Req() req: { user: { sub: string } },
+  ): Observable<MessageEvent> {
     return this.events
-      .subscribe(id, snapshot)
+      .subscribe(id, () => this.service.getEventSnapshot(id, req.user.sub))
       .pipe(map((event): MessageEvent => ({ type: event.type, data: event })));
   }
 
@@ -57,8 +69,9 @@ export class TranscriptionsController {
   async lrc(
     @Param('id', ParseUUIDPipe) id: string,
     @Res() response: Response,
+    @Req() req: { user: { sub: string } },
   ): Promise<void> {
-    const file = await this.service.getLrc(id);
+    const file = await this.service.getLrc(id, req.user.sub);
     response.setHeader(
       'Content-Disposition',
       `attachment; filename="${file.filename}"`,
@@ -67,10 +80,12 @@ export class TranscriptionsController {
   }
 
   @Post(':id/retry')
+  @RateLimit(5, 3600)
   retry(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RetryTranscriptionDto,
+    @Req() req: { user: { sub: string } },
   ) {
-    return this.service.retry(id, dto.audioUrl);
+    return this.service.retry(id, dto.audioUrl, req.user.sub);
   }
 }

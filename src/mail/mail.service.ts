@@ -17,6 +17,20 @@ interface PasswordResetEmailPayload {
   expiresInMinutes: number;
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(
+    /[&<>'"]/g,
+    (character) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;',
+      })[character]!,
+  );
+}
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -53,24 +67,27 @@ export class MailService {
       'Si vous n’avez pas créé de compte, ignorez cet e-mail.',
     ].join('\n');
 
+    const safeUsername = escapeHtml(payload.username);
+    const safeCode = escapeHtml(payload.otpCode);
+    const safeLink = escapeHtml(payload.verificationLink);
     const html = `
       <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto;">
         <h2 style="color: #111;">FretFlow</h2>
-        <p>Bonjour <strong>${payload.username}</strong>,</p>
+        <p>Bonjour <strong>${safeUsername}</strong>,</p>
         <p>Votre code de vérification à 4 chiffres :</p>
         <p style="font-size: 28px; letter-spacing: 8px; font-weight: 700; color: #111;">
-          ${payload.otpCode}
+          ${safeCode}
         </p>
         <p>Ce code expire dans <strong>${payload.expiresInMinutes} minutes</strong>.</p>
         <p>
-          <a href="${payload.verificationLink}"
+          <a href="${safeLink}"
              style="display:inline-block;padding:12px 20px;background:#e11d48;color:#fff;text-decoration:none;border-radius:8px;">
             Vérifier mon compte
           </a>
         </p>
         <p style="color:#666;font-size:13px;">
           Ou copiez ce lien :<br/>
-          <a href="${payload.verificationLink}">${payload.verificationLink}</a>
+          <a href="${safeLink}">${safeLink}</a>
         </p>
       </div>
     `;
@@ -104,12 +121,14 @@ export class MailService {
       '',
       "Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.",
     ].join('\n');
+    const safeUsername = escapeHtml(payload.username);
+    const safeLink = escapeHtml(payload.resetLink);
     const html = `
       <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto;">
         <h2>FretFlow</h2>
-        <p>Bonjour <strong>${payload.username}</strong>,</p>
+        <p>Bonjour <strong>${safeUsername}</strong>,</p>
         <p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
-        <p><a href="${payload.resetLink}" style="display:inline-block;padding:12px 20px;background:#e11d48;color:#fff;text-decoration:none;border-radius:8px;">Choisir un nouveau mot de passe</a></p>
+        <p><a href="${safeLink}" style="display:inline-block;padding:12px 20px;background:#e11d48;color:#fff;text-decoration:none;border-radius:8px;">Choisir un nouveau mot de passe</a></p>
         <p>Ce lien expire dans ${payload.expiresInMinutes} minutes.</p>
         <p style="color:#666;font-size:13px;">Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.</p>
       </div>`;

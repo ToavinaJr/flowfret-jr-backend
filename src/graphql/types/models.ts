@@ -1,4 +1,10 @@
-import { Field, GraphQLISODateTime, Int, ObjectType } from '@nestjs/graphql';
+import {
+  Field,
+  GraphQLISODateTime,
+  HideField,
+  Int,
+  ObjectType,
+} from '@nestjs/graphql';
 import {
   AttachmentKind,
   CommentStatus,
@@ -21,9 +27,9 @@ export class UserModel {
   @Field() id!: string;
   @Field() email!: string;
   @Field() username!: string;
-  @Field(() => String, { nullable: true }) googleId?: string | null;
+  @HideField() googleId?: string | null;
   @Field(() => UserStatus) status!: UserStatus;
-  @Field(() => GraphQLISODateTime, { nullable: true })
+  @HideField()
   lastLoginAt!: Date | null;
   @Field(() => GraphQLISODateTime) createdAt!: Date;
   @Field(() => GraphQLISODateTime) updatedAt!: Date;
