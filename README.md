@@ -143,7 +143,7 @@ The API and worker are separate services; restarting the worker does not stop HT
 
 `start:render` starts only the HTTP API. It cannot process transcription jobs by itself. Create the background worker from `render.yaml` (Render Dashboard **Blueprints > New Blueprint Instance**) or create a Background Worker manually with `Dockerfile.worker`.
 
-Copy the exact same `DATABASE_URL`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS`, and Audius variables from the web service to the worker. The API and worker must point to the same PostgreSQL database and Redis instance. A worker is a paid Render service; keep at least the `standard` plan for the `small` Whisper model. After deployment, its logs must contain `TranscriptionsWorkerModule dependencies initialized` and the BullMQ worker must remain running.
+Set a randomly generated `JWT_SECRET` of at least 32 characters in Render for the web service and worker. Copy the exact same `DATABASE_URL`, `JWT_SECRET`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS`, and Audius variables from the web service to the worker. The API and worker must point to the same PostgreSQL database and Redis instance. A worker is a paid Render service; keep at least the `standard` plan for the `small` Whisper model. After deployment, its logs must contain `TranscriptionsWorkerModule dependencies initialized` and the BullMQ worker must remain running.
 
 The frontend receives the canonical `https://api.audius.co/v1/tracks/:id/stream` URL. It retries that endpoint when an Audius storage node is temporarily unreachable; signed storage-node URLs are never persisted or returned as the durable player URL.
 
