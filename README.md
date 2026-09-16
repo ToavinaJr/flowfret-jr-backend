@@ -145,6 +145,8 @@ The API and worker are separate services; restarting the worker does not stop HT
 
 Set a randomly generated `JWT_SECRET` of at least 32 characters in Render for the web service and worker. Copy the exact same `DATABASE_URL`, `JWT_SECRET`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS`, and Audius variables from the web service to the worker. The API and worker must point to the same PostgreSQL database and Redis instance. A worker is a paid Render service; keep at least the `standard` plan for the `small` Whisper model. After deployment, its logs must contain `TranscriptionsWorkerModule dependencies initialized` and the BullMQ worker must remain running.
 
+For Neon or another hosted PostgreSQL service, use the pooled URL in `DATABASE_URL` for the application and set `DIRECT_DATABASE_URL` to the provider's direct, non-pooler URL. Prisma migrations use `DIRECT_DATABASE_URL` to avoid advisory-lock timeouts through a transaction pooler. Run the migration in one service only; do not run `prisma migrate deploy` concurrently in the web service and transcription worker.
+
 The frontend receives the canonical `https://api.audius.co/v1/tracks/:id/stream` URL. It retries that endpoint when an Audius storage node is temporarily unreachable; signed storage-node URLs are never persisted or returned as the durable player URL.
 
 ### REST endpoints

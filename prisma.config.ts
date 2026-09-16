@@ -9,10 +9,10 @@ config({ path: resolve(process.cwd(), `.env.${nodeEnv}`) });
 config({ path: resolve(process.cwd(), '.env.local') });
 config({ path: resolve(process.cwd(), '.env') });
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL;
 if (!databaseUrl) {
   throw new Error(
-    `DATABASE_URL is missing. Set it in .env.${nodeEnv} (or .env).`,
+    `DATABASE_URL or DIRECT_DATABASE_URL is missing. Set it in .env.${nodeEnv} (or .env).`,
   );
 }
 
