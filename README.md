@@ -147,6 +147,40 @@ Set a randomly generated `JWT_SECRET` of at least 32 characters in Render for th
 
 For Neon or another hosted PostgreSQL service, use the pooled URL in `DATABASE_URL` for the application and set `DIRECT_DATABASE_URL` to the provider's direct, non-pooler URL. Prisma migrations use `DIRECT_DATABASE_URL` to avoid advisory-lock timeouts through a transaction pooler. Run the migration in one service only; do not run `prisma migrate deploy` concurrently in the web service and transcription worker.
 
+### VPS deployment
+
+On an Ubuntu VPS, install Docker and Git, then deploy the repository with the local API, PostgreSQL, Redis, and transcription worker:
+
+```bash
+mkdir -p ~/apps
+cd ~/apps
+git clone https://github.com/ToavinaJr/backend-guitare-app.git
+cd backend-guitare-app
+cp .env.example .env
+nano .env
+```
+
+Set a long random `POSTGRES_PASSWORD`, production `JWT_SECRET`, Audius credentials, and Azure transcription settings in `.env`:
+
+```env
+LLM_PROVIDER=azure
+AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com
+AZURE_OPENAI_API_KEY=<secret>
+AZURE_OPENAI_DEPLOYMENT=whisper
+AZURE_OPENAI_API_VERSION=2024-06-01
+```
+
+The deployment compose file keeps PostgreSQL and Redis private and exposes the API on port `3000`. Start the dependencies, apply migrations once, then start the API and worker:
+
+```bash
+docker compose up -d db redis
+docker compose run --rm backend npx prisma migrate deploy
+docker compose up -d --build backend transcription-worker
+docker compose logs -f transcription-worker
+```
+
+The worker log must contain `worker.ready`. The API queue diagnostics must report `workerCount: 1` or higher. Do not expose ports `5434` or `6379` publicly; use a reverse proxy such as Nginx or Caddy for HTTPS on the API port.
+
 The frontend receives the canonical `https://api.audius.co/v1/tracks/:id/stream` URL. It retries that endpoint when an Audius storage node is temporarily unreachable; signed storage-node URLs are never persisted or returned as the durable player URL.
 
 ### REST endpoints
