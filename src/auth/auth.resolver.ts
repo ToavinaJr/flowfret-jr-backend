@@ -59,6 +59,12 @@ export class AuthResolver {
             event: 'register.failed',
             ...details,
             durationMs: Date.now() - startedAt,
+            errorName: error instanceof Error ? error.name : 'UnknownError',
+            errorCode:
+              error && typeof error === 'object' && 'code' in error
+                ? String((error as { code?: unknown }).code)
+                : undefined,
+            errorMessage: error instanceof Error ? error.message : String(error),
           }),
           undefined,
         );
