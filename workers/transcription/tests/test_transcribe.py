@@ -28,6 +28,12 @@ class TranscribeUtilitiesTest(unittest.TestCase):
             transcribe.validate_public_https_url("https://audio.example.com/a.mp3", ["example.com"])
         self.assertEqual(raised.exception.code, "AUDIO_HOST_NOT_ALLOWED")
 
+    def test_azure_requires_configuration(self):
+        with patch.dict(transcribe.os.environ, {}, clear=True):
+            with self.assertRaises(transcribe.WorkerError) as raised:
+                transcribe.azure_transcribe(Path(__file__), {"language": "auto"})
+        self.assertEqual(raised.exception.code, "AZURE_CONFIG_MISSING")
+
 
 if __name__ == "__main__":
     unittest.main()

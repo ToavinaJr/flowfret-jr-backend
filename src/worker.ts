@@ -14,6 +14,7 @@ async function bootstrap(): Promise<void> {
       ),
       databaseConfigured: Boolean(process.env.DATABASE_URL),
       audiusConfigured: Boolean(process.env.AUDIUS_ACCESS_TOKEN),
+      transcriptionProvider: process.env.LLM_PROVIDER ?? 'whisper',
       model: process.env.WHISPER_MODEL ?? 'small',
     }),
   );

@@ -36,6 +36,16 @@ services:
         sync: false
       - key: AUDIUS_API_SECRET
         sync: false
+      - key: LLM_PROVIDER
+        value: azure
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_DEPLOYMENT
+        sync: false
+      - key: AZURE_OPENAI_API_VERSION
+        value: 2024-06-01
       - key: HF_HOME
         value: /models
       - key: TRANSCRIPTION_TEMP_DIR
