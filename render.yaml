@@ -31,7 +31,7 @@ services:
       - key: REDIS_PASSWORD
         sync: false
       - key: REDIS_TLS
-        value: 'true'
+        value: 'false'
       - key: AUDIUS_ACCESS_TOKEN
         sync: false
       - key: AUDIUS_API_KEY
