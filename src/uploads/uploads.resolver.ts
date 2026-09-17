@@ -85,7 +85,10 @@ export class UploadsResolver {
 
   @Mutation(() => UploadModel)
   async deleteUpload(@Args('id') id: string): Promise<UploadModel> {
-    const deletedUpload = await this.prisma.upload.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' } });
+    const deletedUpload = await this.prisma.upload.update({
+      where: { id },
+      data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' },
+    });
     return {
       ...deletedUpload,
       fileSize: deletedUpload.fileSize.toString(),

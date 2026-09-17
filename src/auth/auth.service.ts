@@ -28,9 +28,12 @@ const OTP_TTL_MINUTES = 15;
 const TOKEN_BYTES = 32;
 const PASSWORD_RESET_TTL_MINUTES = 60;
 const DEFAULT_REFRESH_TOKEN_TTL_DAYS = 30;
-const GENERIC_CREDENTIALS_ERROR = 'Identifiants invalides ou compte indisponible.';
-const GENERIC_REGISTRATION_ERROR = 'Impossible de créer le compte avec les informations fournies.';
-const GENERIC_GOOGLE_ERROR = 'Impossible de continuer avec Google. Vérifiez le parcours choisi et réessayez.';
+const GENERIC_CREDENTIALS_ERROR =
+  'Identifiants invalides ou compte indisponible.';
+const GENERIC_REGISTRATION_ERROR =
+  'Impossible de créer le compte avec les informations fournies.';
+const GENERIC_GOOGLE_ERROR =
+  'Impossible de continuer avec Google. Vérifiez le parcours choisi et réessayez.';
 const GENERIC_TOKEN_ERROR = 'Demande invalide ou expirée.';
 
 interface GoogleUserInfo {
@@ -65,7 +68,12 @@ export class AuthService {
     });
 
     if (existingUser) {
-      this.logger.warn(JSON.stringify({ event: 'registration.rejected', reason: 'identifier_unavailable' }));
+      this.logger.warn(
+        JSON.stringify({
+          event: 'registration.rejected',
+          reason: 'identifier_unavailable',
+        }),
+      );
       throw new ConflictException(GENERIC_REGISTRATION_ERROR);
     }
 
@@ -109,12 +117,22 @@ export class AuthService {
     }
 
     if (user.status === UserStatus.PENDING) {
-      this.logger.warn(JSON.stringify({ event: 'login.rejected', reason: 'account_unavailable' }));
+      this.logger.warn(
+        JSON.stringify({
+          event: 'login.rejected',
+          reason: 'account_unavailable',
+        }),
+      );
       throw new UnauthorizedException(GENERIC_CREDENTIALS_ERROR);
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      this.logger.warn(JSON.stringify({ event: 'login.rejected', reason: 'account_unavailable' }));
+      this.logger.warn(
+        JSON.stringify({
+          event: 'login.rejected',
+          reason: 'account_unavailable',
+        }),
+      );
       throw new UnauthorizedException(GENERIC_CREDENTIALS_ERROR);
     }
 
@@ -146,7 +164,12 @@ export class AuthService {
         user.status === UserStatus.SUSPENDED ||
         user.status === UserStatus.DELETED
       ) {
-        this.logger.warn(JSON.stringify({ event: 'google_login.rejected', reason: 'account_unavailable' }));
+        this.logger.warn(
+          JSON.stringify({
+            event: 'google_login.rejected',
+            reason: 'account_unavailable',
+          }),
+        );
         throw new UnauthorizedException(GENERIC_GOOGLE_ERROR);
       }
 
@@ -161,43 +184,64 @@ export class AuthService {
       return this.createAuthPayload(user);
     }
 
-    this.logger.warn(JSON.stringify({ event: 'google_login.rejected', reason: 'account_unavailable' }));
+    this.logger.warn(
+      JSON.stringify({
+        event: 'google_login.rejected',
+        reason: 'account_unavailable',
+      }),
+    );
     throw new UnauthorizedException(GENERIC_GOOGLE_ERROR);
   }
 
-  async registerWithGoogle(input: GoogleAuthInput): Promise<AuthSessionPayload> {
+  async registerWithGoogle(
+    input: GoogleAuthInput,
+  ): Promise<AuthSessionPayload> {
     const profile = await this.fetchGoogleProfile(input.accessToken);
-    const emailVerified = profile.email_verified === true || profile.email_verified === 'true';
-    if (!profile.email || !emailVerified) throw new UnauthorizedException(GENERIC_GOOGLE_ERROR);
+    const emailVerified =
+      profile.email_verified === true || profile.email_verified === 'true';
+    if (!profile.email || !emailVerified)
+      throw new UnauthorizedException(GENERIC_GOOGLE_ERROR);
     const email = profile.email.toLowerCase();
     const googleId = profile.sub;
     const existing = await this.prisma.user.findFirst({
       where: { OR: [{ googleId }, { email }] },
       include: { profile: true },
     });
-    const hasCompletedGoogleSignup = existing !== null &&
+    const hasCompletedGoogleSignup =
+      existing !== null &&
       'googleSignupCompleted' in existing &&
       existing.googleSignupCompleted === true;
-    if (existing?.googleId === googleId && !hasCompletedGoogleSignup && !existing.isDeleted) {
+    if (
+      existing?.googleId === googleId &&
+      !hasCompletedGoogleSignup &&
+      !existing.isDeleted
+    ) {
       const enrolled = await this.prisma.user.update({
         where: { id: existing.id },
         data: {
           googleSignupCompleted: true,
           status: UserStatus.ACTIVE,
           lastLoginAt: new Date(),
-          profile: existing.profile ? undefined : {
-            create: {
-              displayName: profile.name ?? existing.username,
-              avatarUrl: profile.picture ?? null,
-            },
-          },
+          profile: existing.profile
+            ? undefined
+            : {
+                create: {
+                  displayName: profile.name ?? existing.username,
+                  avatarUrl: profile.picture ?? null,
+                },
+              },
         },
         include: { profile: true },
       });
       return this.createAuthPayload(enrolled);
     }
     if (existing) {
-      this.logger.warn(JSON.stringify({ event: 'google_registration.rejected', reason: 'identifier_unavailable' }));
+      this.logger.warn(
+        JSON.stringify({
+          event: 'google_registration.rejected',
+          reason: 'identifier_unavailable',
+        }),
+      );
       throw new ConflictException(GENERIC_GOOGLE_ERROR);
     }
     const username = await this.allocateUniqueUsername(
@@ -568,9 +612,10 @@ export class AuthService {
       this.configService.get<string>('REFRESH_TOKEN_TTL_DAYS') ??
         DEFAULT_REFRESH_TOKEN_TTL_DAYS,
     );
-    const days = Number.isInteger(configured) && configured > 0
-      ? configured
-      : DEFAULT_REFRESH_TOKEN_TTL_DAYS;
+    const days =
+      Number.isInteger(configured) && configured > 0
+        ? configured
+        : DEFAULT_REFRESH_TOKEN_TTL_DAYS;
     return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   }
 }

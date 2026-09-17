@@ -74,7 +74,16 @@ describe('MusicService', () => {
   it('selects YouTube from MUSIC_PROVIDER case-insensitively', async () => {
     configService.get.mockReturnValue(' youtube ');
     youtubeService.searchMusic.mockResolvedValue({
-      videos: [{ id: 'video', title: 'Song', channelId: 'channel', channelTitle: 'Artist', thumbnailUrl: null, durationMs: 1000 }],
+      videos: [
+        {
+          id: 'video',
+          title: 'Song',
+          channelId: 'channel',
+          channelTitle: 'Artist',
+          thumbnailUrl: null,
+          durationMs: 1000,
+        },
+      ],
       total: 1,
     });
     geniusService.searchBestSong.mockResolvedValue(null);

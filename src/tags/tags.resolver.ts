@@ -23,7 +23,10 @@ export class TagsResolver {
 
   @Query(() => [TagModel], { name: 'tags' })
   async tags(): Promise<TagModel[]> {
-    return this.prisma.tag.findMany({ where: { isDeleted: false }, orderBy: { name: 'asc' } });
+    return this.prisma.tag.findMany({
+      where: { isDeleted: false },
+      orderBy: { name: 'asc' },
+    });
   }
 
   @Query(() => TagModel, { name: 'tag', nullable: true })
@@ -46,7 +49,10 @@ export class TagsResolver {
 
   @Mutation(() => TagModel)
   async deleteTag(@Args('id') id: string): Promise<TagModel> {
-    return this.prisma.tag.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
+    return this.prisma.tag.update({
+      where: { id },
+      data: { isDeleted: true, deletedAt: new Date() },
+    });
   }
 
   @ResolveField(() => [PostTagModel], { name: 'postTags' })

@@ -25,12 +25,22 @@ export class AuditLogsResolver {
   async recordActivity(
     @Args('action') action: string,
     @Args('entityType') entityType: string,
-    @Args('entityId', { type: () => String, nullable: true }) entityId: string | undefined,
+    @Args('entityId', { type: () => String, nullable: true })
+    entityId: string | undefined,
     @Context() context: { req: { user: { sub: string } } },
   ): Promise<AuditLogModel> {
     const allowed = new Set(['TRACK_LISTENED']);
-    if (!allowed.has(action) || entityType !== 'track') throw new BadRequestException('Activité invalide.');
-    if (entityId && entityId.length > 255) throw new BadRequestException('Identifiant invalide.');
-    return this.prisma.auditLog.create({ data: { actorId: context.req.user.sub, action, entityType, metadata: entityId ? { externalId: entityId } : {} } });
+    if (!allowed.has(action) || entityType !== 'track')
+      throw new BadRequestException('Activité invalide.');
+    if (entityId && entityId.length > 255)
+      throw new BadRequestException('Identifiant invalide.');
+    return this.prisma.auditLog.create({
+      data: {
+        actorId: context.req.user.sub,
+        action,
+        entityType,
+        metadata: entityId ? { externalId: entityId } : {},
+      },
+    });
   }
 }
