@@ -45,6 +45,7 @@ export class TranscriptionsProcessor extends WorkerHost {
     const transcription = await this.repository.findById(transcriptionId);
     await this.repository.update(transcriptionId, {
       status: TranscriptionStatus.DOWNLOADING,
+      processingPhase: 'AUDIO_PREPARING',
       attempts: { increment: 1 },
     });
     this.events.emit({
@@ -176,6 +177,25 @@ export class TranscriptionsProcessor extends WorkerHost {
         await this.repository.update(id, {
           status: TranscriptionStatus.PROCESSING,
           duration: message.duration,
+          processingPhase: 'TRANSCRIBING',
+        });
+        return;
+      case 'model-loading':
+        await this.repository.update(id, { processingPhase: 'MODEL_LOADING' });
+        this.events.emit({
+          type: 'transcription.model-loading',
+          transcriptionId: id,
+          progress: 0,
+          processingPhase: 'MODEL_LOADING',
+        });
+        return;
+      case 'model-ready':
+        await this.repository.update(id, { processingPhase: 'MODEL_READY' });
+        this.events.emit({
+          type: 'transcription.model-ready',
+          transcriptionId: id,
+          progress: 0,
+          processingPhase: 'MODEL_READY',
         });
         return;
       case 'segment':
@@ -245,6 +265,7 @@ export class TranscriptionsProcessor extends WorkerHost {
         );
         await this.repository.update(id, {
           status: TranscriptionStatus.COMPLETED,
+          processingPhase: 'COMPLETED',
           progress: 100,
           readyToPlay: true,
           bufferedUntil: message.duration,

@@ -37,6 +37,7 @@ export interface TranscriptionResponse {
   language: string | null;
   detectedLanguage: string | null;
   lrcAvailable: boolean;
+  processingPhase: string | null;
   error: { code: string; message: string } | null;
 }
 
@@ -250,6 +251,7 @@ export class TranscriptionsService {
       progress: item.progress,
       bufferedUntil: item.bufferedUntil,
       readyToPlay: item.readyToPlay,
+      processingPhase: item.processingPhase ?? undefined,
       errorCode: item.errorCode ?? undefined,
       message: item.errorMessage ?? undefined,
     };
@@ -286,7 +288,7 @@ export class TranscriptionsService {
         code: 'TRANSCRIPTION_ALREADY_RUNNING',
         message: 'Only failed transcriptions can be retried',
       });
-    if (item.attempts >= MAX_RETRY_ATTEMPTS)
+    if (item.manualRetryCount >= MAX_RETRY_ATTEMPTS)
       throw new ConflictException({
         code: 'TRANSCRIPTION_FAILED',
         message: 'Retry limit reached',
@@ -296,12 +298,14 @@ export class TranscriptionsService {
       progress: 0,
       bufferedUntil: 0,
       readyToPlay: false,
+      manualRetryCount: { increment: 1 },
+      processingPhase: 'AUDIO_PREPARING',
       errorCode: null,
       errorMessage: null,
     });
     const requestedLanguage =
       item.requestedLanguage === 'auto' ? undefined : item.requestedLanguage;
-    const jobId = `${buildTranscriptionJobId(item.trackId, requestedLanguage, item.model, item.engineVersion)}-retry-${item.attempts + 1}`;
+    const jobId = `${buildTranscriptionJobId(item.trackId, requestedLanguage, item.model, item.engineVersion)}-retry-${item.manualRetryCount + 1}`;
     await this.queue.add(
       TRANSCRIPTION_JOB,
       {
@@ -425,6 +429,7 @@ export class TranscriptionsService {
         item.requestedLanguage === 'auto' ? null : item.requestedLanguage,
       detectedLanguage: item.detectedLanguage,
       lrcAvailable: Boolean(item.lrcContent),
+      processingPhase: item.processingPhase,
       error: item.errorCode
         ? {
             code: item.errorCode,

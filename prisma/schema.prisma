@@ -118,6 +118,8 @@ model Transcription {
   errorCode         String?             @map("error_code") @db.VarChar(64)
   errorMessage      String?             @map("error_message") @db.Text
   attempts          Int                 @default(0)
+  manualRetryCount  Int                 @default(0) @map("manual_retry_count")
+  processingPhase   String?             @map("processing_phase") @db.VarChar(32)
   createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
   completedAt       DateTime?           @map("completed_at") @db.Timestamptz(6)

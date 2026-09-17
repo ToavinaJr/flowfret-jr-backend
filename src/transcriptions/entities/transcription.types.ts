@@ -16,6 +16,8 @@ export interface TranscriptionSegment {
 export type TranscriptionEventType =
   | 'transcription.pending'
   | 'transcription.processing'
+  | 'transcription.model-loading'
+  | 'transcription.model-ready'
   | 'transcription.progress'
   | 'transcription.segment'
   | 'transcription.ready-to-play'
@@ -29,6 +31,7 @@ export interface TranscriptionEvent {
   progress?: number;
   bufferedUntil?: number;
   readyToPlay?: boolean;
+  processingPhase?: string;
   segment?: TranscriptionSegment;
   errorCode?: string;
   message?: string;
@@ -45,6 +48,8 @@ export interface TranscriptionJobData {
 
 export type WorkerMessage =
   | { type: 'started'; duration: number }
+  | { type: 'model-loading' }
+  | { type: 'model-ready' }
   | { type: 'segment'; segment: TranscriptionSegment }
   | { type: 'progress'; progress: number; bufferedUntil: number }
   | { type: 'ready-to-play'; bufferedUntil: number }

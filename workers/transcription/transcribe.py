@@ -264,8 +264,10 @@ def process_request(request: dict[str, Any]) -> int:
             model_key = (str(request.get("model", "small")), str(options.get("device", "cpu")), str(options.get("computeType", "int8")))
             model = MODEL_CACHE.get(model_key)
             if model is None:
+                emit({"type": "model-loading"})
                 model = WhisperModel(model_key[0], device=model_key[1], compute_type=model_key[2])
                 MODEL_CACHE[model_key] = model
+                emit({"type": "model-ready"})
             requested_language = request.get("language")
             whisper_language = None if requested_language in (None, "auto") else requested_language
             whisper_segments, info = model.transcribe(str(prepared), language=whisper_language, vad_filter=True, word_timestamps=True, beam_size=5)

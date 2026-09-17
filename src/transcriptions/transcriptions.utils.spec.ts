@@ -25,4 +25,12 @@ describe('transcription utilities', () => {
       parseWorkerMessage('{"type":"segment","segment":{"id":"x"}}'),
     ).toThrow('Invalid worker message');
   });
+  it('accepts model lifecycle worker messages', () => {
+    expect(parseWorkerMessage('{"type":"model-loading"}')).toEqual({
+      type: 'model-loading',
+    });
+    expect(parseWorkerMessage('{"type":"model-ready"}')).toEqual({
+      type: 'model-ready',
+    });
+  });
 });

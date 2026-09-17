@@ -60,6 +60,9 @@ export function parseWorkerMessage(line: string): WorkerMessage {
       if (isFiniteNumber(message.duration))
         return message as unknown as WorkerMessage;
       break;
+    case 'model-loading':
+    case 'model-ready':
+      return message as unknown as WorkerMessage;
     case 'segment':
       if (isSegment(message.segment))
         return message as unknown as WorkerMessage;

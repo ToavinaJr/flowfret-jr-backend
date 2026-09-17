@@ -26,6 +26,8 @@ describe('TranscriptionsService', () => {
     errorCode: null,
     errorMessage: null,
     attempts: 0,
+    manualRetryCount: 0,
+    processingPhase: null,
     isDeleted: false,
     deletedAt: null,
     createdAt: new Date(),
@@ -114,5 +116,38 @@ describe('TranscriptionsService', () => {
     await expect(service.get(record.id, 'another-user')).rejects.toMatchObject({
       status: 404,
     });
+  });
+
+  it('allows a manual retry after automatic worker attempts are exhausted', async () => {
+    const failed = {
+      ...record,
+      status: TranscriptionStatus.FAILED,
+      attempts: 3,
+      manualRetryCount: 0,
+      errorCode: 'AUDIO_DOWNLOAD_FAILED',
+      errorMessage: 'temporary failure',
+    };
+    const { service, repository, queue } = setup(failed);
+    repository.update.mockResolvedValue({
+      ...failed,
+      status: TranscriptionStatus.PENDING,
+      manualRetryCount: 1,
+      errorCode: null,
+      errorMessage: null,
+    });
+
+    await service.retry(record.id, 'https://api.audius.co/audio', 'user-id');
+
+    expect(repository.update).toHaveBeenCalledWith(
+      record.id,
+      expect.objectContaining({ manualRetryCount: { increment: 1 } }),
+    );
+    expect(queue.add).toHaveBeenCalledTimes(1);
+    const addCall = queue.add.mock.calls[0] as [
+      unknown,
+      unknown,
+      { jobId: string },
+    ];
+    expect(addCall[2].jobId).toContain('-retry-1');
   });
 });
