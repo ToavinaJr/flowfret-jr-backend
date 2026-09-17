@@ -39,9 +39,6 @@ export class UserModel {
   @Field(() => [UploadModel]) uploads?: UploadModel[];
   @Field(() => [NotificationModel]) notifications?: NotificationModel[];
   @Field(() => [AuditLogModel]) auditLogs?: AuditLogModel[];
-  @Field(() => [RefreshTokenModel]) refreshTokens?: RefreshTokenModel[];
-  @Field(() => [PasswordResetTokenModel])
-  passwordResetTokens?: PasswordResetTokenModel[];
   @Field(() => [FriendshipModel]) friendshipsRequested?: FriendshipModel[];
   @Field(() => [FriendshipModel]) friendshipsReceived?: FriendshipModel[];
   @Field(() => [PostLikeModel]) likes?: PostLikeModel[];
@@ -168,29 +165,6 @@ export class AuditLogModel {
   @Field(() => GraphQLJSON) metadata!: Prisma.JsonValue;
   @Field(() => GraphQLISODateTime) createdAt!: Date;
   @Field(() => UserModel) actor?: UserModel;
-}
-
-@ObjectType()
-export class RefreshTokenModel {
-  @Field() id!: string;
-  @Field() userId!: string;
-  @Field() tokenHash!: string;
-  @Field(() => GraphQLISODateTime) expiresAt!: Date;
-  @Field(() => GraphQLISODateTime, { nullable: true }) revokedAt!: Date | null;
-  @Field(() => GraphQLISODateTime) createdAt!: Date;
-  @Field(() => UserModel) user?: UserModel;
-}
-
-@ObjectType()
-export class PasswordResetTokenModel {
-  @Field() id!: string;
-  @Field() userId!: string;
-  @Field() tokenHash!: string;
-  @Field(() => GraphQLISODateTime) expiresAt!: Date;
-  @Field(() => GraphQLISODateTime, { nullable: true }) usedAt!: Date | null;
-  @Field(() => GraphQLISODateTime) createdAt!: Date;
-  @Field(() => PostModel) post?: PostModel;
-  @Field(() => UserModel) user?: UserModel;
 }
 
 @ObjectType()

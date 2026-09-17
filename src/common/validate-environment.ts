@@ -11,6 +11,9 @@ const POSITIVE_INTEGER_KEYS = [
   'TRANSCRIPTION_DOWNLOAD_TIMEOUT_MS',
   'REFRESH_TOKEN_TTL_DAYS',
   'LRCLIB_TIMEOUT_MS',
+  'UPLOAD_MAX_CONCURRENT_GLOBAL',
+  'UPLOAD_MAX_CONCURRENT_PER_USER',
+  'TRANSCRIPTION_MAX_DURATION_SECONDS',
 ] as const;
 
 export function validateEnvironment(
@@ -35,6 +38,31 @@ export function validateEnvironment(
         'JWT_SECRET must contain at least 32 characters in production',
       );
     }
+    requireHttpsUrl(environment.APP_URL, 'APP_URL');
+    const corsOrigins = environment.CORS_ORIGINS;
+    if (corsOrigins !== undefined && typeof corsOrigins !== 'string') {
+      throw new Error('CORS_ORIGINS must contain a comma-separated URL list');
+    }
+    const origins = (corsOrigins ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean);
+    for (const origin of origins) requireHttpsUrl(origin, 'CORS_ORIGINS');
   }
   return environment;
+}
+
+function requireHttpsUrl(value: unknown, key: string): void {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`${key} must be configured in production`);
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${key} must contain a valid URL`);
+  }
+  if (url.protocol !== 'https:') {
+    throw new Error(`${key} must use HTTPS in production`);
+  }
 }

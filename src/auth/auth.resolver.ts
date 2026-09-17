@@ -27,7 +27,7 @@ export class AuthResolver {
   ) {}
 
   @Public()
-  @RateLimit(5, 3600)
+  @RateLimit(5, 3600, true)
   @Mutation(() => RegisterPendingPayload)
   async register(
     @Args('data') data: RegisterInput,
@@ -64,7 +64,8 @@ export class AuthResolver {
               error && typeof error === 'object' && 'code' in error
                 ? String((error as { code?: unknown }).code)
                 : undefined,
-            errorMessage: error instanceof Error ? error.message : String(error),
+            errorMessage:
+              error instanceof Error ? error.message : String(error),
           }),
           undefined,
         );
@@ -74,7 +75,7 @@ export class AuthResolver {
   }
 
   @Public()
-  @RateLimit(10, 900)
+  @RateLimit(10, 900, true)
   @Mutation(() => AuthPayload)
   async login(
     @Args('data') data: LoginInput,
@@ -84,7 +85,7 @@ export class AuthResolver {
   }
 
   @Public()
-  @RateLimit(20, 900)
+  @RateLimit(20, 900, true)
   @Mutation(() => AuthPayload)
   async loginWithGoogle(
     @Args('data') data: GoogleAuthInput,
@@ -97,7 +98,7 @@ export class AuthResolver {
   }
 
   @Public()
-  @RateLimit(10, 3600)
+  @RateLimit(10, 3600, true)
   @Mutation(() => AuthPayload)
   async registerWithGoogle(
     @Args('data') data: GoogleAuthInput,
@@ -110,7 +111,7 @@ export class AuthResolver {
   }
 
   @Public()
-  @RateLimit(10, 900)
+  @RateLimit(10, 900, true)
   @Mutation(() => AuthPayload)
   async verifyEmail(
     @Args('data') data: VerifyEmailInput,
@@ -123,7 +124,7 @@ export class AuthResolver {
   }
 
   @Public()
-  @RateLimit(3, 3600)
+  @RateLimit(3, 3600, true)
   @Mutation(() => RegisterPendingPayload)
   async resendVerificationEmail(
     @Args('token') token: string,
@@ -132,7 +133,7 @@ export class AuthResolver {
   }
 
   @Public()
-  @RateLimit(3, 3600)
+  @RateLimit(3, 3600, true)
   @Mutation(() => Boolean)
   async requestPasswordReset(
     @Args('data') data: RequestPasswordResetInput,
@@ -142,7 +143,7 @@ export class AuthResolver {
   }
 
   @Public()
-  @RateLimit(5, 3600)
+  @RateLimit(5, 3600, true)
   @Mutation(() => Boolean)
   async resetPassword(
     @Args('data') data: ResetPasswordInput,
@@ -152,7 +153,7 @@ export class AuthResolver {
   }
 
   @Public()
-  @RateLimit(60, 900)
+  @RateLimit(60, 900, true)
   @Mutation(() => AuthPayload)
   async refreshSession(
     @Context('req') request: Request,

@@ -35,37 +35,47 @@ export class RateLimitGuard implements CanActivate, OnModuleDestroy {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const options = this.reflector.getAllAndOverride<RateLimitOptions>(
+    const policies = this.reflector.getAllAndOverride<RateLimitOptions[]>(
       RATE_LIMIT_KEY,
       [context.getHandler(), context.getClass()],
     );
-    if (!options) return true;
+    if (!policies?.length) return true;
     const request = this.request(context);
     const identity = request.user?.sub ?? request.ip ?? 'unknown';
-    const digest = createHash('sha256')
-      .update(
-        `${context.getClass().name}:${context.getHandler().name}:${identity}`,
-      )
-      .digest('hex');
-    try {
-      if (this.redis.status === 'wait') await this.redis.connect();
-      const count = Number(
-        await this.redis.eval(
-          "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]); end; return n",
-          1,
-          `rate-limit:${digest}`,
-          String(options.windowSeconds),
-        ),
-      );
-      if (count > options.limit) {
-        throw new HttpException('Trop de requêtes. Réessayez plus tard.', 429);
+    for (const [index, options] of policies.entries()) {
+      const digest = createHash('sha256')
+        .update(
+          `${context.getClass().name}:${context.getHandler().name}:${identity}:${index}:${options.windowSeconds}`,
+        )
+        .digest('hex');
+      try {
+        if (this.redis.status === 'wait') await this.redis.connect();
+        const count = Number(
+          await this.redis.eval(
+            "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]); end; return n",
+            1,
+            `rate-limit:${digest}`,
+            String(options.windowSeconds),
+          ),
+        );
+        if (count > options.limit) {
+          throw new HttpException(
+            'Trop de requêtes. Réessayez plus tard.',
+            429,
+          );
+        }
+      } catch (error) {
+        if (error instanceof HttpException) throw error;
+        this.logger.error(
+          `Rate-limit check unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        if (options.failClosed) {
+          throw new HttpException(
+            'Protection anti-abus temporairement indisponible.',
+            503,
+          );
+        }
       }
-    } catch (error) {
-      if (error instanceof HttpException) throw error;
-      // A Redis outage must not turn into a complete authentication outage.
-      this.logger.error(
-        `Rate-limit check unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      );
     }
     return true;
   }

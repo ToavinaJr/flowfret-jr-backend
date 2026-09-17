@@ -5,10 +5,10 @@ NestJS GraphQL API for FretFlow (auth, social CRUD, music search).
 ## Setup
 
 ```bash
-cp .env.example .env.development
+cp .env.example .env.development.local
 # fill DATABASE_URL, JWT_SECRET, AUDIUS_*, GENIUS_ACCESS_TOKEN
 npm install
-docker compose up -d
+npm run infra:up
 npm run prisma:deploy
 npm run start:dev
 ```
@@ -17,7 +17,9 @@ Package manager in use: **npm** (`package-lock.json`).
 
 ## Environment
 
-See `.env.example`. Active music search and streaming require:
+See `.env.example`. Local overrides belong in `.env.development.local`, which
+takes precedence over `.env.development` and remains ignored by Git. Active
+music search and streaming require:
 
 - `AUDIUS_API_KEY`
 - `AUDIUS_API_SECRET`
@@ -116,7 +118,7 @@ Copy `.env.example` and configure `DATABASE_URL`, Audius credentials, Redis, Whi
 ### Local launch
 
 ```bash
-docker compose up -d db redis
+npm run infra:up
 npm install
 npm run prisma:generate
 npm run prisma:deploy
@@ -170,7 +172,7 @@ AZURE_OPENAI_DEPLOYMENT=whisper
 AZURE_OPENAI_API_VERSION=2024-06-01
 ```
 
-The deployment compose file keeps PostgreSQL and Redis private and exposes the API on port `3000`. Start the dependencies, apply migrations once, then start the API and worker:
+The deployment compose file keeps PostgreSQL, Redis, and the raw HTTP API private. The API listens on `127.0.0.1:3000` so only a reverse proxy running on the VPS can reach it. Start the dependencies, apply migrations once, then start the API and worker:
 
 ```bash
 docker compose up -d db redis
@@ -179,7 +181,7 @@ docker compose up -d --build backend transcription-worker
 docker compose logs -f transcription-worker
 ```
 
-The worker log must contain `worker.ready`. The API queue diagnostics must report `workerCount: 1` or higher. Do not expose ports `5434` or `6379` publicly; use a reverse proxy such as Nginx or Caddy for HTTPS on the API port.
+The worker log must contain `worker.ready`. The API queue diagnostics must report `workerCount: 1` or higher. Do not expose ports `3000`, `5434`, or `6379` publicly. Install Caddy or Nginx on the host, configure the public API domain to proxy to `127.0.0.1:3000`, and set `APP_URL` and every `CORS_ORIGINS` entry to HTTPS URLs. `deploy/Caddyfile.example` is a minimal Caddy configuration; Caddy provisions and renews the TLS certificate automatically once DNS points to the VPS.
 
 The frontend receives the canonical `https://api.audius.co/v1/tracks/:id/stream` URL. It retries that endpoint when an Audius storage node is temporarily unreachable; signed storage-node URLs are never persisted or returned as the durable player URL.
 

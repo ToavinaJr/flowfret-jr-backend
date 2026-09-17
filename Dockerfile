@@ -5,6 +5,7 @@ COPY prisma ./prisma
 RUN npm ci
 COPY . .
 RUN npm run build
+RUN npm prune --omit=dev
 
 FROM node:22-alpine
 WORKDIR /app

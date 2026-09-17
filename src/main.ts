@@ -2,10 +2,12 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.use(helmet());
   if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
   app.enableShutdownHooks();
   const rawPort = process.env.PORT;

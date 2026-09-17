@@ -203,6 +203,10 @@ export class WhisperBridgeService implements OnModuleDestroy {
         45,
       ),
       maxAudioSizeMb: this.numberConfig('TRANSCRIPTION_MAX_AUDIO_SIZE_MB', 100),
+      maxDurationSeconds: this.numberConfig(
+        'TRANSCRIPTION_MAX_DURATION_SECONDS',
+        900,
+      ),
       maxRedirects: this.numberConfig('TRANSCRIPTION_MAX_REDIRECTS', 3),
       downloadTimeoutMs: this.numberConfig(
         'TRANSCRIPTION_DOWNLOAD_TIMEOUT_MS',

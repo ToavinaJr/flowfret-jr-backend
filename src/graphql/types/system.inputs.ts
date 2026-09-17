@@ -29,25 +29,3 @@ export class CreateAuditLogInput {
 }
 @InputType()
 export class UpdateAuditLogInput extends PartialType(CreateAuditLogInput) {}
-@InputType()
-export class CreateRefreshTokenInput {
-  @Field() userId!: string;
-  @Field() tokenHash!: string;
-  @Field(() => GraphQLISODateTime) expiresAt!: Date;
-  @Field(() => GraphQLISODateTime, { nullable: true }) revokedAt?: Date | null;
-}
-@InputType()
-export class UpdateRefreshTokenInput extends PartialType(
-  CreateRefreshTokenInput,
-) {}
-@InputType()
-export class CreatePasswordResetTokenInput {
-  @Field() userId!: string;
-  @Field() tokenHash!: string;
-  @Field(() => GraphQLISODateTime) expiresAt!: Date;
-  @Field(() => GraphQLISODateTime, { nullable: true }) usedAt?: Date | null;
-}
-@InputType()
-export class UpdatePasswordResetTokenInput extends PartialType(
-  CreatePasswordResetTokenInput,
-) {}

@@ -18,7 +18,8 @@ import {
   MAX_POST_IMAGES,
   UploadedImage,
 } from './cloudinary.service';
-import { RateLimit } from '../auth/rate-limit.decorator';
+import { RateLimits } from '../auth/rate-limit.decorator';
+import { ConcurrentUploadsInterceptor } from './concurrent-uploads.interceptor';
 
 @Controller('uploads')
 @UseGuards(AuthGuard('jwt'))
@@ -30,8 +31,12 @@ export class UploadsController {
   ) {}
 
   @Post('images')
-  @RateLimit(30, 3600)
+  @RateLimits(
+    { limit: 5, windowSeconds: 60, failClosed: true },
+    { limit: 30, windowSeconds: 3600, failClosed: true },
+  )
   @UseInterceptors(
+    ConcurrentUploadsInterceptor,
     FilesInterceptor('images', MAX_POST_IMAGES, {
       storage: memoryStorage(),
       limits: { fileSize: MAX_IMAGE_BYTES, files: MAX_POST_IMAGES },

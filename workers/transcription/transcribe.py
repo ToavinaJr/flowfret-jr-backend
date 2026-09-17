@@ -117,6 +117,14 @@ def probe_duration(path: Path) -> float:
     return max(0.0, float(result.stdout.strip()))
 
 
+def validate_duration(duration: float, max_duration: float) -> None:
+    if duration > max_duration:
+        raise WorkerError(
+            "AUDIO_TOO_LONG",
+            "Audio exceeds configured duration limit",
+        )
+
+
 def convert_audio(source: Path, destination: Path) -> None:
     try:
         subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source), "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(destination)], capture_output=True, timeout=300, check=True)
@@ -223,6 +231,8 @@ def process_request(request: dict[str, Any]) -> int:
         prepared = temp_root / "prepared.wav"
         download_audio(str(request["audioUrl"]), downloaded, options)
         duration = probe_duration(downloaded)
+        max_duration = float(options.get("maxDurationSeconds", 900))
+        validate_duration(duration, max_duration)
         emit({"type": "started", "duration": duration})
         convert_audio(downloaded, prepared)
         provider = os.environ.get("LLM_PROVIDER", "whisper").strip().lower()

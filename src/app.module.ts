@@ -27,12 +27,9 @@ import { validateEnvironment } from './common/validate-environment';
 import { UploadsModule } from './uploads/uploads.module';
 import { LyricsModule } from './integrations/lyrics/lyrics.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
+import { Request, Response } from 'express';
 import { AuditInterceptor } from './audit-logs/audit.interceptor';
 import { NotificationsService } from './notifications/notifications.service';
-import {
-  AuthTokensResolver,
-  PasswordResetTokensResolver,
-} from './auth-tokens/auth-tokens.resolver';
 
 @Module({
   imports: [
@@ -56,7 +53,10 @@ import {
       driver: ApolloDriver,
       autoSchemaFile: true,
       sortSchema: true,
-      context: ({ req, res }) => ({ req, res }),
+      context: ({ req, res }: { req: Request; res: Response }) => ({
+        req,
+        res,
+      }),
       formatError: formatGraphQLError,
     }),
   ],
@@ -78,8 +78,6 @@ import {
     PostAttachmentsResolver,
     PostTagsResolver,
     TagsResolver,
-    AuthTokensResolver,
-    PasswordResetTokensResolver,
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })

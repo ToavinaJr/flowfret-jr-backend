@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
       POSTGRES_DB: guitare_app
-    ports: ['127.0.0.1:5434:5432']
+    ports: ['127.0.0.1:${POSTGRES_HOST_PORT:-5434}:5432']
     volumes: [guitare_pg_data:/var/lib/postgresql/data]
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d guitare_app']
@@ -18,7 +18,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: ['redis-server', '--appendonly', 'yes']
-    ports: ['127.0.0.1:6379:6379']
+    ports: ['127.0.0.1:${REDIS_HOST_PORT:-6379}:6379']
     volumes: [guitare_redis_data:/data]
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
@@ -31,14 +31,14 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    env_file: .env
+    env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/guitare_app?schema=public
       DIRECT_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/guitare_app?schema=public
       REDIS_HOST: redis
       REDIS_TLS: 'false'
-    ports: ['3000:3000']
+    ports: ['127.0.0.1:3000:3000']
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -48,7 +48,7 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     restart: unless-stopped
-    env_file: .env
+    env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/guitare_app?schema=public
       DIRECT_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/guitare_app?schema=public

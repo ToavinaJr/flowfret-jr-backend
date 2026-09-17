@@ -22,6 +22,14 @@ class TranscribeUtilitiesTest(unittest.TestCase):
         with self.assertRaises(transcribe.WorkerError):
             transcribe.validate_public_https_url("http://example.com/a.mp3", ["example.com"])
 
+    def test_rejects_audio_over_duration_quota(self):
+        with self.assertRaises(transcribe.WorkerError) as raised:
+            transcribe.validate_duration(901, 900)
+        self.assertEqual(raised.exception.code, "AUDIO_TOO_LONG")
+
+    def test_accepts_audio_at_duration_quota(self):
+        transcribe.validate_duration(900, 900)
+
     @patch("socket.getaddrinfo", return_value=[(None, None, None, None, ("127.0.0.1", 443))])
     def test_rejects_hostname_resolving_to_private_ip(self, _resolve):
         with self.assertRaises(transcribe.WorkerError) as raised:

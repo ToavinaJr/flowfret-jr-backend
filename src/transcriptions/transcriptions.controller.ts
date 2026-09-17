@@ -19,7 +19,7 @@ import { CreateTranscriptionDto } from './dto/create-transcription.dto';
 import { RetryTranscriptionDto } from './dto/retry-transcription.dto';
 import { TranscriptionEvents } from './transcriptions.events';
 import { TranscriptionsService } from './transcriptions.service';
-import { RateLimit } from '../auth/rate-limit.decorator';
+import { RateLimits } from '../auth/rate-limit.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
 
@@ -32,7 +32,10 @@ export class TranscriptionsController {
   ) {}
 
   @Post()
-  @RateLimit(10, 3600)
+  @RateLimits(
+    { limit: 2, windowSeconds: 60, failClosed: true },
+    { limit: 10, windowSeconds: 3600, failClosed: true },
+  )
   create(
     @Body() dto: CreateTranscriptionDto,
     @Req() req: { user: { sub: string } },
@@ -80,7 +83,10 @@ export class TranscriptionsController {
   }
 
   @Post(':id/retry')
-  @RateLimit(5, 3600)
+  @RateLimits(
+    { limit: 1, windowSeconds: 60, failClosed: true },
+    { limit: 5, windowSeconds: 3600, failClosed: true },
+  )
   retry(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RetryTranscriptionDto,
