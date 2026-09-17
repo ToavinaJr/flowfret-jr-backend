@@ -75,6 +75,7 @@ export class AudiusService {
     trackId: string,
     _currentUrl?: string,
   ): Promise<string> {
+    void _currentUrl;
     this.logger.log(
       JSON.stringify({ event: 'audius.stream_refresh_started', trackId }),
     );

@@ -155,7 +155,7 @@ export class YouTubeService {
     };
     return value.replace(
       /&(#x?[0-9a-f]+|[a-z]+);/gi,
-      (entity, code: string) => {
+      (entity: string, code: string) => {
         if (code.startsWith('#')) {
           const hexadecimal = code[1]?.toLowerCase() === 'x';
           const parsed = Number.parseInt(
