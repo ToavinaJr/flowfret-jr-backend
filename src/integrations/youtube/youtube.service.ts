@@ -200,7 +200,7 @@ export class YouTubeService {
     if (!error || typeof error !== 'object') return undefined;
     const errors = (error as Record<string, unknown>).errors;
     if (!Array.isArray(errors)) return undefined;
-    const first = errors[0];
+    const first: unknown = errors[0];
     if (!first || typeof first !== 'object') return undefined;
     const reason = (first as Record<string, unknown>).reason;
     return typeof reason === 'string' ? reason : undefined;
