@@ -17,12 +17,23 @@ from pathlib import Path
 from typing import Any, Iterator
 
 DEFAULT_AUDIUS_SUFFIXES = (
-    ".audius.co",
-    ".audius.work",
-    ".audiuscontent.co",
-    ".theblueprint.xyz",
-    ".zeogrid.com",
+    "audius.co",
+    "audius.work",
+    "audiuscontent.co",
+    "theblueprint.xyz",
+    "zeogrid.com",
 )
+
+
+def normalize_allowed_hosts(allowed_hosts: list[str]) -> list[str]:
+    normalized: list[str] = []
+    for host in allowed_hosts:
+        candidate = str(host).strip().lower().strip("*.")
+        if candidate and candidate not in normalized:
+            normalized.append(candidate)
+    if not normalized:
+        return list(DEFAULT_AUDIUS_SUFFIXES)
+    return normalized
 
 
 def emit(payload: dict[str, Any]) -> None:
@@ -38,8 +49,11 @@ def validate_public_https_url(url: str, allowed_hosts: list[str]) -> None:
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
         raise WorkerError("INVALID_AUDIO_URL", "Audio URL must be a valid HTTPS URL")
     hostname = parsed.hostname.lower().rstrip(".")
-    suffixes = tuple(host.lower().lstrip("*") for host in allowed_hosts) or DEFAULT_AUDIUS_SUFFIXES
-    if not any(hostname == suffix.lstrip(".") or hostname.endswith(suffix) for suffix in suffixes):
+    allowed = normalize_allowed_hosts(allowed_hosts)
+    if not any(
+        hostname == candidate or hostname.endswith(f".{candidate}")
+        for candidate in allowed
+    ):
         raise WorkerError("AUDIO_HOST_NOT_ALLOWED", "Audio host is not allowed")
     try:
         addresses = {item[4][0] for item in socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)}

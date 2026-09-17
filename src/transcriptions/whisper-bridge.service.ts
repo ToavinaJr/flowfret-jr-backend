@@ -195,6 +195,21 @@ export class WhisperBridgeService implements OnModuleDestroy {
     reject(error);
   }
   private workerOptions() {
+    const configured = (
+      this.config.get<string>('TRANSCRIPTION_ALLOWED_AUDIO_HOSTS') ?? ''
+    )
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    const defaultHosts = [
+      'audius.co',
+      'audius.work',
+      'audiuscontent.co',
+      'theblueprint.xyz',
+      'zeogrid.com',
+    ];
+
     return {
       device: this.config.get<string>('WHISPER_DEVICE') ?? 'cpu',
       computeType: this.config.get<string>('WHISPER_COMPUTE_TYPE') ?? 'int8',
@@ -212,12 +227,7 @@ export class WhisperBridgeService implements OnModuleDestroy {
         'TRANSCRIPTION_DOWNLOAD_TIMEOUT_MS',
         120_000,
       ),
-      allowedHosts: (
-        this.config.get<string>('TRANSCRIPTION_ALLOWED_AUDIO_HOSTS') ?? ''
-      )
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean),
+      allowedHosts: [...new Set([...defaultHosts, ...configured])],
       tempDir: this.config.get<string>('TRANSCRIPTION_TEMP_DIR') || undefined,
     };
   }
