@@ -133,6 +133,12 @@ terminal to follow model loading and transcription. Stop the foreground apps
 with `Ctrl+C`; use `npm run infra:down` when you also want to stop the worker,
 PostgreSQL, and Redis.
 
+The worker downloads the source audio from Audius. Create an Audius developer
+application, then put its backend Bearer Token in
+`AUDIUS_ACCESS_TOKEN` inside `.env.development.local`. `npm run dev:all` fails
+early with a clear error when this required secret is missing. Never expose the
+Bearer Token through a `VITE_*` frontend variable.
+
 The equivalent manual launch is:
 
 ```bash
@@ -145,12 +151,15 @@ npm run worker:up
 npm run start:dev
 ```
 
-In another terminal:
+In another terminal, launch the frontend:
 
 ```bash
-pip install -r workers/transcription/requirements.txt
-npm run start:worker
+bun --cwd ../flowfret-jr run dev
 ```
+
+Do not also run `npm run start:worker` on Windows when the Docker worker is
+active. Two BullMQ workers would compete for the same jobs, and the host worker
+would require its own compatible Python, FFmpeg, and `faster-whisper` setup.
 
 Or launch the complete backend infrastructure:
 

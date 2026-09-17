@@ -38,6 +38,14 @@ if (!['localhost', '127.0.0.1'].includes(redisUrl.hostname)) {
 }
 
 const command = process.argv[2];
+if (
+  ['worker', 'worker-start'].includes(command) &&
+  !process.env.AUDIUS_ACCESS_TOKEN
+) {
+  throw new Error(
+    'AUDIUS_ACCESS_TOKEN is required by the transcription worker. Add the Audius API bearer token to .env.development.local.',
+  );
+}
 const composeArgs =
   command === 'up'
     ? ['compose', 'up', '-d', '--wait', 'db', 'redis']
@@ -45,13 +53,13 @@ const composeArgs =
       ? ['compose', 'up', '-d', '--build', 'transcription-worker']
       : command === 'worker-start'
         ? ['compose', 'up', '-d', '--no-build', 'transcription-worker']
-      : command === 'worker-logs'
-        ? ['compose', 'logs', '-f', 'transcription-worker']
-        : command === 'down'
-          ? ['compose', 'down']
-          : command === 'status'
-            ? ['compose', 'ps']
-            : null;
+        : command === 'worker-logs'
+          ? ['compose', 'logs', '-f', 'transcription-worker']
+          : command === 'down'
+            ? ['compose', 'down']
+            : command === 'status'
+              ? ['compose', 'ps']
+              : null;
 
 if (!composeArgs) {
   throw new Error(
