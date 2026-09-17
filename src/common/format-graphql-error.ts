@@ -1,5 +1,5 @@
 import type { GraphQLFormattedError } from 'graphql';
-import { HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { HttpException, Logger } from '@nestjs/common';
 import { errorDetails, isDebugEnabled } from './debug';
 
 const logger = new Logger('GraphQLFormatError');
@@ -28,20 +28,20 @@ function getOriginalException(error: unknown): unknown {
 
 function graphQLCode(status: number): string {
   switch (status) {
-    case HttpStatus.BAD_REQUEST:
-    case HttpStatus.UNPROCESSABLE_ENTITY:
+    case 400:
+    case 422:
       return 'BAD_USER_INPUT';
-    case HttpStatus.UNAUTHORIZED:
+    case 401:
       return 'UNAUTHENTICATED';
-    case HttpStatus.FORBIDDEN:
+    case 403:
       return 'FORBIDDEN';
-    case HttpStatus.NOT_FOUND:
+    case 404:
       return 'NOT_FOUND';
-    case HttpStatus.CONFLICT:
+    case 409:
       return 'CONFLICT';
-    case HttpStatus.TOO_MANY_REQUESTS:
+    case 429:
       return 'TOO_MANY_REQUESTS';
-    case HttpStatus.SERVICE_UNAVAILABLE:
+    case 503:
       return 'SERVICE_UNAVAILABLE';
     default:
       return status >= 500 ? 'INTERNAL_SERVER_ERROR' : 'BAD_REQUEST';
@@ -79,15 +79,18 @@ export function formatGraphQLError(
   const original = getOriginalException(error);
 
   if (isDebugEnabled()) {
-    logger.error(
-      JSON.stringify({
-        event: 'graphql.request_failed',
-        message: formattedError.message,
-        path: formattedError.path,
-        code: formattedError.extensions?.code,
-      }),
-      errorDetails(original),
-    );
+    const event = JSON.stringify({
+      event: 'graphql.request_failed',
+      message: formattedError.message,
+      path: formattedError.path,
+      code: formattedError.extensions?.code,
+      statusCode: isHttpException(original) ? original.getStatus() : undefined,
+    });
+    if (isHttpException(original) && original.getStatus() < 500) {
+      logger.warn(event);
+    } else {
+      logger.error(event, errorDetails(original));
+    }
   }
 
   if (isHttpException(original)) {
