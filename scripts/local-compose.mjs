@@ -43,6 +43,8 @@ const composeArgs =
     ? ['compose', 'up', '-d', '--wait', 'db', 'redis']
     : command === 'worker'
       ? ['compose', 'up', '-d', '--build', 'transcription-worker']
+      : command === 'worker-start'
+        ? ['compose', 'up', '-d', '--no-build', 'transcription-worker']
       : command === 'worker-logs'
         ? ['compose', 'logs', '-f', 'transcription-worker']
         : command === 'down'
@@ -52,7 +54,9 @@ const composeArgs =
             : null;
 
 if (!composeArgs) {
-  throw new Error('Expected one of: up, worker, worker-logs, down, status.');
+  throw new Error(
+    'Expected one of: up, worker, worker-start, worker-logs, down, status.',
+  );
 }
 
 const result = spawnSync('docker', composeArgs, {

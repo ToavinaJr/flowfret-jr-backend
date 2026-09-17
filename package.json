@@ -35,6 +35,7 @@
     "infra:down": "node scripts/local-compose.mjs down",
     "infra:status": "node scripts/local-compose.mjs status",
     "worker:up": "node scripts/local-compose.mjs worker",
+    "worker:start": "node scripts/local-compose.mjs worker-start",
     "worker:logs": "node scripts/local-compose.mjs worker-logs",
     "local:prepare": "npm run infra:up && npm run prisma:deploy && npm run worker:up",
     "dev:all": "npm run local:prepare && concurrently --kill-others-on-fail --names backend,frontend --prefix-colors blue,magenta \"npm run start:dev\" \"bun --cwd ../flowfret-jr run dev\""

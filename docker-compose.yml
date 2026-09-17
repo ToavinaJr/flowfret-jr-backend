@@ -36,6 +36,8 @@ services:
       NODE_ENV: ${BACKEND_NODE_ENV:-production}
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/guitare_app?schema=public
       DIRECT_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/guitare_app?schema=public
+      REDIS_URL: redis://redis:6379
+      REDIS_PRIVATE_URL: ''
       REDIS_HOST: redis
       REDIS_TLS: 'false'
     ports: ['127.0.0.1:3000:3000']
@@ -53,6 +55,8 @@ services:
       NODE_ENV: ${BACKEND_NODE_ENV:-production}
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/guitare_app?schema=public
       DIRECT_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/guitare_app?schema=public
+      REDIS_URL: redis://redis:6379
+      REDIS_PRIVATE_URL: ''
       REDIS_HOST: redis
       REDIS_TLS: 'false'
       HF_HOME: /models
