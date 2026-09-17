@@ -208,6 +208,7 @@ export class WhisperBridgeService implements OnModuleDestroy {
       'audiuscontent.co',
       'theblueprint.xyz',
       'zeogrid.com',
+      'staked.cloud',
     ];
 
     return {

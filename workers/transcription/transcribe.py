@@ -22,6 +22,7 @@ DEFAULT_AUDIUS_SUFFIXES = (
     "audiuscontent.co",
     "theblueprint.xyz",
     "zeogrid.com",
+    "staked.cloud",
 )
 
 
