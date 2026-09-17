@@ -23,6 +23,7 @@ DEFAULT_AUDIUS_SUFFIXES = (
     "theblueprint.xyz",
     "zeogrid.com",
     "staked.cloud",
+    "altego.net",
 )
 
 
@@ -265,7 +266,9 @@ def process_request(request: dict[str, Any]) -> int:
             if model is None:
                 model = WhisperModel(model_key[0], device=model_key[1], compute_type=model_key[2])
                 MODEL_CACHE[model_key] = model
-            whisper_segments, info = model.transcribe(str(prepared), language=request.get("language"), vad_filter=True, word_timestamps=True, beam_size=5)
+            requested_language = request.get("language")
+            whisper_language = None if requested_language in (None, "auto") else requested_language
+            whisper_segments, info = model.transcribe(str(prepared), language=whisper_language, vad_filter=True, word_timestamps=True, beam_size=5)
             collected = []
         else:
             raise WorkerError("UNSUPPORTED_TRANSCRIPTION_PROVIDER", f"Unsupported transcription provider: {provider}")

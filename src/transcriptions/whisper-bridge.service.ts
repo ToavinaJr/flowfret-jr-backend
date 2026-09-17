@@ -209,6 +209,7 @@ export class WhisperBridgeService implements OnModuleDestroy {
       'theblueprint.xyz',
       'zeogrid.com',
       'staked.cloud',
+      'altego.net',
     ];
 
     return {
