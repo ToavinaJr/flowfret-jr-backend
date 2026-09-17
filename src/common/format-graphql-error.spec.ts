@@ -19,10 +19,20 @@ describe('formatGraphQLError', () => {
   });
 
   it('maps rate limiting to a stable GraphQL code', () => {
-    const error = wrapped(new HttpException('Try again later.', 429));
+    const error = wrapped(
+      new HttpException(
+        {
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Le service de transcription est temporairement saturé.',
+          retryAfterSeconds: 30,
+        },
+        429,
+      ),
+    );
 
     expect(formatGraphQLError(error.toJSON(), error)).toEqual({
-      message: 'Try again later.',
+      message:
+        'Le service de transcription est temporairement saturé.',
       extensions: { code: 'TOO_MANY_REQUESTS', statusCode: 429 },
     });
   });

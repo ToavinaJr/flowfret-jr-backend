@@ -60,7 +60,11 @@ export class RateLimitGuard implements CanActivate, OnModuleDestroy {
         );
         if (count > options.limit) {
           throw new HttpException(
-            'Trop de requêtes. Réessayez plus tard.',
+            {
+              code: 'TOO_MANY_REQUESTS',
+              message: 'Le service de transcription est temporairement saturé.',
+              retryAfterSeconds: options.windowSeconds,
+            },
             429,
           );
         }
