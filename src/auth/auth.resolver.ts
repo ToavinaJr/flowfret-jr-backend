@@ -15,7 +15,7 @@ import {
 import { AuthService, AuthSessionPayload } from './auth.service';
 import { Public } from './public.decorator';
 import { isDebugEnabled } from '../common/debug';
-import { RateLimit } from './rate-limit.decorator';
+import { RateLimit, RateLimits } from './rate-limit.decorator';
 
 @Resolver()
 export class AuthResolver {
@@ -27,7 +27,10 @@ export class AuthResolver {
   ) {}
 
   @Public()
-  @RateLimit(5, 3600, true)
+  @RateLimits(
+    { limit: 5, windowSeconds: 60, failClosed: true },
+    { limit: 20, windowSeconds: 3600, failClosed: true },
+  )
   @Mutation(() => RegisterPendingPayload)
   async register(
     @Args('data') data: RegisterInput,

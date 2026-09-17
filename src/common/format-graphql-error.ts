@@ -1,5 +1,5 @@
 import type { GraphQLFormattedError } from 'graphql';
-import { HttpException, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { errorDetails, isDebugEnabled } from './debug';
 
 const logger = new Logger('GraphQLFormatError');
@@ -11,10 +11,41 @@ function isHttpException(error: unknown): error is HttpException {
 }
 
 function getOriginalException(error: unknown): unknown {
-  if (typeof error === 'object' && error !== null && 'originalError' in error) {
-    return error.originalError;
+  let current = error;
+  const visited = new Set<object>();
+  while (
+    typeof current === 'object' &&
+    current !== null &&
+    !visited.has(current) &&
+    'originalError' in current &&
+    current.originalError
+  ) {
+    visited.add(current);
+    current = current.originalError;
   }
-  return error;
+  return current;
+}
+
+function graphQLCode(status: number): string {
+  switch (status) {
+    case HttpStatus.BAD_REQUEST:
+    case HttpStatus.UNPROCESSABLE_ENTITY:
+      return 'BAD_USER_INPUT';
+    case HttpStatus.UNAUTHORIZED:
+      return 'UNAUTHENTICATED';
+    case HttpStatus.FORBIDDEN:
+      return 'FORBIDDEN';
+    case HttpStatus.NOT_FOUND:
+      return 'NOT_FOUND';
+    case HttpStatus.CONFLICT:
+      return 'CONFLICT';
+    case HttpStatus.TOO_MANY_REQUESTS:
+      return 'TOO_MANY_REQUESTS';
+    case HttpStatus.SERVICE_UNAVAILABLE:
+      return 'SERVICE_UNAVAILABLE';
+    default:
+      return status >= 500 ? 'INTERNAL_SERVER_ERROR' : 'BAD_REQUEST';
+  }
 }
 
 function looksLikeInternalMessage(message: string): boolean {
@@ -73,10 +104,12 @@ export function formatGraphQLError(
           : original.message;
 
     if (!looksLikeInternalMessage(message)) {
+      const status = original.getStatus();
       return {
         message,
         extensions: {
-          code: original.getStatus(),
+          code: graphQLCode(status),
+          statusCode: status,
         },
       };
     }
