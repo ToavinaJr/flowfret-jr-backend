@@ -8,7 +8,7 @@ export function getRequiredConfig(
   const value = configService.get<string>(key)?.trim();
   if (!value) {
     throw new InternalServerErrorException(
-      `Missing required configuration: ${key}`,
+      `Missing required configuration: ${key}. Configure it in your .env.development.local or .env file before starting the transcription worker.`,
     );
   }
   return value;
