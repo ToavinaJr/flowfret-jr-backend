@@ -330,6 +330,12 @@ export class TranscriptionsService {
   }
 
   async diagnostics(): Promise<Record<string, unknown>> {
+    const checkedAt = new Date().toISOString();
+    const configuration = {
+      provider: this.config.get<string>('LLM_PROVIDER') ?? 'whisper',
+      model: this.config.get<string>('WHISPER_MODEL') ?? 'small',
+      concurrency: this.numberConfig('TRANSCRIPTION_CONCURRENCY', 1),
+    };
     const diagnosticQueue = this.queue as Queue<TranscriptionJobData> & {
       getJobCounts?: Queue<TranscriptionJobData>['getJobCounts'];
       getWorkers?: Queue<TranscriptionJobData>['getWorkers'];
@@ -340,9 +346,12 @@ export class TranscriptionsService {
     ) {
       return {
         queue: TRANSCRIPTION_QUEUE,
+        status: 'QUEUE_UNAVAILABLE',
+        queueHealthy: false,
         available: false,
         workerCount: null,
-        checkedAt: new Date().toISOString(),
+        configuration,
+        checkedAt,
       };
     }
     const [counts, workers] = await Promise.all([
@@ -359,16 +368,20 @@ export class TranscriptionsService {
       ),
       this.queueOperation('diagnosticWorkers', diagnosticQueue.getWorkers()),
     ]);
+    const workerCount = workers.length;
     return {
       queue: TRANSCRIPTION_QUEUE,
+      status: workerCount > 0 ? 'READY' : 'NO_WORKER',
+      queueHealthy: true,
       counts,
-      workerCount: workers.length,
+      workerCount,
+      configuration,
       workers: workers.map((worker) => ({
         id: worker.id,
         name: worker.name,
         addr: worker.addr,
       })),
-      checkedAt: new Date().toISOString(),
+      checkedAt,
     };
   }
 

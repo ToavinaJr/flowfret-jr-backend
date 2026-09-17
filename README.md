@@ -222,8 +222,22 @@ All endpoints use the existing JWT Bearer authentication.
 - `GET /api/transcriptions/:id/events` — authenticated SSE stream
 - `GET /api/transcriptions/:id/lrc` — download completed LRC
 - `POST /api/transcriptions/:id/retry` — retry a failed job within the attempt limit
+- `GET /api/transcriptions/diagnostics/queue` — admin-only queue and worker health
 
-SSE event names are `transcription.pending`, `transcription.processing`, `transcription.progress`, `transcription.segment`, `transcription.ready-to-play`, `transcription.completed`, `transcription.failed`, and `transcription.heartbeat`. Reconnecting clients first receive a PostgreSQL snapshot, then Redis events. The frontend uses a streamed `fetch` because native `EventSource` cannot send the existing Bearer header.
+The diagnostics endpoint returns `status: READY` when Redis is reachable and at
+least one BullMQ worker is connected, `NO_WORKER` when the queue is reachable
+but no worker is connected, and `QUEUE_UNAVAILABLE` when queue diagnostics
+cannot be read. It also returns the configured transcription provider, model,
+concurrency, queue counts, and worker identities. It never returns credentials.
+
+SSE event names are `transcription.pending`, `transcription.processing`,
+`transcription.model-loading`, `transcription.model-ready`,
+`transcription.progress`, `transcription.segment`,
+`transcription.ready-to-play`, `transcription.completed`,
+`transcription.failed`, and `transcription.heartbeat`. Reconnecting clients
+first receive a PostgreSQL snapshot, then Redis events. The frontend uses a
+streamed `fetch` because native `EventSource` cannot send the existing Bearer
+header.
 
 ### Audius and download security
 

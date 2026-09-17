@@ -34,7 +34,10 @@ describe('TranscriptionsService', () => {
     updatedAt: new Date(),
     completedAt: null,
   };
-  function setup(existing: typeof record | null = null) {
+  function setup(
+    existing: typeof record | null = null,
+    queueOverrides: Record<string, unknown> = {},
+  ) {
     const repository = {
       findCompatible: jest.fn().mockResolvedValue(existing),
       create: jest.fn().mockResolvedValue(record),
@@ -48,15 +51,20 @@ describe('TranscriptionsService', () => {
     const queue = {
       getJob: jest.fn().mockResolvedValue(null),
       add: jest.fn().mockResolvedValue({ id: 'job' }),
+      ...queueOverrides,
     };
     const events = { emit: jest.fn() };
     const service = new TranscriptionsService(
       repository as unknown as TranscriptionsRepository,
       events as unknown as TranscriptionEvents,
       {
-        get: jest.fn((key: string) =>
-          key === 'WHISPER_ENGINE_VERSION' ? '1' : undefined,
-        ),
+        get: jest.fn((key: string) => {
+          if (key === 'WHISPER_ENGINE_VERSION') return '1';
+          if (key === 'LLM_PROVIDER') return 'whisper';
+          if (key === 'WHISPER_MODEL') return 'small';
+          if (key === 'TRANSCRIPTION_CONCURRENCY') return '2';
+          return undefined;
+        }),
       } as unknown as ConfigService,
       queue as unknown as Queue<TranscriptionJobData>,
     );
@@ -149,5 +157,36 @@ describe('TranscriptionsService', () => {
       { jobId: string },
     ];
     expect(addCall[2].jobId).toContain('-retry-1');
+  });
+
+  it('reports a ready queue with worker configuration', async () => {
+    const { service } = setup(null, {
+      getJobCounts: jest.fn().mockResolvedValue({ waiting: 0, active: 0 }),
+      getWorkers: jest
+        .fn()
+        .mockResolvedValue([
+          { id: 'worker-1', name: 'transcribe', addr: 'worker-host' },
+        ]),
+    });
+
+    await expect(service.diagnostics()).resolves.toMatchObject({
+      status: 'READY',
+      queueHealthy: true,
+      workerCount: 1,
+      configuration: { provider: 'whisper', model: 'small', concurrency: 2 },
+    });
+  });
+
+  it('reports when Redis is available but no worker is connected', async () => {
+    const { service } = setup(null, {
+      getJobCounts: jest.fn().mockResolvedValue({ waiting: 1, active: 0 }),
+      getWorkers: jest.fn().mockResolvedValue([]),
+    });
+
+    await expect(service.diagnostics()).resolves.toMatchObject({
+      status: 'NO_WORKER',
+      queueHealthy: true,
+      workerCount: 0,
+    });
   });
 });
