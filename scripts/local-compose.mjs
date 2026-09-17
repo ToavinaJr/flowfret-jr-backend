@@ -10,7 +10,9 @@ const environmentFile = existsSync(localEnvironmentFile)
   : resolve(projectRoot, '.env.development');
 
 if (!existsSync(environmentFile)) {
-  throw new Error('Missing .env.development. Copy .env.example before starting local infrastructure.');
+  throw new Error(
+    'Missing .env.development. Copy .env.example before starting local infrastructure.',
+  );
 }
 
 config({ path: environmentFile, quiet: true });
@@ -23,9 +25,12 @@ const databaseUrl = new URL(process.env.DATABASE_URL);
 if (!['localhost', '127.0.0.1'].includes(databaseUrl.hostname)) {
   throw new Error('infra:* commands only accept a local DATABASE_URL.');
 }
-const postgresPassword = process.env.POSTGRES_PASSWORD || decodeURIComponent(databaseUrl.password);
+const postgresPassword =
+  process.env.POSTGRES_PASSWORD || decodeURIComponent(databaseUrl.password);
 if (!postgresPassword) {
-  throw new Error('The local DATABASE_URL must contain the PostgreSQL password.');
+  throw new Error(
+    'The local DATABASE_URL must contain the PostgreSQL password.',
+  );
 }
 const redisUrl = new URL(process.env.REDIS_URL || 'redis://localhost:6379');
 if (!['localhost', '127.0.0.1'].includes(redisUrl.hostname)) {
@@ -36,14 +41,18 @@ const command = process.argv[2];
 const composeArgs =
   command === 'up'
     ? ['compose', 'up', '-d', '--wait', 'db', 'redis']
-    : command === 'down'
-      ? ['compose', 'down']
-      : command === 'status'
-        ? ['compose', 'ps']
-        : null;
+    : command === 'worker'
+      ? ['compose', 'up', '-d', '--build', 'transcription-worker']
+      : command === 'worker-logs'
+        ? ['compose', 'logs', '-f', 'transcription-worker']
+        : command === 'down'
+          ? ['compose', 'down']
+          : command === 'status'
+            ? ['compose', 'ps']
+            : null;
 
 if (!composeArgs) {
-  throw new Error('Expected one of: up, down, status.');
+  throw new Error('Expected one of: up, worker, worker-logs, down, status.');
 }
 
 const result = spawnSync('docker', composeArgs, {
@@ -51,6 +60,7 @@ const result = spawnSync('docker', composeArgs, {
   env: {
     ...process.env,
     BACKEND_ENV_FILE: basename(environmentFile),
+    BACKEND_NODE_ENV: 'development',
     POSTGRES_PASSWORD: postgresPassword,
     POSTGRES_HOST_PORT: databaseUrl.port || '5432',
     REDIS_HOST_PORT: redisUrl.port || '6379',

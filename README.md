@@ -117,12 +117,31 @@ Copy `.env.example` and configure `DATABASE_URL`, Audius credentials, Redis, Whi
 
 ### Local launch
 
+The recommended Windows development command starts PostgreSQL, Redis, applies
+migrations, builds/starts the containerized transcription worker, then launches
+the backend and sibling frontend together:
+
+```bash
+npm run dev:all
+```
+
+Docker Desktop must be running. The first worker build installs FFmpeg and
+`faster-whisper`; the first transcription also downloads the configured Whisper
+model into the persistent `whisper_models` volume, so it can take several
+minutes before progress moves beyond zero. Use `npm run worker:logs` in another
+terminal to follow model loading and transcription. Stop the foreground apps
+with `Ctrl+C`; use `npm run infra:down` when you also want to stop the worker,
+PostgreSQL, and Redis.
+
+The equivalent manual launch is:
+
 ```bash
 npm run infra:up
 npm install
 npm run prisma:generate
 npm run prisma:deploy
 npm run build
+npm run worker:up
 npm run start:dev
 ```
 

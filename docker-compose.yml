@@ -33,7 +33,7 @@ services:
     restart: unless-stopped
     env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${BACKEND_NODE_ENV:-production}
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/guitare_app?schema=public
       DIRECT_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/guitare_app?schema=public
       REDIS_HOST: redis
@@ -50,6 +50,7 @@ services:
     restart: unless-stopped
     env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
+      NODE_ENV: ${BACKEND_NODE_ENV:-production}
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/guitare_app?schema=public
       DIRECT_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/guitare_app?schema=public
       REDIS_HOST: redis
