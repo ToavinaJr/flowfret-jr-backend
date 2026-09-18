@@ -30,6 +30,10 @@ import type {
   SpotifySearchTracksResponse,
   SpotifyTokenResponse,
 } from './spotify.types';
+import {
+  readRetryAfterHeader,
+  readSpotifyErrorDetail,
+} from './spotify-http.utils';
 
 @Injectable()
 export class SpotifyService {
@@ -170,8 +174,8 @@ export class SpotifyService {
     }
 
     const status = error.response?.status;
-    const retryAfter = this.readRetryAfterHeader(error.response?.headers);
-    const spotifyDetail = this.readSpotifyErrorDetail(error.response?.data);
+    const retryAfter = readRetryAfterHeader(error.response?.headers);
+    const spotifyDetail = readSpotifyErrorDetail(error.response?.data);
     const detailSuffix = spotifyDetail ? ` detail="${spotifyDetail}"` : '';
 
     if (status === 401) {
@@ -196,46 +200,4 @@ export class SpotifyService {
     return new BadGatewayException(fallbackMessage);
   }
 
-  private readSpotifyErrorDetail(data: unknown): string | undefined {
-    if (!data || typeof data !== 'object') {
-      return undefined;
-    }
-
-    const body = data as Record<string, unknown>;
-    const apiError = body.error;
-
-    if (apiError && typeof apiError === 'object') {
-      const err = apiError as Record<string, unknown>;
-      const parts: string[] = [];
-
-      if (typeof err.message === 'string') {
-        parts.push(err.message);
-      }
-      if (typeof err.reason === 'string') {
-        parts.push(`reason=${err.reason}`);
-      }
-
-      if (parts.length > 0) {
-        return parts.join(', ');
-      }
-    }
-
-    if (typeof body.error === 'string') {
-      const parts = [body.error];
-      if (typeof body.error_description === 'string') {
-        parts.push(body.error_description);
-      }
-      return parts.join(': ');
-    }
-
-    return undefined;
-  }
-
-  private readRetryAfterHeader(headers: unknown): string | undefined {
-    if (!headers || typeof headers !== 'object') {
-      return undefined;
-    }
-    const value = (headers as Record<string, unknown>)['retry-after'];
-    return typeof value === 'string' ? value : undefined;
-  }
 }

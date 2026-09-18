@@ -1,15 +1,17 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AudiusService } from '../audius/audius.service';
-import { AUDIUS_API_URL, AUDIUS_WEB_URL } from '../audius/audius.constants';
-import type { AudiusTrack } from '../audius/audius.types';
 import { GENIUS_MAX_CONCURRENCY } from '../genius/genius.constants';
 import { GeniusService } from '../genius/genius.service';
 import { SpotifyService } from '../spotify/spotify.service';
-import type { SpotifyTrack } from '../spotify/spotify.types';
 import { YouTubeService } from '../youtube/youtube.service';
-import type { YouTubeVideo } from '../youtube/youtube.types';
 import type { MusicSearchResult, MusicTrack } from './music.types';
+import {
+  mapAudius,
+  mapSpotify,
+  mapYouTube,
+  type ProviderTrack,
+} from './music-track-mappers';
 
 export const MUSIC_PROVIDER_KEY = 'MUSIC_PROVIDER';
 export const MUSIC_PROVIDERS = ['YOUTUBE', 'AUDIUS', 'SPOTIFY'] as const;
@@ -68,20 +70,20 @@ export class MusicService {
     if (provider === 'YOUTUBE') {
       const result = await this.youtubeService.searchMusic(query, limit);
       return {
-        tracks: this.dedupeTracks(result.videos.map(this.mapYouTube)),
+        tracks: this.dedupeTracks(result.videos.map(mapYouTube)),
         total: result.total,
       };
     }
     if (provider === 'SPOTIFY') {
       const result = await this.spotifyService.searchTracks(query, limit);
       return {
-        tracks: this.dedupeTracks(result.tracks.map(this.mapSpotify)),
+        tracks: this.dedupeTracks(result.tracks.map(mapSpotify)),
         total: result.total,
       };
     }
     const result = await this.audiusService.searchTracks(query, limit);
     return {
-      tracks: this.dedupeTracks(result.tracks.map(this.mapAudius)),
+      tracks: this.dedupeTracks(result.tracks.map(mapAudius)),
       total: result.total,
     };
   }
@@ -160,78 +162,4 @@ export class MusicService {
     };
   }
 
-  private readonly mapAudius = (track: AudiusTrack): ProviderTrack => ({
-    provider: 'AUDIUS',
-    id: track.id,
-    title: track.title,
-    artists: [{ id: track.user.id, name: track.user.name }],
-    imageUrl: this.pickArtwork(track),
-    externalUrl: this.buildAudiusUrl(track.permalink),
-    streamUrl: `${AUDIUS_API_URL}/tracks/${encodeURIComponent(track.id)}/stream`,
-    genre: track.genre ?? null,
-    album: null,
-    isrc: null,
-    durationMs: Math.max(0, Math.round(track.duration * 1000)),
-  });
-
-  private readonly mapSpotify = (track: SpotifyTrack): ProviderTrack => ({
-    provider: 'SPOTIFY',
-    id: track.id,
-    title: track.name,
-    artists: track.artists,
-    imageUrl: track.album.images[0]?.url ?? null,
-    externalUrl: track.external_urls.spotify,
-    streamUrl: track.preview_url ?? track.external_urls.spotify,
-    genre: null,
-    album: track.album.name || null,
-    isrc: track.external_ids?.isrc ?? null,
-    durationMs: Math.max(0, track.duration_ms),
-  });
-
-  private readonly mapYouTube = (video: YouTubeVideo): ProviderTrack => ({
-    provider: 'YOUTUBE',
-    id: video.id,
-    title: video.title,
-    artists: [{ id: video.channelId, name: video.channelTitle }],
-    imageUrl: video.thumbnailUrl,
-    externalUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`,
-    streamUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`,
-    genre: null,
-    album: null,
-    isrc: null,
-    durationMs: Math.max(0, video.durationMs),
-  });
-
-  private pickArtwork(track: AudiusTrack): string | null {
-    const artwork = track.artwork;
-    return (
-      artwork?.['_1000x1000'] ??
-      artwork?.['1000x1000'] ??
-      artwork?.['_480x480'] ??
-      artwork?.['480x480'] ??
-      artwork?.['_150x150'] ??
-      artwork?.['150x150'] ??
-      null
-    );
-  }
-
-  private buildAudiusUrl(permalink?: string): string {
-    if (!permalink) return AUDIUS_WEB_URL;
-    if (/^https?:\/\//i.test(permalink)) return permalink;
-    return `${AUDIUS_WEB_URL}/${permalink.replace(/^\/+/, '')}`;
-  }
-}
-
-interface ProviderTrack {
-  provider: MusicProvider;
-  id: string;
-  title: string;
-  artists: Array<{ id: string; name: string }>;
-  imageUrl: string | null;
-  externalUrl: string;
-  streamUrl: string;
-  genre: string | null;
-  album: string | null;
-  isrc: string | null;
-  durationMs: number;
 }

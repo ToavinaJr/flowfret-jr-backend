@@ -1,7 +1,7 @@
 import { Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Args, Context, Mutation, Resolver } from '@nestjs/graphql';
-import type { CookieOptions, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import {
   AuthPayload,
   GoogleAuthInput,
@@ -16,6 +16,11 @@ import { AuthService, AuthSessionPayload } from './auth.service';
 import { Public } from './public.decorator';
 import { isDebugEnabled } from '../common/debug';
 import { RateLimit, RateLimits } from './rate-limit.decorator';
+import {
+  cookieName,
+  cookieOptions,
+  readRefreshToken,
+} from './auth-cookie.utils';
 
 @Resolver()
 export class AuthResolver {
@@ -162,7 +167,7 @@ export class AuthResolver {
     @Context('req') request: Request,
     @Context('res') response: Response,
   ): Promise<AuthPayload> {
-    const refreshToken = this.readRefreshToken(request);
+    const refreshToken = readRefreshToken(request, cookieName(this.configService));
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh session cookie is missing.');
     }
@@ -178,9 +183,9 @@ export class AuthResolver {
     @Context('req') request: Request,
     @Context('res') response: Response,
   ): Promise<boolean> {
-    const refreshToken = this.readRefreshToken(request);
+    const refreshToken = readRefreshToken(request, cookieName(this.configService));
     if (refreshToken) await this.authService.logout(refreshToken);
-    response.clearCookie(this.cookieName(), this.cookieOptions());
+    response.clearCookie(cookieName(this.configService), cookieOptions(this.configService));
     return true;
   }
 
@@ -189,47 +194,11 @@ export class AuthResolver {
     response: Response,
   ): AuthPayload {
     response.cookie(
-      this.cookieName(),
+      cookieName(this.configService),
       session.refreshToken,
-      this.cookieOptions(true),
+      cookieOptions(this.configService, true),
     );
     return { accessToken: session.accessToken, user: session.user };
   }
 
-  private readRefreshToken(request: Request): string | null {
-    const name = encodeURIComponent(this.cookieName());
-    const match = request.headers.cookie
-      ?.split(';')
-      .map((part) => part.trim())
-      .find((part) => part.startsWith(`${name}=`));
-    if (!match) return null;
-    const value = match.slice(name.length + 1);
-    try {
-      return decodeURIComponent(value);
-    } catch {
-      return null;
-    }
-  }
-
-  private cookieName(): string {
-    return (
-      this.configService.get<string>('REFRESH_COOKIE_NAME') ??
-      'fretflow_refresh'
-    );
-  }
-
-  private cookieOptions(withMaxAge = false): CookieOptions {
-    const production =
-      this.configService.get<string>('NODE_ENV') === 'production';
-    const days = Number(
-      this.configService.get<string>('REFRESH_TOKEN_TTL_DAYS') ?? 30,
-    );
-    return {
-      httpOnly: true,
-      secure: production,
-      sameSite: production ? 'none' : 'lax',
-      path: '/graphql',
-      ...(withMaxAge ? { maxAge: days * 24 * 60 * 60 * 1000 } : {}),
-    };
-  }
 }
