@@ -199,5 +199,4 @@ export class SpotifyService {
     );
     return new BadGatewayException(fallbackMessage);
   }
-
 }

@@ -47,9 +47,7 @@ export class GeniusService {
       this.setCache(cacheKey, bestMatch);
       return bestMatch;
     } catch (error) {
-      this.logger.warn(
-        `Genius enrichment skipped: ${describeError(error)}`,
-      );
+      this.logger.warn(`Genius enrichment skipped: ${describeError(error)}`);
       return null;
     }
   }
@@ -186,5 +184,4 @@ export class GeniusService {
       }
     }
   }
-
 }

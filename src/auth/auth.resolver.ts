@@ -167,7 +167,10 @@ export class AuthResolver {
     @Context('req') request: Request,
     @Context('res') response: Response,
   ): Promise<AuthPayload> {
-    const refreshToken = readRefreshToken(request, cookieName(this.configService));
+    const refreshToken = readRefreshToken(
+      request,
+      cookieName(this.configService),
+    );
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh session cookie is missing.');
     }
@@ -183,9 +186,15 @@ export class AuthResolver {
     @Context('req') request: Request,
     @Context('res') response: Response,
   ): Promise<boolean> {
-    const refreshToken = readRefreshToken(request, cookieName(this.configService));
+    const refreshToken = readRefreshToken(
+      request,
+      cookieName(this.configService),
+    );
     if (refreshToken) await this.authService.logout(refreshToken);
-    response.clearCookie(cookieName(this.configService), cookieOptions(this.configService));
+    response.clearCookie(
+      cookieName(this.configService),
+      cookieOptions(this.configService),
+    );
     return true;
   }
 
@@ -200,5 +209,4 @@ export class AuthResolver {
     );
     return { accessToken: session.accessToken, user: session.user };
   }
-
 }

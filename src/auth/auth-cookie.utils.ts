@@ -1,7 +1,10 @@
 import type { ConfigService } from '@nestjs/config';
 import type { CookieOptions, Request } from 'express';
 
-export function readRefreshToken(request: Request, name: string): string | null {
+export function readRefreshToken(
+  request: Request,
+  name: string,
+): string | null {
   const encodedName = encodeURIComponent(name);
   const match = request.headers.cookie
     ?.split(';')
