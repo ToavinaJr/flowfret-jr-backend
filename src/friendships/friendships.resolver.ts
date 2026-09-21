@@ -90,7 +90,7 @@ export class FriendshipsResolver {
   @Mutation(() => FriendshipModel)
   async sendFriendRequest(
     @Args('receiverId') receiverId: string,
-    @Context() context: { req: { user: { sub: string } } },
+    @Context() context: { req: { user: { sub: string; username: string } } },
   ): Promise<FriendshipModel> {
     const actorId = context.req.user.sub;
     if (receiverId === actorId)
@@ -113,7 +113,7 @@ export class FriendshipsResolver {
       throw new BadRequestException(
         'Une relation existe déjà avec cet utilisateur.',
       );
-    return this.prisma.$transaction(async (tx) => {
+    const friendship = await this.prisma.$transaction(async (tx) => {
       const previous = await tx.friendship.findUnique({
         where: { requesterId_receiverId: { requesterId: actorId, receiverId } },
       });
@@ -143,6 +143,12 @@ export class FriendshipsResolver {
       });
       return friendship;
     });
+    await this.notifications.friendRequested(
+      actorId,
+      context.req.user.username,
+      receiverId,
+    );
+    return friendship;
   }
 
   @Mutation(() => FriendshipModel)

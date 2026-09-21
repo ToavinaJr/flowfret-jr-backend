@@ -6,6 +6,17 @@ import { PrismaService } from '../prisma/prisma.service';
 export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async friendRequested(
+    actorId: string,
+    actorUsername: string,
+    recipientId: string,
+  ): Promise<void> {
+    await this.createMany([recipientId], 'FRIEND_REQUEST', {
+      ...(await this.actorPayload(actorId, actorUsername)),
+      action: 'FRIEND_REQUESTED',
+    });
+  }
+
   async friendPosted(
     actorId: string,
     actorUsername: string,
@@ -48,6 +59,12 @@ export class NotificationsService {
     postId: string,
     postAuthorId: string,
   ): Promise<void> {
+    if (postAuthorId !== actorId)
+      await this.createMany([postAuthorId], 'POST_LIKE', {
+        ...(await this.actorPayload(actorId, actorUsername)),
+        postId,
+        action: 'POST_LIKED',
+      });
     await this.notifyEngagedFriends(
       actorId,
       actorUsername,

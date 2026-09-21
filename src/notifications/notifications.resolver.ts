@@ -23,6 +23,19 @@ export class NotificationsResolver {
     });
   }
 
+  @Query(() => Int, { name: 'unreadNotificationCount' })
+  unreadNotificationCount(
+    @Context() context: { req: { user: { sub: string } } },
+  ) {
+    return this.prisma.notification.count({
+      where: {
+        userId: context.req.user.sub,
+        isDeleted: false,
+        readAt: null,
+      },
+    });
+  }
+
   @Query(() => [NotificationPreferenceModel], {
     name: 'myNotificationPreferences',
   })
@@ -56,7 +69,9 @@ export class NotificationsResolver {
     @Context() context: { req: { user: { sub: string } } },
   ) {
     const allowed: NotificationType[] = [
+      'FRIEND_REQUEST',
       'FRIEND_POST',
+      'POST_LIKE',
       'POST_COMMENT',
       'FOLLOWED_POST_ACTIVITY',
     ];

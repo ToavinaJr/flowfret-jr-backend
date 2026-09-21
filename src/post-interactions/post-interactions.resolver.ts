@@ -115,7 +115,8 @@ export class PostInteractionsResolver {
           postId_userId: { postId: data.postId, userId: context.req.user.sub },
         },
       });
-      if (previous && !previous.isDeleted) return previous;
+      if (previous && !previous.isDeleted)
+        return { like: previous, shouldNotify: false };
       const like = previous
         ? await tx.postLike.update({
             where: { id: previous.id },
@@ -137,20 +138,20 @@ export class PostInteractionsResolver {
           metadata: { likeId: like.id },
         },
       });
-      return like;
+      return { like, shouldNotify: true };
     });
     const post = await this.prisma.post.findUnique({
       where: { id: data.postId },
       select: { authorId: true },
     });
-    if (post)
+    if (post && result.shouldNotify)
       await this.notifications.postLiked(
         context.req.user.sub,
         context.req.user.username,
         data.postId,
         post.authorId,
       );
-    return result;
+    return result.like;
   }
 
   @Mutation(() => PostLikeModel)
