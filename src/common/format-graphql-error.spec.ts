@@ -31,8 +31,7 @@ describe('formatGraphQLError', () => {
     );
 
     expect(formatGraphQLError(error.toJSON(), error)).toEqual({
-      message:
-        'Le service de transcription est temporairement saturé.',
+      message: 'Le service de transcription est temporairement saturé.',
       extensions: { code: 'TOO_MANY_REQUESTS', statusCode: 429 },
     });
   });

@@ -130,8 +130,12 @@ export class ProfilesResolver {
       throw new ForbiddenException('Action interdite.');
     const safeData = { ...data };
     delete safeData.userId;
+    if (safeData.displayName !== undefined) {
+      safeData.displayName = safeData.displayName.trim();
+    }
     if (
       (safeData.bio?.length ?? 0) > 1000 ||
+      safeData.displayName === '' ||
       (safeData.displayName?.length ?? 0) > 120
     )
       throw new ForbiddenException('Profil invalide.');

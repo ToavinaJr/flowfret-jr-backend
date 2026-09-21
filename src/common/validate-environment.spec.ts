@@ -38,4 +38,25 @@ describe('validateEnvironment', () => {
       }),
     ).toThrow('UPLOAD_MAX_CONCURRENT_GLOBAL must be a positive integer');
   });
+
+  it('rejects unknown music providers', () => {
+    expect(() => validateEnvironment({ MUSIC_PROVIDER: 'SOUNDCLOUD' })).toThrow(
+      'MUSIC_PROVIDER must be one of: AUDIUS, SPOTIFY, YOUTUBE',
+    );
+  });
+
+  it('rejects unknown transcription providers', () => {
+    expect(() => validateEnvironment({ LLM_PROVIDER: 'openai' })).toThrow(
+      'LLM_PROVIDER must be one of: whisper, azure',
+    );
+  });
+
+  it('validates database pool and server port values', () => {
+    expect(() => validateEnvironment({ DATABASE_POOL_MAX: '2.5' })).toThrow(
+      'DATABASE_POOL_MAX must be a positive integer',
+    );
+    expect(() => validateEnvironment({ PORT: '0' })).toThrow(
+      'PORT must be a positive integer',
+    );
+  });
 });

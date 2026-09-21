@@ -15,7 +15,7 @@ export class LyricsService {
   private readonly providers: readonly LyricsProvider[];
 
   constructor(
-    private readonly lrclib: LrclibProvider,
+    lrclib: LrclibProvider,
     private readonly cache: LyricsCacheService,
   ) {
     this.providers = [lrclib];

@@ -6,7 +6,9 @@ describe('TranscriptionsController', () => {
   const reflector = new Reflector();
 
   it('does not rate-limit transcription creation requests', () => {
-    const policies = reflector.getAllAndOverride(RATE_LIMIT_KEY, [
+    const policies = reflector.getAllAndOverride<unknown>(RATE_LIMIT_KEY, [
+      // Metadata belongs to the prototype method; the test never invokes it.
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       TranscriptionsController.prototype.create,
       TranscriptionsController,
     ]);
@@ -15,7 +17,9 @@ describe('TranscriptionsController', () => {
   });
 
   it('does not rate-limit transcription retry requests', () => {
-    const policies = reflector.getAllAndOverride(RATE_LIMIT_KEY, [
+    const policies = reflector.getAllAndOverride<unknown>(RATE_LIMIT_KEY, [
+      // Metadata belongs to the prototype method; the test never invokes it.
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       TranscriptionsController.prototype.retry,
       TranscriptionsController,
     ]);

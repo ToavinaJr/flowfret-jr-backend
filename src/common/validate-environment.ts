@@ -1,6 +1,10 @@
 const POSITIVE_INTEGER_KEYS = [
+  'PORT',
+  'DATABASE_POOL_MAX',
+  'TRANSCRIPTION_DATABASE_TIMEOUT_MS',
   'REDIS_PORT',
   'TRANSCRIPTION_CONCURRENCY',
+  'TRANSCRIPTION_QUEUE_TIMEOUT_MS',
   'TRANSCRIPTION_ATTEMPTS',
   'TRANSCRIPTION_TIMEOUT_MS',
   'TRANSCRIPTION_INITIAL_BUFFER_SECONDS',
@@ -15,6 +19,9 @@ const POSITIVE_INTEGER_KEYS = [
   'UPLOAD_MAX_CONCURRENT_PER_USER',
   'TRANSCRIPTION_MAX_DURATION_SECONDS',
 ] as const;
+
+const ALLOWED_MUSIC_PROVIDERS = ['AUDIUS', 'SPOTIFY', 'YOUTUBE'] as const;
+const ALLOWED_TRANSCRIPTION_PROVIDERS = ['whisper', 'azure'] as const;
 
 export function validateEnvironment(
   environment: Record<string, unknown>,
@@ -31,6 +38,16 @@ export function validateEnvironment(
     throw new Error('REDIS_TLS must be true or false');
   if (typeof redisTls === 'string' && !['true', 'false'].includes(redisTls))
     throw new Error('REDIS_TLS must be true or false');
+  validateEnum(
+    environment.MUSIC_PROVIDER,
+    'MUSIC_PROVIDER',
+    ALLOWED_MUSIC_PROVIDERS,
+  );
+  validateEnum(
+    environment.LLM_PROVIDER,
+    'LLM_PROVIDER',
+    ALLOWED_TRANSCRIPTION_PROVIDERS,
+  );
   if (environment.NODE_ENV === 'production') {
     const jwtSecret = environment.JWT_SECRET;
     if (typeof jwtSecret !== 'string' || jwtSecret.length < 32) {
@@ -50,6 +67,17 @@ export function validateEnvironment(
     for (const origin of origins) requireHttpsUrl(origin, 'CORS_ORIGINS');
   }
   return environment;
+}
+
+function validateEnum(
+  value: unknown,
+  key: string,
+  allowed: readonly string[],
+): void {
+  if (value === undefined || value === '') return;
+  if (typeof value !== 'string' || !allowed.includes(value)) {
+    throw new Error(`${key} must be one of: ${allowed.join(', ')}`);
+  }
 }
 
 function requireHttpsUrl(value: unknown, key: string): void {
