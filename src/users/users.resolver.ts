@@ -183,14 +183,14 @@ export class UsersResolver {
           orderBy: { position: 'asc' },
           include: { upload: true },
         },
-        tags: {
-          where: { isDeleted: false, tag: { isDeleted: false } },
-          include: { tag: true },
+        mentions: {
+          where: { isDeleted: false },
+          include: { user: { include: { profile: true } } },
         },
       },
     });
     return rows.map((row) => {
-      const { likes, ...post } = row;
+      const { likes, mentions, ...post } = row;
       return {
         ...post,
         attachments: post.attachments.map(({ upload, ...attachment }) => ({
@@ -199,6 +199,7 @@ export class UsersResolver {
         })),
         viewerHasLiked: likes.length > 0,
         viewerLikeId: likes[0]?.id ?? null,
+        mentionedUsers: mentions.map(({ user }) => user),
       };
     });
   }

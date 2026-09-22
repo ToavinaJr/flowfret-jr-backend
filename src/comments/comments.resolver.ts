@@ -19,6 +19,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { requireVisiblePost, visiblePostWhere } from '../common/post-access';
+import { syncCommentMentions } from '../common/mentions';
 
 @Resolver(() => CommentModel)
 export class CommentsResolver {
@@ -31,14 +32,25 @@ export class CommentsResolver {
   async comments(
     @Context() context: { req: { user: { sub: string } } },
   ): Promise<CommentModel[]> {
-    return this.prisma.comment.findMany({
+    const rows = await this.prisma.comment.findMany({
       where: {
         isDeleted: false,
         post: await visiblePostWhere(this.prisma, context.req.user.sub),
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
+      include: {
+        author: { include: { profile: true } },
+        mentions: {
+          where: { isDeleted: false },
+          include: { user: { include: { profile: true } } },
+        },
+      },
     });
+    return rows.map(({ mentions, ...comment }) => ({
+      ...comment,
+      mentionedUsers: mentions.map(({ user }) => user),
+    }));
   }
 
   @Query(() => CommentModel, { name: 'comment', nullable: true })
@@ -48,6 +60,13 @@ export class CommentsResolver {
   ): Promise<CommentModel | null> {
     const comment = await this.prisma.comment.findFirst({
       where: { id, isDeleted: false },
+      include: {
+        author: { include: { profile: true } },
+        mentions: {
+          where: { isDeleted: false },
+          include: { user: { include: { profile: true } } },
+        },
+      },
     });
     if (comment)
       await requireVisiblePost(
@@ -55,7 +74,12 @@ export class CommentsResolver {
         comment.postId,
         context.req.user.sub,
       );
-    return comment;
+    if (!comment) return null;
+    const { mentions, ...result } = comment;
+    return {
+      ...result,
+      mentionedUsers: mentions.map(({ user }) => user),
+    };
   }
 
   @Query(() => [CommentModel], { name: 'commentsByPost' })
@@ -66,12 +90,23 @@ export class CommentsResolver {
     @Context() context: { req: { user: { sub: string } } },
   ): Promise<CommentModel[]> {
     await requireVisiblePost(this.prisma, postId, context.req.user.sub);
-    return this.prisma.comment.findMany({
+    const rows = await this.prisma.comment.findMany({
       where: { postId, isDeleted: false },
       orderBy: { createdAt: 'desc' },
       skip: Math.max(0, skip),
       take: Math.min(50, Math.max(1, take)),
+      include: {
+        author: { include: { profile: true } },
+        mentions: {
+          where: { isDeleted: false },
+          include: { user: { include: { profile: true } } },
+        },
+      },
     });
+    return rows.map(({ mentions, ...comment }) => ({
+      ...comment,
+      mentionedUsers: mentions.map(({ user }) => user),
+    }));
   }
 
   @Mutation(() => CommentModel)
@@ -95,6 +130,12 @@ export class CommentsResolver {
           status: 'ACTIVE',
         },
       });
+      await syncCommentMentions(
+        tx,
+        comment.id,
+        context.req.user.sub,
+        comment.content,
+      );
 
       await tx.post.update({
         where: { id: data.postId },
@@ -149,6 +190,13 @@ export class CommentsResolver {
         where: { id },
         data: safeData,
       });
+      if (safeData.content !== undefined)
+        await syncCommentMentions(
+          tx,
+          id,
+          context.req.user.sub,
+          safeData.content,
+        );
       await tx.auditLog.create({
         data: {
           actorId: context.req.user.sub,
@@ -179,6 +227,10 @@ export class CommentsResolver {
       const deletedComment = await tx.comment.update({
         where: { id },
         data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' },
+      });
+      await tx.commentMention.updateMany({
+        where: { commentId: id, isDeleted: false },
+        data: { isDeleted: true, deletedAt: new Date() },
       });
 
       await tx.post.updateMany({
@@ -216,6 +268,19 @@ export class CommentsResolver {
 
   @ResolveField(() => UserModel, { name: 'author' })
   async author(@Parent() comment: CommentModel): Promise<UserModel | null> {
+    if (Object.prototype.hasOwnProperty.call(comment, 'author'))
+      return comment.author ?? null;
     return this.prisma.user.findUnique({ where: { id: comment.authorId } });
+  }
+
+  @ResolveField(() => [UserModel], { name: 'mentionedUsers' })
+  async mentionedUsers(@Parent() comment: CommentModel): Promise<UserModel[]> {
+    if (Object.prototype.hasOwnProperty.call(comment, 'mentionedUsers'))
+      return comment.mentionedUsers ?? [];
+    const mentions = await this.prisma.commentMention.findMany({
+      where: { commentId: comment.id, isDeleted: false },
+      include: { user: { include: { profile: true } } },
+    });
+    return mentions.map(({ user }) => user);
   }
 }

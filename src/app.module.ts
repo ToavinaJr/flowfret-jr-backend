@@ -12,12 +12,10 @@ import { AppResolver } from './app.resolver';
 import { PostInteractionsResolver } from './post-interactions/post-interactions.resolver';
 import { PostAttachmentsResolver } from './post-interactions/post-interactions.resolver';
 import { PostReportsResolver } from './post-interactions/post-interactions.resolver';
-import { PostTagsResolver } from './post-tags/post-tags.resolver';
 import { AuthModule } from './auth/auth.module';
 import { ProfilesResolver } from './profiles/profiles.resolver';
 import { PostsResolver } from './posts/posts.resolver';
 import { NotificationsResolver } from './notifications/notifications.resolver';
-import { TagsResolver } from './tags/tags.resolver';
 import { UsersResolver } from './users/users.resolver';
 import { formatGraphQLError } from './common/format-graphql-error';
 import { MusicModule } from './integrations/music/music.module';
@@ -90,8 +88,6 @@ import { createGraphqlSecurityRule } from './common/graphql-security';
     PostInteractionsResolver,
     PostReportsResolver,
     PostAttachmentsResolver,
-    PostTagsResolver,
-    TagsResolver,
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })

@@ -163,6 +163,8 @@ model User {
   friendshipsReceived  Friendship[]           @relation("FriendshipReceiver")
   likes                PostLike[]
   reports              PostReport[]           @relation("PostReportsByReporter")
+  postMentions         PostMention[]           @relation("UserPostMentions")
+  commentMentions      CommentMention[]        @relation("UserCommentMentions")
   transcriptionAccess  TranscriptionAccess[]
 
   @@map("users")
@@ -222,7 +224,7 @@ model Post {
   likes        PostLike[]
   reports      PostReport[]
   attachments  PostAttachment[]
-  tags         PostTag[]
+  mentions     PostMention[]
 
   @@index([authorId, createdAt(sort: Desc)])
   @@index([visibility, createdAt(sort: Desc)])
@@ -243,6 +245,7 @@ model Comment {
 
   post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   author User @relation("UserComments", fields: [authorId], references: [id], onDelete: Cascade)
+  mentions CommentMention[]
 
   @@index([postId, createdAt(sort: Desc)])
   @@index([authorId, createdAt(sort: Desc)])
@@ -433,31 +436,34 @@ model PostReport {
   @@map("post_reports")
 }
 
-model Tag {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String   @unique @db.VarChar(60)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  isDeleted Boolean  @default(false) @map("is_deleted")
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  posts PostTag[]
-
-  @@index([name])
-  @@map("tags")
-}
-
-model PostTag {
+model PostMention {
   postId String @map("post_id") @db.Uuid
-  tagId  String @map("tag_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   isDeleted Boolean @default(false) @map("is_deleted")
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  user User @relation("UserPostMentions", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@id([postId, tagId])
-  @@index([tagId])
-  @@map("post_tags")
+  @@id([postId, userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("post_mentions")
+}
+
+model CommentMention {
+  commentId String @map("comment_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  isDeleted Boolean @default(false) @map("is_deleted")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user User @relation("UserCommentMentions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("comment_mentions")
 }
 
 model PostAttachment {

@@ -84,7 +84,7 @@ export class PostModel {
   @Field(() => [PostLikeModel]) likes?: PostLikeModel[];
   @Field(() => [PostReportModel]) reports?: PostReportModel[];
   @Field(() => [PostAttachmentModel]) attachments?: PostAttachmentModel[];
-  @Field(() => [PostTagModel]) tags?: PostTagModel[];
+  @Field(() => [UserModel]) mentionedUsers?: UserModel[];
 }
 
 @ObjectType()
@@ -99,14 +99,7 @@ export class CommentModel {
   @Field(() => GraphQLISODateTime, { nullable: true }) deletedAt!: Date | null;
   @Field(() => PostModel) post?: PostModel;
   @Field(() => UserModel) author?: UserModel;
-}
-
-@ObjectType()
-export class TagModel {
-  @Field() id!: string;
-  @Field() name!: string;
-  @Field(() => GraphQLISODateTime) createdAt!: Date;
-  @Field(() => [PostTagModel]) postTags?: PostTagModel[];
+  @Field(() => [UserModel]) mentionedUsers?: UserModel[];
 }
 
 @ObjectType()
@@ -202,12 +195,4 @@ export class PostAttachmentModel {
   @Field(() => GraphQLISODateTime) createdAt!: Date;
   @Field(() => PostModel) post?: PostModel;
   @Field(() => UploadModel) upload?: UploadModel;
-}
-
-@ObjectType()
-export class PostTagModel {
-  @Field() postId!: string;
-  @Field() tagId!: string;
-  @Field(() => PostModel) post?: PostModel;
-  @Field(() => TagModel) tag?: TagModel;
 }

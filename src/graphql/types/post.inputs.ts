@@ -98,10 +98,3 @@ export class CreatePostAttachmentInput {
 export class UpdatePostAttachmentInput extends PartialType(
   CreatePostAttachmentInput,
 ) {}
-@InputType()
-export class CreatePostTagInput {
-  @Field() postId!: string;
-  @Field() tagId!: string;
-}
-@InputType()
-export class UpdatePostTagInput extends PartialType(CreatePostTagInput) {}

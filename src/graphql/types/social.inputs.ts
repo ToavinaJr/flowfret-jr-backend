@@ -7,12 +7,6 @@ import {
 import './enums';
 
 @InputType()
-export class CreateTagInput {
-  @Field() name!: string;
-}
-@InputType()
-export class UpdateTagInput extends PartialType(CreateTagInput) {}
-@InputType()
 export class CreateFriendshipInput {
   @Field() requesterId!: string;
   @Field() receiverId!: string;
