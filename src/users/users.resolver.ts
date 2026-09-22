@@ -112,14 +112,13 @@ export class UsersResolver {
     @Parent() user: UserModel,
     @Context() context: { req: { user: { sub: string } } },
   ): Promise<ProfileModel | null> {
-    const preloaded = Object.prototype.hasOwnProperty.call(user, 'profile');
+    const preloaded = 'profile' in user;
     const profile = preloaded
       ? (user.profile ?? null)
       : await this.prisma.profile.findFirst({
           where: { userId: user.id, isDeleted: false },
         });
-    if ((profile as (ProfileModel & { isDeleted?: boolean }) | null)?.isDeleted)
-      return null;
+    if (profile && 'isDeleted' in profile && profile.isDeleted) return null;
     if (
       !profile ||
       user.id === context.req.user.sub ||
