@@ -26,10 +26,11 @@ import {
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 import { visiblePostWhere } from '../common/post-access';
 import { UploadCleanupService } from '../uploads/upload-cleanup.service';
+import { extractPostTags } from '../common/post-tags';
 
 @Resolver(() => PostModel)
 export class PostsResolver {
@@ -44,10 +45,26 @@ export class PostsResolver {
     @Context() context: { req: { user: { sub: string } } },
     @Args('after', { type: () => String, nullable: true }) after?: string,
     @Args('take', { type: () => Int, defaultValue: 20 }) take = 20,
+    @Args('tag', { type: () => String, nullable: true }) tag?: string,
   ): Promise<PostModel[]> {
     const viewerId = context.req.user.sub;
+    const tagName = tag?.replace(/^@/, '').trim().toLocaleLowerCase('en-US');
+    if (tagName && !/^[\p{L}\p{N}_]{1,30}$/u.test(tagName))
+      throw new BadRequestException('Tag invalide.');
     const rows = await this.prisma.post.findMany({
-      where: await visiblePostWhere(this.prisma, context.req.user.sub),
+      where: {
+        ...(await visiblePostWhere(this.prisma, context.req.user.sub)),
+        ...(tagName
+          ? {
+              tags: {
+                some: {
+                  isDeleted: false,
+                  tag: { name: tagName, isDeleted: false },
+                },
+              },
+            }
+          : {}),
+      },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: Math.min(50, Math.max(1, take)),
       ...(after ? { cursor: { id: after }, skip: 1 } : {}),
@@ -62,6 +79,10 @@ export class PostsResolver {
           where: { isDeleted: false },
           orderBy: { position: 'asc' },
           include: { upload: true },
+        },
+        tags: {
+          where: { isDeleted: false, tag: { isDeleted: false } },
+          include: { tag: true },
         },
       },
     });
@@ -102,6 +123,10 @@ export class PostsResolver {
           orderBy: { position: 'asc' },
           include: { upload: true },
         },
+        tags: {
+          where: { isDeleted: false, tag: { isDeleted: false } },
+          include: { tag: true },
+        },
       },
     });
     if (!row) return null;
@@ -125,6 +150,7 @@ export class PostsResolver {
     if (data.authorId !== context.req.user.sub)
       throw new ForbiddenException('Vous ne pouvez publier qu’en votre nom.');
     const content = data.content?.trim() || null;
+    const tagNames = extractPostTags(content);
     const imageUploadIds = data.imageUploadIds ?? [];
     if (!content && imageUploadIds.length === 0)
       throw new BadRequestException('Ajoutez un texte ou au moins une image.');
@@ -160,13 +186,14 @@ export class PostsResolver {
             : undefined,
         },
       });
+      await syncPostTags(tx, post.id, tagNames);
       await tx.auditLog.create({
         data: {
           actorId: context.req.user.sub,
           action: 'POST_CREATED',
           entityType: 'post',
           entityId: post.id,
-          metadata: { imageCount: imageUploadIds.length },
+          metadata: { imageCount: imageUploadIds.length, tags: tagNames },
         },
       });
       return post;
@@ -199,6 +226,10 @@ export class PostsResolver {
     delete safeData.authorId;
     delete safeData.imageUploadIds;
     delete safeData.status;
+    const tagNames =
+      safeData.content !== undefined
+        ? extractPostTags(safeData.content)
+        : undefined;
     if (safeData.content !== undefined && !safeData.content?.trim()) {
       const imageCount = await this.prisma.postAttachment.count({
         where: { postId: id, kind: 'IMAGE', isDeleted: false },
@@ -211,6 +242,7 @@ export class PostsResolver {
     }
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.post.update({ where: { id }, data: safeData });
+      if (tagNames) await syncPostTags(tx, id, tagNames);
       await tx.auditLog.create({
         data: {
           actorId: context.req.user.sub,
@@ -247,6 +279,10 @@ export class PostsResolver {
         data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' },
       });
       await tx.postAttachment.updateMany({
+        where: { postId: id, isDeleted: false },
+        data: { isDeleted: true, deletedAt: new Date() },
+      });
+      await tx.postTag.updateMany({
         where: { postId: id, isDeleted: false },
         data: { isDeleted: true, deletedAt: new Date() },
       });
@@ -361,8 +397,46 @@ export class PostsResolver {
 
   @ResolveField(() => [PostTagModel], { name: 'tags' })
   async tags(@Parent() post: PostModel): Promise<PostTagModel[]> {
+    if (Object.prototype.hasOwnProperty.call(post, 'tags'))
+      return post.tags ?? [];
     return this.prisma.postTag.findMany({
       where: { postId: post.id, isDeleted: false },
+      include: { tag: true },
     });
   }
+}
+
+async function syncPostTags(
+  tx: Prisma.TransactionClient,
+  postId: string,
+  names: string[],
+): Promise<void> {
+  const tags = await Promise.all(
+    names.map((name) =>
+      tx.tag.upsert({
+        where: { name },
+        create: { name },
+        update: { isDeleted: false, deletedAt: null },
+        select: { id: true },
+      }),
+    ),
+  );
+  const tagIds = tags.map(({ id }) => id);
+  await tx.postTag.updateMany({
+    where: {
+      postId,
+      isDeleted: false,
+      ...(tagIds.length ? { tagId: { notIn: tagIds } } : {}),
+    },
+    data: { isDeleted: true, deletedAt: new Date() },
+  });
+  await Promise.all(
+    tagIds.map((tagId) =>
+      tx.postTag.upsert({
+        where: { postId_tagId: { postId, tagId } },
+        create: { postId, tagId },
+        update: { isDeleted: false, deletedAt: null },
+      }),
+    ),
+  );
 }

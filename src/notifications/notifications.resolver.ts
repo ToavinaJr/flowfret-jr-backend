@@ -19,7 +19,7 @@ export class NotificationsResolver {
   ) {
     return this.prisma.notification.findMany({
       where: { userId: context.req.user.sub, isDeleted: false },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: Math.min(100, Math.max(1, take)),
       ...(after ? { cursor: { id: after }, skip: 1 } : {}),
     });

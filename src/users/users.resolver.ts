@@ -183,6 +183,10 @@ export class UsersResolver {
           orderBy: { position: 'asc' },
           include: { upload: true },
         },
+        tags: {
+          where: { isDeleted: false, tag: { isDeleted: false } },
+          include: { tag: true },
+        },
       },
     });
     return rows.map((row) => {

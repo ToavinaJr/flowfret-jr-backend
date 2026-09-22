@@ -17,17 +17,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 
-@Roles(UserRole.ADMIN)
 @Resolver(() => PostTagModel)
 export class PostTagsResolver {
   constructor(private readonly prisma: PrismaService) {}
 
   @Query(() => [PostTagModel], { name: 'postTags' })
+  @Roles(UserRole.ADMIN)
   async postTags(): Promise<PostTagModel[]> {
     return this.prisma.postTag.findMany();
   }
 
   @Mutation(() => PostTagModel)
+  @Roles(UserRole.ADMIN)
   async createPostTag(
     @Args('data') data: CreatePostTagInput,
   ): Promise<PostTagModel> {
@@ -35,6 +36,7 @@ export class PostTagsResolver {
   }
 
   @Mutation(() => PostTagModel)
+  @Roles(UserRole.ADMIN)
   async updatePostTag(
     @Args('postId') postId: string,
     @Args('tagId') tagId: string,
@@ -47,6 +49,7 @@ export class PostTagsResolver {
   }
 
   @Mutation(() => PostTagModel)
+  @Roles(UserRole.ADMIN)
   async deletePostTag(
     @Args('postId') postId: string,
     @Args('tagId') tagId: string,
@@ -58,6 +61,7 @@ export class PostTagsResolver {
   }
 
   @Query(() => PostTagModel, { name: 'postTag', nullable: true })
+  @Roles(UserRole.ADMIN)
   async postTag(
     @Args('postId') postId: string,
     @Args('tagId') tagId: string,
@@ -74,6 +78,8 @@ export class PostTagsResolver {
 
   @ResolveField(() => TagModel, { name: 'tag' })
   async tag(@Parent() postTag: PostTagModel): Promise<TagModel | null> {
+    if (Object.prototype.hasOwnProperty.call(postTag, 'tag'))
+      return postTag.tag ?? null;
     return this.prisma.tag.findUnique({ where: { id: postTag.tagId } });
   }
 }

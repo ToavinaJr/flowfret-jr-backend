@@ -9,6 +9,7 @@ import {
   Int,
 } from '@nestjs/graphql';
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -250,6 +251,8 @@ export class PostInteractionsResolver {
     @Args('id') id: string,
     @Args('data') data: UpdatePostReportInput,
   ): Promise<PostReportModel> {
+    if (!data.status)
+      throw new BadRequestException('Un statut de modération est requis.');
     return this.prisma.postReport.update({
       where: { id },
       data: { status: data.status, reviewedAt: new Date() },
