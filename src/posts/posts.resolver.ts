@@ -6,6 +6,7 @@ import {
   ResolveField,
   Resolver,
   Query,
+  Int,
 } from '@nestjs/graphql';
 import {
   BadRequestException,
@@ -27,7 +28,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
-import { requireVisiblePost, visiblePostWhere } from '../common/post-access';
+import { visiblePostWhere } from '../common/post-access';
 import { UploadCleanupService } from '../uploads/upload-cleanup.service';
 
 @Resolver(() => PostModel)
@@ -41,11 +42,40 @@ export class PostsResolver {
   @Query(() => [PostModel], { name: 'posts' })
   async posts(
     @Context() context: { req: { user: { sub: string } } },
+    @Args('after', { type: () => String, nullable: true }) after?: string,
+    @Args('take', { type: () => Int, defaultValue: 20 }) take = 20,
   ): Promise<PostModel[]> {
-    return this.prisma.post.findMany({
+    const viewerId = context.req.user.sub;
+    const rows = await this.prisma.post.findMany({
       where: await visiblePostWhere(this.prisma, context.req.user.sub),
-      orderBy: { createdAt: 'desc' },
-      take: 50,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: Math.min(50, Math.max(1, take)),
+      ...(after ? { cursor: { id: after }, skip: 1 } : {}),
+      include: {
+        author: { include: { profile: true } },
+        likes: {
+          where: { userId: viewerId, isDeleted: false },
+          select: { id: true },
+          take: 1,
+        },
+        attachments: {
+          where: { isDeleted: false },
+          orderBy: { position: 'asc' },
+          include: { upload: true },
+        },
+      },
+    });
+    return rows.map((row) => {
+      const { likes, ...post } = row;
+      return {
+        ...post,
+        attachments: post.attachments.map(({ upload, ...attachment }) => ({
+          ...attachment,
+          upload: { ...upload, fileSize: upload.fileSize.toString() },
+        })),
+        viewerHasLiked: likes.length > 0,
+        viewerLikeId: likes[0]?.id ?? null,
+      };
     });
   }
 
@@ -54,7 +84,37 @@ export class PostsResolver {
     @Args('id') id: string,
     @Context() context: { req: { user: { sub: string } } },
   ): Promise<PostModel | null> {
-    return requireVisiblePost(this.prisma, id, context.req.user.sub);
+    const viewerId = context.req.user.sub;
+    const row = await this.prisma.post.findFirst({
+      where: {
+        ...(await visiblePostWhere(this.prisma, viewerId)),
+        id,
+      },
+      include: {
+        author: { include: { profile: true } },
+        likes: {
+          where: { userId: viewerId, isDeleted: false },
+          select: { id: true },
+          take: 1,
+        },
+        attachments: {
+          where: { isDeleted: false },
+          orderBy: { position: 'asc' },
+          include: { upload: true },
+        },
+      },
+    });
+    if (!row) return null;
+    const { likes, ...post } = row;
+    return {
+      ...post,
+      attachments: post.attachments.map(({ upload, ...attachment }) => ({
+        ...attachment,
+        upload: { ...upload, fileSize: upload.fileSize.toString() },
+      })),
+      viewerHasLiked: likes.length > 0,
+      viewerLikeId: likes[0]?.id ?? null,
+    };
   }
 
   @Mutation(() => PostModel)
@@ -225,6 +285,8 @@ export class PostsResolver {
 
   @ResolveField(() => UserModel, { name: 'author' })
   async author(@Parent() post: PostModel): Promise<UserModel | null> {
+    if (Object.prototype.hasOwnProperty.call(post, 'author'))
+      return post.author ?? null;
     return this.prisma.user.findUnique({ where: { id: post.authorId } });
   }
 
@@ -244,6 +306,40 @@ export class PostsResolver {
     });
   }
 
+  @ResolveField(() => Boolean, { name: 'viewerHasLiked' })
+  async viewerHasLiked(
+    @Parent() post: PostModel,
+    @Context() context: { req: { user: { sub: string } } },
+  ): Promise<boolean> {
+    if (typeof post.viewerHasLiked === 'boolean') return post.viewerHasLiked;
+    return Boolean(
+      await this.prisma.postLike.count({
+        where: {
+          postId: post.id,
+          userId: context.req.user.sub,
+          isDeleted: false,
+        },
+      }),
+    );
+  }
+
+  @ResolveField(() => String, { name: 'viewerLikeId', nullable: true })
+  async viewerLikeId(
+    @Parent() post: PostModel,
+    @Context() context: { req: { user: { sub: string } } },
+  ): Promise<string | null> {
+    if (post.viewerLikeId !== undefined) return post.viewerLikeId;
+    const like = await this.prisma.postLike.findFirst({
+      where: {
+        postId: post.id,
+        userId: context.req.user.sub,
+        isDeleted: false,
+      },
+      select: { id: true },
+    });
+    return like?.id ?? null;
+  }
+
   @ResolveField(() => [PostReportModel], { name: 'reports' })
   @Roles(UserRole.ADMIN)
   async reports(@Parent() post: PostModel): Promise<PostReportModel[]> {
@@ -255,6 +351,8 @@ export class PostsResolver {
 
   @ResolveField(() => [PostAttachmentModel], { name: 'attachments' })
   async attachments(@Parent() post: PostModel): Promise<PostAttachmentModel[]> {
+    if (Object.prototype.hasOwnProperty.call(post, 'attachments'))
+      return post.attachments ?? [];
     return this.prisma.postAttachment.findMany({
       where: { postId: post.id, isDeleted: false },
       orderBy: { position: 'asc' },

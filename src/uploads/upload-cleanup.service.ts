@@ -20,7 +20,10 @@ export class UploadCleanupService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    this.timer = setInterval(() => void this.processPending(), CLEANUP_INTERVAL_MS);
+    this.timer = setInterval(
+      () => void this.processPending(),
+      CLEANUP_INTERVAL_MS,
+    );
     this.timer.unref();
   }
 
@@ -43,7 +46,9 @@ export class UploadCleanupService implements OnModuleInit, OnModuleDestroy {
       const publicId =
         upload.storagePublicId ?? this.publicIdFromUrl(upload.storagePath);
       if (!publicId) {
-        this.logger.error(`Cloudinary public id unavailable for upload ${upload.id}`);
+        this.logger.error(
+          `Cloudinary public id unavailable for upload ${upload.id}`,
+        );
         continue;
       }
       try {
@@ -74,7 +79,7 @@ export class UploadCleanupService implements OnModuleInit, OnModuleDestroy {
         .filter(Boolean);
       if (/^v\d+$/.test(segments[0] ?? '')) segments.shift();
       if (!segments.length) return null;
-      const encoded = segments.join('/').replace(/\.[^.\/]+$/, '');
+      const encoded = segments.join('/').replace(/\.[^./]+$/, '');
       return decodeURIComponent(encoded);
     } catch {
       return null;

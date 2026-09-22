@@ -118,34 +118,36 @@ export class FriendshipsResolver {
     let friendship: FriendshipModel;
     try {
       friendship = await this.prisma.$transaction(async (tx) => {
-      const previous = await tx.friendship.findUnique({
-        where: { requesterId_receiverId: { requesterId: actorId, receiverId } },
-      });
-      if (
-        previous &&
-        ['PENDING', 'ACCEPTED', 'BLOCKED'].includes(previous.status)
-      )
-        throw new BadRequestException(
-          'Une relation existe déjà avec cet utilisateur.',
-        );
-      const friendship = previous
-        ? await tx.friendship.update({
-            where: { id: previous.id },
-            data: { status: 'PENDING', isDeleted: false, deletedAt: null },
-          })
-        : await tx.friendship.create({
-            data: { requesterId: actorId, receiverId },
-          });
-      await tx.auditLog.create({
-        data: {
-          actorId,
-          action: 'FRIEND_REQUESTED',
-          entityType: 'friendship',
-          entityId: friendship.id,
-          metadata: { receiverId },
-        },
-      });
-      return friendship;
+        const previous = await tx.friendship.findUnique({
+          where: {
+            requesterId_receiverId: { requesterId: actorId, receiverId },
+          },
+        });
+        if (
+          previous &&
+          ['PENDING', 'ACCEPTED', 'BLOCKED'].includes(previous.status)
+        )
+          throw new BadRequestException(
+            'Une relation existe déjà avec cet utilisateur.',
+          );
+        const friendship = previous
+          ? await tx.friendship.update({
+              where: { id: previous.id },
+              data: { status: 'PENDING', isDeleted: false, deletedAt: null },
+            })
+          : await tx.friendship.create({
+              data: { requesterId: actorId, receiverId },
+            });
+        await tx.auditLog.create({
+          data: {
+            actorId,
+            action: 'FRIEND_REQUESTED',
+            entityType: 'friendship',
+            entityId: friendship.id,
+            metadata: { receiverId },
+          },
+        });
+        return friendship;
       });
     } catch (error) {
       if (

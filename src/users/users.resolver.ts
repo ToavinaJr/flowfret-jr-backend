@@ -112,9 +112,14 @@ export class UsersResolver {
     @Parent() user: UserModel,
     @Context() context: { req: { user: { sub: string } } },
   ): Promise<ProfileModel | null> {
-    const profile = await this.prisma.profile.findFirst({
-      where: { userId: user.id, isDeleted: false },
-    });
+    const preloaded = Object.prototype.hasOwnProperty.call(user, 'profile');
+    const profile = preloaded
+      ? (user.profile ?? null)
+      : await this.prisma.profile.findFirst({
+          where: { userId: user.id, isDeleted: false },
+        });
+    if ((profile as (ProfileModel & { isDeleted?: boolean }) | null)?.isDeleted)
+      return null;
     if (
       !profile ||
       user.id === context.req.user.sub ||
@@ -155,7 +160,7 @@ export class UsersResolver {
             },
           }),
         );
-    return this.prisma.post.findMany({
+    const rows = await this.prisma.post.findMany({
       where: {
         authorId: user.id,
         isDeleted: false,
@@ -166,6 +171,32 @@ export class UsersResolver {
             }),
       },
       orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: {
+        author: { include: { profile: true } },
+        likes: {
+          where: { userId: context.req.user.sub, isDeleted: false },
+          select: { id: true },
+          take: 1,
+        },
+        attachments: {
+          where: { isDeleted: false },
+          orderBy: { position: 'asc' },
+          include: { upload: true },
+        },
+      },
+    });
+    return rows.map((row) => {
+      const { likes, ...post } = row;
+      return {
+        ...post,
+        attachments: post.attachments.map(({ upload, ...attachment }) => ({
+          ...attachment,
+          upload: { ...upload, fileSize: upload.fileSize.toString() },
+        })),
+        viewerHasLiked: likes.length > 0,
+        viewerLikeId: likes[0]?.id ?? null,
+      };
     });
   }
 

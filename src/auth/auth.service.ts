@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { Prisma, UserStatus } from '@prisma/client';
+import { Prisma, User, UserStatus } from '@prisma/client';
 import { createHash, randomBytes, randomInt } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -90,7 +90,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(input.password, 10);
 
-    let user;
+    let user: User;
     try {
       user = await this.prisma.user.create({
         data: {
@@ -266,7 +266,7 @@ export class AuthService {
       profile.name ?? profile.given_name ?? email.split('@')[0],
     );
 
-    let user;
+    let user: User;
     try {
       user = await this.prisma.user.create({
         data: {

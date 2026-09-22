@@ -79,9 +79,9 @@ export class CreatePostLikeInput {
 export class UpdatePostLikeInput extends PartialType(CreatePostLikeInput) {}
 @InputType()
 export class CreatePostReportInput {
-  @Field() postId!: string;
-  @Field() reporterId!: string;
-  @Field() reason!: string;
+  @Field() @IsUUID() postId!: string;
+  @Field() @IsUUID() reporterId!: string;
+  @Field() @IsString() @MinLength(5) @MaxLength(1000) reason!: string;
   @Field(() => ReportStatus, { nullable: true }) status?: ReportStatus;
   @Field(() => GraphQLISODateTime, { nullable: true }) reviewedAt?: Date | null;
 }

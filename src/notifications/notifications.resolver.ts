@@ -15,11 +15,13 @@ export class NotificationsResolver {
   myNotifications(
     @Context() context: { req: { user: { sub: string } } },
     @Args('take', { type: () => Int, defaultValue: 50 }) take: number,
+    @Args('after', { type: () => String, nullable: true }) after?: string,
   ) {
     return this.prisma.notification.findMany({
       where: { userId: context.req.user.sub, isDeleted: false },
       orderBy: { createdAt: 'desc' },
       take: Math.min(100, Math.max(1, take)),
+      ...(after ? { cursor: { id: after }, skip: 1 } : {}),
     });
   }
 

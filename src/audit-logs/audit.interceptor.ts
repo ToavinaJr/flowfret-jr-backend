@@ -55,7 +55,7 @@ export class AuditInterceptor implements NestInterceptor {
         ? args.id
         : undefined;
     return next.handle().pipe(
-      concatMap((value) =>
+      concatMap((value: unknown) =>
         from(
           this.prisma.auditLog.create({
             data: {
@@ -66,7 +66,7 @@ export class AuditInterceptor implements NestInterceptor {
               metadata: {},
             },
           }),
-        ).pipe(map(() => value)),
+        ).pipe(map((): unknown => value)),
       ),
     );
   }

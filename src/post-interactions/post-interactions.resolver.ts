@@ -6,6 +6,7 @@ import {
   ResolveField,
   Query,
   Resolver,
+  Int,
 } from '@nestjs/graphql';
 import {
   ConflictException,
@@ -68,10 +69,14 @@ export class PostInteractionsResolver {
 
   @Query(() => [PostReportModel], { name: 'postReports' })
   @Roles(UserRole.ADMIN)
-  async postReports(): Promise<PostReportModel[]> {
+  async postReports(
+    @Args('take', { type: () => Int, defaultValue: 50 }) take: number,
+  ): Promise<PostReportModel[]> {
     return this.prisma.postReport.findMany({
       where: { isDeleted: false },
       orderBy: { createdAt: 'desc' },
+      take: Math.min(100, Math.max(1, take)),
+      include: { post: { include: { author: true } }, reporter: true },
     });
   }
 
@@ -245,7 +250,10 @@ export class PostInteractionsResolver {
     @Args('id') id: string,
     @Args('data') data: UpdatePostReportInput,
   ): Promise<PostReportModel> {
-    return this.prisma.postReport.update({ where: { id }, data });
+    return this.prisma.postReport.update({
+      where: { id },
+      data: { status: data.status, reviewedAt: new Date() },
+    });
   }
 
   @Mutation(() => PostReportModel)
@@ -302,11 +310,15 @@ export class PostReportsResolver {
 
   @ResolveField(() => PostModel, { name: 'post' })
   async post(@Parent() row: PostReportModel): Promise<PostModel | null> {
+    if (Object.prototype.hasOwnProperty.call(row, 'post'))
+      return row.post ?? null;
     return this.prisma.post.findUnique({ where: { id: row.postId } });
   }
 
   @ResolveField(() => UserModel, { name: 'reporter' })
   async reporter(@Parent() row: PostReportModel): Promise<UserModel | null> {
+    if (Object.prototype.hasOwnProperty.call(row, 'reporter'))
+      return row.reporter ?? null;
     return this.prisma.user.findUnique({ where: { id: row.reporterId } });
   }
 }
@@ -324,6 +336,12 @@ export class PostAttachmentsResolver {
   async upload(
     @Parent() row: PostAttachmentModel,
   ): Promise<UploadModel | null> {
+    if (Object.prototype.hasOwnProperty.call(row, 'upload')) {
+      const preloaded = row.upload;
+      return preloaded
+        ? { ...preloaded, fileSize: String(preloaded.fileSize) }
+        : null;
+    }
     const upload = await this.prisma.upload.findUnique({
       where: { id: row.uploadId },
     });

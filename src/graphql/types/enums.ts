@@ -11,9 +11,11 @@ import {
   UploadSourceType,
   UploadStatus,
   UserStatus,
+  UserRole,
 } from '@prisma/client';
 
 registerEnumType(UserStatus, { name: 'UserStatus' });
+registerEnumType(UserRole, { name: 'UserRole' });
 registerEnumType(ProfileVisibility, { name: 'ProfileVisibility' });
 registerEnumType(PostVisibility, { name: 'PostVisibility' });
 registerEnumType(PostStatus, { name: 'PostStatus' });

@@ -18,6 +18,7 @@ import {
   UploadSourceType,
   UploadStatus,
   UserStatus,
+  UserRole,
 } from '@prisma/client';
 import { GraphQLJSON } from 'graphql-type-json';
 import './enums';
@@ -29,6 +30,7 @@ export class UserModel {
   @Field() username!: string;
   @HideField() googleId?: string | null;
   @Field(() => UserStatus) status!: UserStatus;
+  @Field(() => UserRole) role!: UserRole;
   @HideField()
   lastLoginAt!: Date | null;
   @Field(() => GraphQLISODateTime) createdAt!: Date;
@@ -71,6 +73,8 @@ export class PostModel {
   @Field(() => PostVisibility) visibility!: PostVisibility;
   @Field(() => Int) likeCount!: number;
   @Field(() => Int) commentCount!: number;
+  @Field() viewerHasLiked?: boolean;
+  @Field(() => String, { nullable: true }) viewerLikeId?: string | null;
   @Field(() => PostStatus) status!: PostStatus;
   @Field(() => GraphQLISODateTime) createdAt!: Date;
   @Field(() => GraphQLISODateTime) updatedAt!: Date;
