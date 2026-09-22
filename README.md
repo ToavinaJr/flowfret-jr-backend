@@ -154,7 +154,7 @@ npm run start:dev
 In another terminal, launch the frontend:
 
 ```bash
-bun --cwd ../flowfret-jr run dev
+bun --cwd r run dev
 ```
 
 Do not also run `npm run start:worker` on Windows when the Docker worker is
@@ -257,4 +257,4 @@ python -m unittest discover -s workers/transcription/tests -v
 npm run build
 ```
 
-The frontend is tested and launched from `../flowfret-jr` with `npm test` and `npm run dev`.
+The frontend is tested and launched from `../frontend` with `npm test` and `npm run dev`.
