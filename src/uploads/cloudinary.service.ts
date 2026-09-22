@@ -69,7 +69,11 @@ export class CloudinaryService {
     body.append('signature', signature);
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-      { method: 'POST', body },
+      {
+        method: 'POST',
+        body,
+        signal: AbortSignal.timeout(this.timeoutMs()),
+      },
     );
     const result = (await response.json()) as {
       secure_url?: string;
@@ -103,7 +107,11 @@ export class CloudinaryService {
     body.append('signature', signature);
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`,
-      { method: 'POST', body },
+      {
+        method: 'POST',
+        body,
+        signal: AbortSignal.timeout(this.timeoutMs()),
+      },
     );
     if (!response.ok) {
       this.logger.error(
@@ -111,5 +119,10 @@ export class CloudinaryService {
       );
       throw new Error(`Cloudinary cleanup failed for ${publicId}`);
     }
+  }
+
+  private timeoutMs(): number {
+    const value = Number(this.config.get('EXTERNAL_HTTP_TIMEOUT_MS'));
+    return Number.isInteger(value) && value > 0 ? value : 15_000;
   }
 }

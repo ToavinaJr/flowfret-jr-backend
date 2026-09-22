@@ -7,7 +7,11 @@ import {
   Query,
   Resolver,
 } from '@nestjs/graphql';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   CreatePostAttachmentInput,
   CreatePostLikeInput,
@@ -24,7 +28,7 @@ import {
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 import { requireVisiblePost, visiblePostWhere } from '../common/post-access';
 
@@ -205,13 +209,34 @@ export class PostInteractionsResolver {
       throw new ForbiddenException('Action interdite.');
     }
     await requireVisiblePost(this.prisma, data.postId, context.req.user.sub);
-    return this.prisma.postReport.create({
-      data: {
-        postId: data.postId,
-        reporterId: context.req.user.sub,
-        reason: data.reason,
-      },
-    });
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const report = await tx.postReport.create({
+          data: {
+            postId: data.postId,
+            reporterId: context.req.user.sub,
+            reason: data.reason,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            actorId: context.req.user.sub,
+            action: 'POST_REPORTED',
+            entityType: 'post',
+            entityId: data.postId,
+            metadata: { reportId: report.id },
+          },
+        });
+        return report;
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      )
+        throw new ConflictException('Cette publication est déjà signalée.');
+      throw error;
+    }
   }
 
   @Mutation(() => PostReportModel)

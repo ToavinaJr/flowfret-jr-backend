@@ -28,12 +28,14 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 import { requireVisiblePost, visiblePostWhere } from '../common/post-access';
+import { UploadCleanupService } from '../uploads/upload-cleanup.service';
 
 @Resolver(() => PostModel)
 export class PostsResolver {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly uploadCleanup: UploadCleanupService,
   ) {}
 
   @Query(() => [PostModel], { name: 'posts' })
@@ -175,11 +177,37 @@ export class PostsResolver {
       throw new ForbiddenException(
         'Seul le propriétaire peut supprimer cette publication.',
       );
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const attachments = await tx.postAttachment.findMany({
+        where: { postId: id, isDeleted: false },
+        select: { uploadId: true },
+      });
       const deleted = await tx.post.update({
         where: { id },
         data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' },
       });
+      await tx.postAttachment.updateMany({
+        where: { postId: id, isDeleted: false },
+        data: { isDeleted: true, deletedAt: new Date() },
+      });
+      const uploadIds: string[] = [];
+      for (const { uploadId } of attachments) {
+        const remainingReferences = await tx.postAttachment.count({
+          where: { uploadId, isDeleted: false },
+        });
+        if (remainingReferences === 0) {
+          await tx.upload.updateMany({
+            where: { id: uploadId, isDeleted: false },
+            data: {
+              isDeleted: true,
+              deletedAt: new Date(),
+              status: 'DELETED',
+              cleanupPending: true,
+            },
+          });
+          uploadIds.push(uploadId);
+        }
+      }
       await tx.auditLog.create({
         data: {
           actorId: context.req.user.sub,
@@ -189,8 +217,10 @@ export class PostsResolver {
           metadata: {},
         },
       });
-      return deleted;
+      return { deleted, uploadIds };
     });
+    await this.uploadCleanup.processPending(result.uploadIds);
+    return result.deleted;
   }
 
   @ResolveField(() => UserModel, { name: 'author' })

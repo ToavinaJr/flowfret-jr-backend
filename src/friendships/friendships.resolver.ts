@@ -10,9 +10,11 @@ import {
 } from '@nestjs/graphql';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { FriendshipModel, UserModel } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -113,7 +115,9 @@ export class FriendshipsResolver {
       throw new BadRequestException(
         'Une relation existe déjà avec cet utilisateur.',
       );
-    const friendship = await this.prisma.$transaction(async (tx) => {
+    let friendship: FriendshipModel;
+    try {
+      friendship = await this.prisma.$transaction(async (tx) => {
       const previous = await tx.friendship.findUnique({
         where: { requesterId_receiverId: { requesterId: actorId, receiverId } },
       });
@@ -142,7 +146,17 @@ export class FriendshipsResolver {
         },
       });
       return friendship;
-    });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      )
+        throw new ConflictException(
+          'Une relation existe déjà avec cet utilisateur.',
+        );
+      throw error;
+    }
     await this.notifications.friendRequested(
       actorId,
       context.req.user.username,

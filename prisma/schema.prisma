@@ -276,6 +276,8 @@ model Upload {
   fileType    String            @map("file_type") @db.VarChar(100)
   fileSize    BigInt            @map("file_size") @db.BigInt
   storagePath String            @map("storage_path") @db.Text
+  storagePublicId String?       @map("storage_public_id") @db.Text
+  cleanupPending Boolean        @default(false) @map("cleanup_pending")
   duration    Int?              @db.Integer
   status      UploadStatus      @default(UPLOADED)
   sourceType  UploadSourceType  @default(OTHER) @map("source_type")
@@ -290,6 +292,7 @@ model Upload {
   @@index([userId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
   @@index([sourceType, createdAt(sort: Desc)])
+  @@index([cleanupPending, isDeleted])
   @@map("uploads")
 }
 

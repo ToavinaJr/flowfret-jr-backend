@@ -5,6 +5,7 @@ import {
   ResolveField,
   Query,
   Resolver,
+  Context,
 } from '@nestjs/graphql';
 import {
   CreateUploadInput,
@@ -16,11 +17,15 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
+import { UploadCleanupService } from './upload-cleanup.service';
 
 @Roles(UserRole.ADMIN)
 @Resolver(() => UploadModel)
 export class UploadsResolver {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cleanup: UploadCleanupService,
+  ) {}
 
   @Query(() => [UploadModel], { name: 'uploads' })
   async uploads(): Promise<UploadModel[]> {
@@ -84,11 +89,32 @@ export class UploadsResolver {
   }
 
   @Mutation(() => UploadModel)
-  async deleteUpload(@Args('id') id: string): Promise<UploadModel> {
-    const deletedUpload = await this.prisma.upload.update({
-      where: { id },
-      data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' },
+  async deleteUpload(
+    @Args('id') id: string,
+    @Context() context: { req: { user: { sub: string } } },
+  ): Promise<UploadModel> {
+    const deletedUpload = await this.prisma.$transaction(async (tx) => {
+      const upload = await tx.upload.update({
+        where: { id },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          status: 'DELETED',
+          cleanupPending: true,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: context.req.user.sub,
+          action: 'UPLOAD_DELETED',
+          entityType: 'upload',
+          entityId: id,
+          metadata: {},
+        },
+      });
+      return upload;
     });
+    await this.cleanup.processPending([id]);
     return {
       ...deletedUpload,
       fileSize: deletedUpload.fileSize.toString(),

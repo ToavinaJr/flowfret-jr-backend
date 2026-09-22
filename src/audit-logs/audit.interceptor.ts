@@ -5,12 +5,32 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
-import { Observable, tap } from 'rxjs';
+import { concatMap, from, map, Observable } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** Safety net that records every successful authenticated GraphQL mutation. */
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
+  private readonly transactionallyAudited = new Set([
+    'createPost',
+    'updatePost',
+    'deletePost',
+    'createComment',
+    'updateComment',
+    'deleteComment',
+    'createPostLike',
+    'deletePostLike',
+    'createPostReport',
+    'sendFriendRequest',
+    'respondFriendRequest',
+    'removeFriend',
+    'createProfile',
+    'updateProfile',
+    'deleteProfile',
+    'deleteUpload',
+    'recordActivity',
+  ]);
+
   constructor(private readonly prisma: PrismaService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -22,7 +42,11 @@ export class AuditInterceptor implements NestInterceptor {
     }>();
     const actorId = gql.getContext<{ req?: { user?: { sub?: string } } }>().req
       ?.user?.sub;
-    if (info.operation.operation !== 'mutation' || !actorId)
+    if (
+      info.operation.operation !== 'mutation' ||
+      !actorId ||
+      this.transactionallyAudited.has(info.fieldName)
+    )
       return next.handle();
     const args = gql.getArgs<{ id?: string }>();
     const entityId =
@@ -31,24 +55,19 @@ export class AuditInterceptor implements NestInterceptor {
         ? args.id
         : undefined;
     return next.handle().pipe(
-      tap({
-        next: () => {
-          void this.prisma.auditLog
-            .create({
-              data: {
-                actorId,
-                action: `MUTATION_${info.fieldName.toUpperCase()}`.slice(
-                  0,
-                  100,
-                ),
-                entityType: info.fieldName.slice(0, 100),
-                entityId,
-                metadata: {},
-              },
-            })
-            .catch(() => undefined);
-        },
-      }),
+      concatMap((value) =>
+        from(
+          this.prisma.auditLog.create({
+            data: {
+              actorId,
+              action: `MUTATION_${info.fieldName.toUpperCase()}`.slice(0, 100),
+              entityType: info.fieldName.slice(0, 100),
+              entityId,
+              metadata: {},
+            },
+          }),
+        ).pipe(map(() => value)),
+      ),
     );
   }
 }

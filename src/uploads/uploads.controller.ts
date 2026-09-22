@@ -20,6 +20,7 @@ import {
 } from './cloudinary.service';
 import { RateLimits } from '../auth/rate-limit.decorator';
 import { ConcurrentUploadsInterceptor } from './concurrent-uploads.interceptor';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('uploads')
 @UseGuards(AuthGuard('jwt'))
@@ -28,6 +29,7 @@ export class UploadsController {
   constructor(
     private readonly cloudinary: CloudinaryService,
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
   ) {}
 
   @Post('images')
@@ -48,6 +50,17 @@ export class UploadsController {
   ) {
     if (!files?.length)
       throw new BadRequestException('Au moins une image est requise.');
+    const incomingBytes = files.reduce((total, file) => total + file.size, 0);
+    const used = await this.prisma.upload.aggregate({
+      where: { userId: req.user.sub, isDeleted: false },
+      _sum: { fileSize: true },
+    });
+    const quota = BigInt(this.storageQuotaBytes());
+    if ((used._sum.fileSize ?? 0n) + BigInt(incomingBytes) > quota) {
+      throw new BadRequestException(
+        'Quota de stockage atteint. Supprimez des fichiers avant de continuer.',
+      );
+    }
     this.logger.log(
       `Authenticated image upload started (userId=${req.user.sub}, count=${files.length})`,
     );
@@ -80,6 +93,7 @@ export class UploadsController {
                 fileType: files[index].mimetype,
                 fileSize: BigInt(files[index].size),
                 storagePath: result.url,
+                storagePublicId: result.publicId,
                 status: 'AVAILABLE',
                 sourceType: 'POST',
               },
@@ -123,5 +137,14 @@ export class UploadsController {
         );
       }
     });
+  }
+
+  private storageQuotaBytes(): number {
+    const configured = Number(
+      this.config.get('UPLOAD_MAX_STORAGE_BYTES_PER_USER'),
+    );
+    return Number.isSafeInteger(configured) && configured > 0
+      ? configured
+      : 250 * 1024 * 1024;
   }
 }

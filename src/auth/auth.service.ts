@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { UserStatus } from '@prisma/client';
+import { Prisma, UserStatus } from '@prisma/client';
 import { createHash, randomBytes, randomInt } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -45,6 +45,13 @@ interface GoogleUserInfo {
   picture?: string;
 }
 
+interface GoogleTokenInfo {
+  aud?: string;
+  expires_in?: string;
+  user_id?: string;
+  scope?: string;
+}
+
 export interface AuthSessionPayload extends AuthPayload {
   refreshToken: string;
 }
@@ -61,9 +68,13 @@ export class AuthService {
   ) {}
 
   async register(input: RegisterInput): Promise<RegisterPendingPayload> {
+    const email = this.normalizeEmail(input.email);
     const existingUser = await this.prisma.user.findFirst({
       where: {
-        OR: [{ email: input.email }, { username: input.username }],
+        OR: [
+          { email: { equals: email, mode: 'insensitive' } },
+          { username: input.username },
+        ],
       },
     });
 
@@ -79,14 +90,21 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(input.password, 10);
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: input.email,
-        username: input.username,
-        passwordHash,
-        status: UserStatus.PENDING,
-      },
-    });
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          username: input.username,
+          passwordHash,
+          status: UserStatus.PENDING,
+        },
+      });
+    } catch (error) {
+      if (this.isUniqueConstraintError(error))
+        throw new ConflictException(GENERIC_REGISTRATION_ERROR);
+      throw error;
+    }
 
     const verification = await this.createAndSendOtp(user);
 
@@ -101,7 +119,7 @@ export class AuthService {
 
   async login(input: LoginInput): Promise<AuthSessionPayload> {
     const user = await this.prisma.user.findUnique({
-      where: { email: input.email },
+      where: { email: this.normalizeEmail(input.email) },
     });
 
     if (!user || !user.passwordHash) {
@@ -201,7 +219,7 @@ export class AuthService {
       profile.email_verified === true || profile.email_verified === 'true';
     if (!profile.email || !emailVerified)
       throw new UnauthorizedException(GENERIC_GOOGLE_ERROR);
-    const email = profile.email.toLowerCase();
+    const email = this.normalizeEmail(profile.email);
     const googleId = profile.sub;
     const existing = await this.prisma.user.findFirst({
       where: { OR: [{ googleId }, { email }] },
@@ -248,23 +266,30 @@ export class AuthService {
       profile.name ?? profile.given_name ?? email.split('@')[0],
     );
 
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        username,
-        googleId,
-        googleSignupCompleted: true,
-        passwordHash: null,
-        status: UserStatus.ACTIVE,
-        lastLoginAt: new Date(),
-        profile: {
-          create: {
-            displayName: profile.name ?? username,
-            avatarUrl: profile.picture ?? null,
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          username,
+          googleId,
+          googleSignupCompleted: true,
+          passwordHash: null,
+          status: UserStatus.ACTIVE,
+          lastLoginAt: new Date(),
+          profile: {
+            create: {
+              displayName: profile.name ?? username,
+              avatarUrl: profile.picture ?? null,
+            },
           },
         },
-      },
-    });
+      });
+    } catch (error) {
+      if (this.isUniqueConstraintError(error))
+        throw new ConflictException(GENERIC_GOOGLE_ERROR);
+      throw error;
+    }
 
     return this.createAuthPayload(user);
   }
@@ -482,24 +507,58 @@ export class AuthService {
   private async fetchGoogleProfile(
     accessToken: string,
   ): Promise<GoogleUserInfo> {
+    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID')?.trim();
+    if (!clientId) throw new UnauthorizedException(GENERIC_GOOGLE_ERROR);
+    const timeoutMs = this.externalHttpTimeoutMs();
+    let tokenResponse: Response;
     let response: Response;
     try {
+      tokenResponse = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`,
+        { signal: AbortSignal.timeout(timeoutMs) },
+      );
+      if (!tokenResponse.ok)
+        throw new UnauthorizedException('Invalid Google access token.');
+      const tokenInfo = (await tokenResponse.json()) as GoogleTokenInfo;
+      if (
+        tokenInfo.aud !== clientId ||
+        !tokenInfo.user_id ||
+        !Number.isFinite(Number(tokenInfo.expires_in)) ||
+        Number(tokenInfo.expires_in) <= 0 ||
+        !tokenInfo.scope?.split(' ').includes('openid')
+      ) {
+        throw new UnauthorizedException('Invalid Google access token.');
+      }
       response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(timeoutMs),
       });
-    } catch {
+      if (!response.ok)
+        throw new UnauthorizedException('Invalid Google access token.');
+      const profile = (await response.json()) as GoogleUserInfo;
+      if (!profile.sub || profile.sub !== tokenInfo.user_id)
+        throw new UnauthorizedException('Invalid Google profile.');
+      return profile;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
       throw new UnauthorizedException('Unable to reach Google.');
     }
+  }
 
-    if (!response.ok) {
-      throw new UnauthorizedException('Invalid Google access token.');
-    }
+  private externalHttpTimeoutMs(): number {
+    const value = Number(this.configService.get('EXTERNAL_HTTP_TIMEOUT_MS'));
+    return Number.isInteger(value) && value > 0 ? value : 8_000;
+  }
 
-    const profile = (await response.json()) as GoogleUserInfo;
-    if (!profile.sub) {
-      throw new UnauthorizedException('Invalid Google profile.');
-    }
-    return profile;
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    );
   }
 
   private async allocateUniqueUsername(seed: string): Promise<string> {
@@ -560,13 +619,22 @@ export class AuthService {
       this.configService.get<string>('APP_URL') ?? 'http://localhost:5173';
     const verificationLink = `${appUrl.replace(/\/$/, '')}/verify-email?token=${token}`;
 
-    await this.mailService.sendOtpVerificationEmail({
-      to: user.email,
-      username: user.username,
-      otpCode,
-      verificationLink,
-      expiresInMinutes: OTP_TTL_MINUTES,
-    });
+    try {
+      await this.mailService.sendOtpVerificationEmail({
+        to: user.email,
+        username: user.username,
+        otpCode,
+        verificationLink,
+        expiresInMinutes: OTP_TTL_MINUTES,
+      });
+    } catch (error) {
+      // Keep the opaque verification token usable by the resend flow. A mail
+      // provider outage must not leave an unreachable account behind.
+      this.logger.error(
+        `Unable to send verification email for user ${user.id}`,
+        errorDetails(error),
+      );
+    }
 
     return { token, expiresAt };
   }

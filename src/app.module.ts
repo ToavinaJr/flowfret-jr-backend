@@ -17,7 +17,6 @@ import { AuthModule } from './auth/auth.module';
 import { ProfilesResolver } from './profiles/profiles.resolver';
 import { PostsResolver } from './posts/posts.resolver';
 import { NotificationsResolver } from './notifications/notifications.resolver';
-import { UploadsResolver } from './uploads/uploads.resolver';
 import { TagsResolver } from './tags/tags.resolver';
 import { UsersResolver } from './users/users.resolver';
 import { formatGraphQLError } from './common/format-graphql-error';
@@ -85,7 +84,6 @@ import { createGraphqlSecurityRule } from './common/graphql-security';
     PostsResolver,
     CommentsResolver,
     FriendshipsResolver,
-    UploadsResolver,
     NotificationsResolver,
     NotificationsService,
     AuditLogsResolver,
