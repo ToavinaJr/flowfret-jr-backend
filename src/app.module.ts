@@ -1,5 +1,5 @@
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Module } from '@nestjs/common';
 import { GraphQLModule } from '@nestjs/graphql';
 import { AppController } from './app.controller';
@@ -30,6 +30,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { Request, Response } from 'express';
 import { AuditInterceptor } from './audit-logs/audit.interceptor';
 import { NotificationsService } from './notifications/notifications.service';
+import { createGraphqlSecurityRule } from './common/graphql-security';
 
 @Module({
   imports: [
@@ -49,15 +50,30 @@ import { NotificationsService } from './notifications/notifications.service';
     TranscriptionsModule,
     LyricsModule,
     UploadsModule,
-    GraphQLModule.forRoot<ApolloDriverConfig>({
+    GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
-      autoSchemaFile: true,
-      sortSchema: true,
-      context: ({ req, res }: { req: Request; res: Response }) => ({
-        req,
-        res,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService): ApolloDriverConfig => ({
+        driver: ApolloDriver,
+        autoSchemaFile: true,
+        sortSchema: true,
+        introspection: config.get<string>('NODE_ENV') !== 'production',
+        allowBatchedHttpRequests: false,
+        csrfPrevention: true,
+        includeStacktraceInErrorResponses: false,
+        validationRules: [
+          createGraphqlSecurityRule({
+            maxDepth: positiveConfig(config, 'GRAPHQL_MAX_DEPTH', 12),
+            maxFields: positiveConfig(config, 'GRAPHQL_MAX_FIELDS', 300),
+            maxAliases: positiveConfig(config, 'GRAPHQL_MAX_ALIASES', 30),
+          }),
+        ],
+        context: ({ req, res }: { req: Request; res: Response }) => ({
+          req,
+          res,
+        }),
+        formatError: formatGraphQLError,
       }),
-      formatError: formatGraphQLError,
     }),
   ],
   controllers: [AppController],
@@ -82,3 +98,12 @@ import { NotificationsService } from './notifications/notifications.service';
   ],
 })
 export class AppModule {}
+
+function positiveConfig(
+  config: ConfigService,
+  key: string,
+  fallback: number,
+): number {
+  const value = Number(config.get(key));
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}

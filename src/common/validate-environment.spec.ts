@@ -16,9 +16,31 @@ describe('validateEnvironment', () => {
       JWT_SECRET: 'a-secure-secret-containing-32-chars',
       APP_URL: 'https://fretflow.app',
       CORS_ORIGINS: 'https://www.fretflow.app',
+      SENDGRID_API_KEY: 'sendgrid-test-key',
+      SENDGRID_FROM_EMAIL: 'noreply@fretflow.app',
     };
 
     expect(validateEnvironment(environment)).toBe(environment);
+  });
+
+  it('requires mail delivery configuration in production', () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'a-secure-secret-containing-32-chars',
+        APP_URL: 'https://fretflow.app',
+      }),
+    ).toThrow('SENDGRID_API_KEY must be configured in production');
+
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'a-secure-secret-containing-32-chars',
+        APP_URL: 'https://fretflow.app',
+        SENDGRID_API_KEY: 'sendgrid-test-key',
+        SENDGRID_FROM_EMAIL: 'invalid',
+      }),
+    ).toThrow('SENDGRID_FROM_EMAIL must contain a valid email address');
   });
 
   it('rejects HTTP application URLs in production', () => {

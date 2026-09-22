@@ -41,6 +41,12 @@ The inactive Spotify provider is also retained and accepts:
 
 Never commit real secrets.
 
+In production, `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` are mandatory. The
+HTTP API refuses to start without them and never writes OTP codes or password
+reset links to logs. Deployments that ran an older version without SendGrid
+must purge retained application logs according to the hosting provider's
+retention controls before going live with this version.
+
 ## Music search
 
 - Audius track search → streamable MP3 URL → integrated web player

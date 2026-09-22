@@ -21,6 +21,7 @@ import { TranscriptionEvents } from './transcriptions.events';
 import { TranscriptionsService } from './transcriptions.service';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { RateLimits } from '../auth/rate-limit.decorator';
 
 @Controller('api/transcriptions')
 @UseGuards(AuthGuard('jwt'))
@@ -31,6 +32,10 @@ export class TranscriptionsController {
   ) {}
 
   @Post()
+  @RateLimits(
+    { limit: 5, windowSeconds: 60, failClosed: true },
+    { limit: 20, windowSeconds: 86_400, failClosed: true },
+  )
   create(
     @Body() dto: CreateTranscriptionDto,
     @Req() req: { user: { sub: string } },
@@ -78,6 +83,10 @@ export class TranscriptionsController {
   }
 
   @Post(':id/retry')
+  @RateLimits(
+    { limit: 3, windowSeconds: 3600, failClosed: true },
+    { limit: 5, windowSeconds: 86_400, failClosed: true },
+  )
   retry(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RetryTranscriptionDto,

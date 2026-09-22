@@ -45,6 +45,7 @@ describe('TranscriptionsService', () => {
       update: jest.fn(),
       grantAccess: jest.fn().mockResolvedValue(undefined),
       hasAccess: jest.fn().mockResolvedValue(true),
+      countActiveForUser: jest.fn().mockResolvedValue(0),
       saveSegments: jest.fn(),
       markFailed: jest.fn(),
     };
@@ -101,6 +102,42 @@ describe('TranscriptionsService', () => {
     );
     expect(result.cached).toBe(true);
     expect(result.jobId).toBeNull();
+    expect(queue.add).not.toHaveBeenCalled();
+  });
+  it('rejects a new transcription when the user active-job quota is full', async () => {
+    const { service, repository, queue } = setup();
+    repository.countActiveForUser.mockResolvedValue(2);
+
+    await expect(
+      service.createOrGet(
+        {
+          trackId: 'another-track',
+          audioUrl: 'https://api.audius.co/audio',
+          model: 'small',
+        },
+        'user-id',
+      ),
+    ).rejects.toMatchObject({ status: 429 });
+    expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('rejects new work when the global queue is saturated', async () => {
+    const { service, queue } = setup(null, {
+      getJobCounts: jest
+        .fn()
+        .mockResolvedValue({ waiting: 49, active: 1, delayed: 0 }),
+    });
+
+    await expect(
+      service.createOrGet(
+        {
+          trackId: 'another-track',
+          audioUrl: 'https://api.audius.co/audio',
+          model: 'small',
+        },
+        'user-id',
+      ),
+    ).rejects.toMatchObject({ status: 503 });
     expect(queue.add).not.toHaveBeenCalled();
   });
   it('reuses an existing deterministic BullMQ job', async () => {

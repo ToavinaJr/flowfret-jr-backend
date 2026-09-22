@@ -48,7 +48,7 @@ export class MailService {
       sgMail.setApiKey(apiKey);
     } else {
       this.logger.warn(
-        'SENDGRID_API_KEY is missing — OTP emails will be logged only.',
+        'Email delivery is disabled because SENDGRID_API_KEY is missing.',
       );
     }
   }
@@ -93,9 +93,7 @@ export class MailService {
     `;
 
     if (!this.isConfigured) {
-      this.logger.log(
-        `[DEV OTP] to=${payload.to} code=${payload.otpCode} link=${payload.verificationLink}`,
-      );
+      this.logger.warn('OTP email suppressed because delivery is disabled.');
       return;
     }
 
@@ -134,8 +132,8 @@ export class MailService {
       </div>`;
 
     if (!this.isConfigured) {
-      this.logger.log(
-        `[DEV PASSWORD RESET] to=${payload.to} link=${payload.resetLink}`,
+      this.logger.warn(
+        'Password reset email suppressed because delivery is disabled.',
       );
       return;
     }

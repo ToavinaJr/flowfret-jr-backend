@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -87,6 +88,7 @@ export class TranscriptionsService {
     );
     let created = false;
     if (!transcription) {
+      await this.ensureCapacity(userId);
       try {
         transcription = await this.repository.create({
           trackId: dto.trackId,
@@ -454,6 +456,38 @@ export class TranscriptionsService {
   private numberConfig(key: string, fallback: number): number {
     const value = Number(this.config.get(key));
     return Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  private async ensureCapacity(userId: string): Promise<void> {
+    const active = await this.repository.countActiveForUser(userId);
+    const maxActive = this.numberConfig('TRANSCRIPTION_MAX_ACTIVE_PER_USER', 2);
+    if (active >= maxActive) {
+      throw new HttpException(
+        {
+          code: 'TRANSCRIPTION_USER_QUOTA_REACHED',
+          message: 'Trop de transcriptions sont déjà en cours.',
+        },
+        429,
+      );
+    }
+
+    if (typeof this.queue.getJobCounts !== 'function') return;
+    const counts = await this.queueOperation(
+      'capacityJobCounts',
+      this.queue.getJobCounts('waiting', 'active', 'delayed'),
+    );
+    const queued =
+      (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0);
+    const maxQueueDepth = this.numberConfig(
+      'TRANSCRIPTION_MAX_QUEUE_DEPTH',
+      50,
+    );
+    if (queued >= maxQueueDepth) {
+      throw new ServiceUnavailableException({
+        code: 'TRANSCRIPTION_QUEUE_SATURATED',
+        message: 'La file de transcription est temporairement saturée.',
+      });
+    }
   }
 
   private errorMessage(error: unknown): string {

@@ -7,6 +7,8 @@ import helmet from 'helmet';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const bodyLimitKb = Number(process.env.GRAPHQL_BODY_LIMIT_KB ?? 64);
+  app.useBodyParser('json', { limit: `${bodyLimitKb}kb` });
   app.use(helmet());
   if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
   app.enableShutdownHooks();

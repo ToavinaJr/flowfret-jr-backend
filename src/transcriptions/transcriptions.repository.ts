@@ -65,6 +65,26 @@ export class TranscriptionsRepository {
       ),
     );
   }
+  countActiveForUser(userId: string): Promise<number> {
+    return this.execute('countActiveForUser', () =>
+      this.prisma.transcriptionAccess.count({
+        where: {
+          userId,
+          transcription: {
+            isDeleted: false,
+            status: {
+              in: [
+                TranscriptionStatus.PENDING,
+                TranscriptionStatus.DOWNLOADING,
+                TranscriptionStatus.PROCESSING,
+                TranscriptionStatus.READY_TO_PLAY,
+              ],
+            },
+          },
+        },
+      }),
+    );
+  }
   create(data: {
     trackId: string;
     title?: string;

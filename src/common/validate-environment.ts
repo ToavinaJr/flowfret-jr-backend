@@ -18,6 +18,12 @@ const POSITIVE_INTEGER_KEYS = [
   'UPLOAD_MAX_CONCURRENT_GLOBAL',
   'UPLOAD_MAX_CONCURRENT_PER_USER',
   'TRANSCRIPTION_MAX_DURATION_SECONDS',
+  'TRANSCRIPTION_MAX_ACTIVE_PER_USER',
+  'TRANSCRIPTION_MAX_QUEUE_DEPTH',
+  'GRAPHQL_MAX_DEPTH',
+  'GRAPHQL_MAX_FIELDS',
+  'GRAPHQL_MAX_ALIASES',
+  'GRAPHQL_BODY_LIMIT_KB',
 ] as const;
 
 const ALLOWED_MUSIC_PROVIDERS = ['AUDIUS', 'SPOTIFY', 'YOUTUBE'] as const;
@@ -25,6 +31,7 @@ const ALLOWED_TRANSCRIPTION_PROVIDERS = ['whisper', 'azure'] as const;
 
 export function validateEnvironment(
   environment: Record<string, unknown>,
+  options: { requireMail?: boolean } = {},
 ): Record<string, unknown> {
   for (const key of POSITIVE_INTEGER_KEYS) {
     const raw = environment[key];
@@ -65,8 +72,25 @@ export function validateEnvironment(
       .map((origin) => origin.trim())
       .filter(Boolean);
     for (const origin of origins) requireHttpsUrl(origin, 'CORS_ORIGINS');
+    if (options.requireMail !== false) {
+      requireNonEmpty(environment.SENDGRID_API_KEY, 'SENDGRID_API_KEY');
+      requireEmail(environment.SENDGRID_FROM_EMAIL, 'SENDGRID_FROM_EMAIL');
+    }
   }
   return environment;
+}
+
+function requireNonEmpty(value: unknown, key: string): void {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`${key} must be configured in production`);
+  }
+}
+
+function requireEmail(value: unknown, key: string): void {
+  requireNonEmpty(value, key);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value as string)) {
+    throw new Error(`${key} must contain a valid email address`);
+  }
 }
 
 function validateEnum(

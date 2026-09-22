@@ -15,7 +15,8 @@ import { getRedisOptions } from '../common/redis-config';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validate: validateEnvironment,
+      validate: (environment) =>
+        validateEnvironment(environment, { requireMail: false }),
       envFilePath: [
         `.env.${process.env.NODE_ENV ?? 'development'}.local`,
         `.env.${process.env.NODE_ENV ?? 'development'}`,
