@@ -98,6 +98,12 @@ export class TrackSnapshotInput {
 
   @Field(() => String, { nullable: true })
   @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  genre?: string | null;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
   @IsUrl({ protocols: ['https'], require_protocol: true })
   @MaxLength(2048)
   imageUrl?: string | null;

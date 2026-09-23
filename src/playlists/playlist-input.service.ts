@@ -27,6 +27,7 @@ export class PlaylistInputService {
         name: this.requiredText(artist.name, "Le nom de l'artiste"),
       })),
       album: this.optionalText(track.album),
+      genre: this.optionalText(track.genre),
       imageUrl: track.imageUrl ?? null,
       externalUrl: track.externalUrl,
       durationMs: track.durationMs,

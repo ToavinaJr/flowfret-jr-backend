@@ -32,6 +32,9 @@ export class CatalogTrackModel {
   album!: string | null;
 
   @Field(() => String, { nullable: true })
+  genre!: string | null;
+
+  @Field(() => String, { nullable: true })
   imageUrl!: string | null;
 
   @Field()
