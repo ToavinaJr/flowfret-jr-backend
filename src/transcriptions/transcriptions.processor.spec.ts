@@ -131,4 +131,45 @@ describe('TranscriptionsProcessor deterministic flow', () => {
       'transcription.completed',
     ]);
   });
+
+  it('returns a retryable job to pending without marking it failed', async () => {
+    const { processor, repository, job } = setup();
+    job.opts.attempts = 2;
+    const whisper = Reflect.get(processor, 'whisper') as {
+      run: jest.Mock;
+    };
+    whisper.run.mockRejectedValueOnce(
+      Object.assign(new Error('temporary failure'), { code: 'TEMPORARY' }),
+    );
+
+    await expect(processor.process(job)).rejects.toThrow('temporary failure');
+    expect(repository.update).toHaveBeenCalledWith(
+      transcriptionId,
+      expect.objectContaining({ status: TranscriptionStatus.PENDING }),
+    );
+    expect(repository.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('marks a final worker failure and emits a safe failure event', async () => {
+    const { processor, repository, events, job } = setup();
+    const whisper = Reflect.get(processor, 'whisper') as {
+      run: jest.Mock;
+    };
+    whisper.run.mockRejectedValueOnce(
+      Object.assign(new Error('sensitive detail'), { code: 'WORKER_FAILED' }),
+    );
+
+    await expect(processor.process(job)).rejects.toThrow('sensitive detail');
+    expect(repository.markFailed).toHaveBeenCalledWith(
+      transcriptionId,
+      'WORKER_FAILED',
+      'sensitive detail',
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'transcription.failed',
+        message: 'Transcription failed',
+      }),
+    );
+  });
 });

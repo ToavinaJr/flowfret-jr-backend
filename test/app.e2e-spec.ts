@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { GraphQLSchemaHost } from '@nestjs/graphql';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -31,6 +32,47 @@ describe('AppController (e2e)', () => {
       .expect(({ body }: { body: { data?: { dbHealth?: string } } }) => {
         expect(body.data?.dbHealth).toBe('ok');
       });
+  });
+
+  it('preserves the public GraphQL operation contract', () => {
+    const schema = app.get(GraphQLSchemaHost).schema;
+    const queries = Object.keys(schema.getQueryType()?.getFields() ?? {});
+    const mutations = Object.keys(schema.getMutationType()?.getFields() ?? {});
+
+    expect(queries).toEqual(
+      expect.arrayContaining([
+        'posts',
+        'post',
+        'comments',
+        'commentsByPost',
+        'searchUsers',
+        'myFriendships',
+        'postLikes',
+        'postReports',
+        'profiles',
+        'user',
+      ]),
+    );
+    expect(mutations).toEqual(
+      expect.arrayContaining([
+        'register',
+        'login',
+        'loginWithGoogle',
+        'registerWithGoogle',
+        'verifyEmail',
+        'refreshSession',
+        'createPost',
+        'updatePost',
+        'deletePost',
+        'createComment',
+        'updateComment',
+        'deleteComment',
+        'sendFriendRequest',
+        'respondFriendRequest',
+        'createPostLike',
+        'deletePostLike',
+      ]),
+    );
   });
 
   afterAll(async () => {
