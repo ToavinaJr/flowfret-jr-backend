@@ -51,6 +51,9 @@ describe('AppController (e2e)', () => {
         'postReports',
         'profiles',
         'user',
+        'myPlaylists',
+        'playlist',
+        'playlistItems',
       ]),
     );
     expect(mutations).toEqual(
@@ -71,6 +74,12 @@ describe('AppController (e2e)', () => {
         'respondFriendRequest',
         'createPostLike',
         'deletePostLike',
+        'createPlaylist',
+        'updatePlaylist',
+        'deletePlaylist',
+        'addTrackToPlaylist',
+        'removeTrackFromPlaylist',
+        'reorderPlaylistItems',
       ]),
     );
   });

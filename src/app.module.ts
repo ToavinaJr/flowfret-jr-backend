@@ -16,6 +16,7 @@ import { LyricsModule } from './integrations/lyrics/lyrics.module';
 import { Request, Response } from 'express';
 import { createGraphqlSecurityRule } from './common/graphql-security';
 import { SocialModule } from './social/social.module';
+import { PlaylistsModule } from './playlists/playlists.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { SocialModule } from './social/social.module';
     LyricsModule,
     UploadsModule,
     SocialModule,
+    PlaylistsModule,
     GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
       inject: [ConfigService],

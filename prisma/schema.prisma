@@ -100,32 +100,44 @@ enum TranscriptionStatus {
   FAILED
 }
 
+enum MusicProvider {
+  AUDIUS
+  SPOTIFY
+  YOUTUBE
+}
+
+enum PlaylistVisibility {
+  PRIVATE
+  FRIENDS
+  PUBLIC
+}
+
 model Transcription {
-  id                String              @id @default(uuid()) @db.Uuid
-  trackId           String              @map("track_id") @db.VarChar(255)
-  title             String?             @db.VarChar(500)
-  artist            String?             @db.VarChar(500)
-  requestedLanguage String              @default("auto") @map("requested_language") @db.VarChar(16)
-  detectedLanguage  String?             @map("detected_language") @db.VarChar(16)
-  model             String              @db.VarChar(32)
-  engineVersion     String              @map("engine_version") @db.VarChar(32)
-  status            TranscriptionStatus @default(PENDING)
-  progress          Int                 @default(0)
-  bufferedUntil     Float               @default(0) @map("buffered_until")
+  id                String                @id @default(uuid()) @db.Uuid
+  trackId           String                @map("track_id") @db.VarChar(255)
+  title             String?               @db.VarChar(500)
+  artist            String?               @db.VarChar(500)
+  requestedLanguage String                @default("auto") @map("requested_language") @db.VarChar(16)
+  detectedLanguage  String?               @map("detected_language") @db.VarChar(16)
+  model             String                @db.VarChar(32)
+  engineVersion     String                @map("engine_version") @db.VarChar(32)
+  status            TranscriptionStatus   @default(PENDING)
+  progress          Int                   @default(0)
+  bufferedUntil     Float                 @default(0) @map("buffered_until")
   duration          Float?
-  readyToPlay       Boolean             @default(false) @map("ready_to_play")
-  segments          Json?               @db.JsonB
-  lrcContent        String?             @map("lrc_content") @db.Text
-  errorCode         String?             @map("error_code") @db.VarChar(64)
-  errorMessage      String?             @map("error_message") @db.Text
-  attempts          Int                 @default(0)
-  manualRetryCount  Int                 @default(0) @map("manual_retry_count")
-  processingPhase   String?             @map("processing_phase") @db.VarChar(32)
-  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
-  completedAt       DateTime?           @map("completed_at") @db.Timestamptz(6)
-  isDeleted         Boolean             @default(false) @map("is_deleted")
-  deletedAt         DateTime?           @map("deleted_at") @db.Timestamptz(6)
+  readyToPlay       Boolean               @default(false) @map("ready_to_play")
+  segments          Json?                 @db.JsonB
+  lrcContent        String?               @map("lrc_content") @db.Text
+  errorCode         String?               @map("error_code") @db.VarChar(64)
+  errorMessage      String?               @map("error_message") @db.Text
+  attempts          Int                   @default(0)
+  manualRetryCount  Int                   @default(0) @map("manual_retry_count")
+  processingPhase   String?               @map("processing_phase") @db.VarChar(32)
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt       DateTime?             @map("completed_at") @db.Timestamptz(6)
+  isDeleted         Boolean               @default(false) @map("is_deleted")
+  deletedAt         DateTime?             @map("deleted_at") @db.Timestamptz(6)
   accessors         TranscriptionAccess[]
 
   @@unique([trackId, requestedLanguage, model, engineVersion], map: "transcriptions_cache_key_unique")
@@ -135,44 +147,107 @@ model Transcription {
 }
 
 model User {
-  id                   String                 @id @default(uuid()) @db.Uuid
-  email                String                 @unique @db.VarChar(255)
-  passwordHash         String?                @map("password_hash") @db.VarChar(255)
-  googleId             String?                @unique @map("google_id") @db.VarChar(255)
-  googleSignupCompleted Boolean               @default(false) @map("google_signup_completed")
-  username             String                 @unique @db.VarChar(50)
-  status               UserStatus             @default(PENDING)
-  role                 UserRole               @default(USER)
-  lastLoginAt          DateTime?              @map("last_login_at") @db.Timestamptz(6)
-  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
-  isDeleted            Boolean                @default(false) @map("is_deleted")
-  deletedAt            DateTime?              @map("deleted_at") @db.Timestamptz(6)
+  id                    String     @id @default(uuid()) @db.Uuid
+  email                 String     @unique @db.VarChar(255)
+  passwordHash          String?    @map("password_hash") @db.VarChar(255)
+  googleId              String?    @unique @map("google_id") @db.VarChar(255)
+  googleSignupCompleted Boolean    @default(false) @map("google_signup_completed")
+  username              String     @unique @db.VarChar(50)
+  status                UserStatus @default(PENDING)
+  role                  UserRole   @default(USER)
+  lastLoginAt           DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt             DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  isDeleted             Boolean    @default(false) @map("is_deleted")
+  deletedAt             DateTime?  @map("deleted_at") @db.Timestamptz(6)
 
-  profile              Profile?
-  authoredPosts        Post[]                 @relation("UserAuthoredPosts")
-  comments             Comment[]              @relation("UserComments")
-  uploads              Upload[]
-  notifications        Notification[]
+  profile                 Profile?
+  authoredPosts           Post[]                   @relation("UserAuthoredPosts")
+  comments                Comment[]                @relation("UserComments")
+  uploads                 Upload[]
+  notifications           Notification[]
   notificationPreferences NotificationPreference[]
-  auditLogs             AuditLog[]             @relation("UserAuditLogs")
-  refreshTokens        RefreshToken[]
-  passwordResetTokens   PasswordResetToken[]
+  auditLogs               AuditLog[]               @relation("UserAuditLogs")
+  refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
-  friendshipsRequested Friendship[]           @relation("FriendshipRequester")
-  friendshipsReceived  Friendship[]           @relation("FriendshipReceiver")
-  likes                PostLike[]
-  reports              PostReport[]           @relation("PostReportsByReporter")
-  postMentions         PostMention[]           @relation("UserPostMentions")
-  commentMentions      CommentMention[]        @relation("UserCommentMentions")
-  transcriptionAccess  TranscriptionAccess[]
+  friendshipsRequested    Friendship[]             @relation("FriendshipRequester")
+  friendshipsReceived     Friendship[]             @relation("FriendshipReceiver")
+  likes                   PostLike[]
+  reports                 PostReport[]             @relation("PostReportsByReporter")
+  postMentions            PostMention[]            @relation("UserPostMentions")
+  commentMentions         CommentMention[]         @relation("UserCommentMentions")
+  transcriptionAccess     TranscriptionAccess[]
+  playlists               Playlist[]               @relation("UserPlaylists")
+  playlistItemsAdded      PlaylistItem[]           @relation("PlaylistItemsAddedByUser")
 
   @@map("users")
 }
 
+model CatalogTrack {
+  id              String         @id @default(uuid()) @db.Uuid
+  provider        MusicProvider
+  providerTrackId String         @map("provider_track_id") @db.VarChar(255)
+  title           String         @db.VarChar(500)
+  artists         Json           @db.JsonB
+  album           String?        @db.VarChar(500)
+  imageUrl        String?        @map("image_url") @db.Text
+  externalUrl     String         @map("external_url") @db.Text
+  durationMs      Int            @map("duration_ms")
+  isrc            String?        @db.VarChar(32)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  playlistItems   PlaylistItem[]
+
+  @@unique([provider, providerTrackId], map: "catalog_tracks_provider_track_unique")
+  @@index([provider, title])
+  @@map("catalog_tracks")
+}
+
+model Playlist {
+  id           String             @id @default(uuid()) @db.Uuid
+  userId       String             @map("user_id") @db.Uuid
+  name         String             @db.VarChar(120)
+  description  String?            @db.Text
+  coverUrl     String?            @map("cover_url") @db.Text
+  visibility   PlaylistVisibility @default(PRIVATE)
+  version      Int                @default(0)
+  nextPosition Int                @default(0) @map("next_position")
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  isDeleted    Boolean            @default(false) @map("is_deleted")
+  deletedAt    DateTime?          @map("deleted_at") @db.Timestamptz(6)
+
+  user  User           @relation("UserPlaylists", fields: [userId], references: [id], onDelete: Cascade)
+  items PlaylistItem[]
+
+  @@index([userId, isDeleted, updatedAt(sort: Desc)])
+  @@map("playlists")
+}
+
+model PlaylistItem {
+  id         String   @id @default(uuid()) @db.Uuid
+  playlistId String   @map("playlist_id") @db.Uuid
+  trackId    String   @map("track_id") @db.Uuid
+  addedById  String   @map("added_by_id") @db.Uuid
+  position   Int
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  playlist Playlist     @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track    CatalogTrack @relation(fields: [trackId], references: [id], onDelete: Restrict)
+  addedBy  User         @relation("PlaylistItemsAddedByUser", fields: [addedById], references: [id], onDelete: Restrict)
+
+  @@unique([playlistId, trackId], map: "playlist_items_playlist_track_unique")
+  @@unique([playlistId, position], map: "playlist_items_playlist_position_unique")
+  @@index([trackId])
+  @@index([addedById])
+  @@map("playlist_items")
+}
+
 model TranscriptionAccess {
   userId          String   @map("user_id") @db.Uuid
-  transcriptionId String  @map("transcription_id") @db.Uuid
+  transcriptionId String   @map("transcription_id") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -205,26 +280,26 @@ model Profile {
 }
 
 model Post {
-  id             String          @id @default(uuid()) @db.Uuid
-  authorId       String          @map("author_id") @db.Uuid
-  content        String?         @db.Text
-  coverImageUrl  String?         @map("cover_image_url") @db.Text
-  audioUrl       String?         @map("audio_url") @db.Text
-  visibility     PostVisibility  @default(PUBLIC)
-  likeCount      Int             @default(0) @map("like_count")
-  commentCount   Int             @default(0) @map("comment_count")
-  status         PostStatus      @default(ACTIVE)
-  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt      DateTime?       @map("deleted_at") @db.Timestamptz(6)
-  isDeleted      Boolean         @default(false) @map("is_deleted")
+  id            String         @id @default(uuid()) @db.Uuid
+  authorId      String         @map("author_id") @db.Uuid
+  content       String?        @db.Text
+  coverImageUrl String?        @map("cover_image_url") @db.Text
+  audioUrl      String?        @map("audio_url") @db.Text
+  visibility    PostVisibility @default(PUBLIC)
+  likeCount     Int            @default(0) @map("like_count")
+  commentCount  Int            @default(0) @map("comment_count")
+  status        PostStatus     @default(ACTIVE)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime?      @map("deleted_at") @db.Timestamptz(6)
+  isDeleted     Boolean        @default(false) @map("is_deleted")
 
-  author       User             @relation("UserAuthoredPosts", fields: [authorId], references: [id], onDelete: Cascade)
-  comments     Comment[]
-  likes        PostLike[]
-  reports      PostReport[]
-  attachments  PostAttachment[]
-  mentions     PostMention[]
+  author      User             @relation("UserAuthoredPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  comments    Comment[]
+  likes       PostLike[]
+  reports     PostReport[]
+  attachments PostAttachment[]
+  mentions    PostMention[]
 
   @@index([authorId, createdAt(sort: Desc)])
   @@index([visibility, createdAt(sort: Desc)])
@@ -233,18 +308,18 @@ model Post {
 }
 
 model Comment {
-  id         String        @id @default(uuid()) @db.Uuid
-  postId     String        @map("post_id") @db.Uuid
-  authorId   String        @map("author_id") @db.Uuid
-  content    String        @db.Text
-  status     CommentStatus @default(ACTIVE)
-  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt  DateTime?     @map("deleted_at") @db.Timestamptz(6)
-  isDeleted  Boolean       @default(false) @map("is_deleted")
+  id        String        @id @default(uuid()) @db.Uuid
+  postId    String        @map("post_id") @db.Uuid
+  authorId  String        @map("author_id") @db.Uuid
+  content   String        @db.Text
+  status    CommentStatus @default(ACTIVE)
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  isDeleted Boolean       @default(false) @map("is_deleted")
 
-  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author User @relation("UserComments", fields: [authorId], references: [id], onDelete: Cascade)
+  post     Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author   User             @relation("UserComments", fields: [authorId], references: [id], onDelete: Cascade)
   mentions CommentMention[]
 
   @@index([postId, createdAt(sort: Desc)])
@@ -273,24 +348,24 @@ model Friendship {
 }
 
 model Upload {
-  id          String            @id @default(uuid()) @db.Uuid
-  userId      String            @map("user_id") @db.Uuid
-  fileName    String            @map("file_name") @db.VarChar(255)
-  fileType    String            @map("file_type") @db.VarChar(100)
-  fileSize    BigInt            @map("file_size") @db.BigInt
-  storagePath String            @map("storage_path") @db.Text
-  storagePublicId String?       @map("storage_public_id") @db.Text
-  cleanupPending Boolean        @default(false) @map("cleanup_pending")
-  duration    Int?              @db.Integer
-  status      UploadStatus      @default(UPLOADED)
-  sourceType  UploadSourceType  @default(OTHER) @map("source_type")
-  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt   DateTime?         @map("deleted_at") @db.Timestamptz(6)
-  isDeleted   Boolean           @default(false) @map("is_deleted")
+  id              String           @id @default(uuid()) @db.Uuid
+  userId          String           @map("user_id") @db.Uuid
+  fileName        String           @map("file_name") @db.VarChar(255)
+  fileType        String           @map("file_type") @db.VarChar(100)
+  fileSize        BigInt           @map("file_size") @db.BigInt
+  storagePath     String           @map("storage_path") @db.Text
+  storagePublicId String?          @map("storage_public_id") @db.Text
+  cleanupPending  Boolean          @default(false) @map("cleanup_pending")
+  duration        Int?             @db.Integer
+  status          UploadStatus     @default(UPLOADED)
+  sourceType      UploadSourceType @default(OTHER) @map("source_type")
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?        @map("deleted_at") @db.Timestamptz(6)
+  isDeleted       Boolean          @default(false) @map("is_deleted")
 
-  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attachments   PostAttachment[]
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments PostAttachment[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
@@ -350,14 +425,14 @@ model AuditLog {
 }
 
 model RefreshToken {
-  id         String    @id @default(uuid()) @db.Uuid
-  userId     String    @map("user_id") @db.Uuid
-  tokenHash  String    @unique @map("token_hash") @db.VarChar(255)
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
-  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  isDeleted  Boolean   @default(false) @map("is_deleted")
-  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  isDeleted Boolean   @default(false) @map("is_deleted")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -367,14 +442,14 @@ model RefreshToken {
 }
 
 model PasswordResetToken {
-  id         String    @id @default(uuid()) @db.Uuid
-  userId     String    @map("user_id") @db.Uuid
-  tokenHash  String    @unique @map("token_hash") @db.VarChar(255)
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
-  usedAt     DateTime? @map("used_at") @db.Timestamptz(6)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  isDeleted  Boolean   @default(false) @map("is_deleted")
-  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  isDeleted Boolean   @default(false) @map("is_deleted")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -402,11 +477,11 @@ model EmailVerificationToken {
 }
 
 model PostLike {
-  id        String   @id @default(uuid()) @db.Uuid
-  postId    String   @map("post_id") @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  isDeleted Boolean  @default(false) @map("is_deleted")
+  id        String    @id @default(uuid()) @db.Uuid
+  postId    String    @map("post_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  isDeleted Boolean   @default(false) @map("is_deleted")
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -437,10 +512,10 @@ model PostReport {
 }
 
 model PostMention {
-  postId String @map("post_id") @db.Uuid
-  userId String @map("user_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  isDeleted Boolean @default(false) @map("is_deleted")
+  postId    String    @map("post_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  isDeleted Boolean   @default(false) @map("is_deleted")
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -452,14 +527,14 @@ model PostMention {
 }
 
 model CommentMention {
-  commentId String @map("comment_id") @db.Uuid
-  userId String @map("user_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  isDeleted Boolean @default(false) @map("is_deleted")
+  commentId String    @map("comment_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  isDeleted Boolean   @default(false) @map("is_deleted")
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  user User @relation("UserCommentMentions", fields: [userId], references: [id], onDelete: Cascade)
+  user    User    @relation("UserCommentMentions", fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([commentId, userId])
   @@index([userId, createdAt(sort: Desc)])
