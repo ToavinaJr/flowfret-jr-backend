@@ -18,8 +18,9 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CommentsCommandService } from './comments-command.service';
 import { CommentsQueryService } from './comments-query.service';
+import { GraphqlRequestContext } from '../common/request-loaders';
 
-type RequestContext = { req: { user: { sub: string; username: string } } };
+type RequestContext = GraphqlRequestContext;
 
 @Resolver(() => CommentModel)
 export class CommentsResolver {
@@ -78,21 +79,35 @@ export class CommentsResolver {
   }
 
   @ResolveField(() => PostModel, { name: 'post' })
-  post(@Parent() comment: CommentModel): Promise<PostModel | null> {
+  post(
+    @Parent() comment: CommentModel,
+    @Context() context?: RequestContext,
+  ): Promise<PostModel | null> {
+    if (context?.loaders) return context.loaders.postById.load(comment.postId);
     return this.prisma.post.findUnique({ where: { id: comment.postId } });
   }
 
   @ResolveField(() => UserModel, { name: 'author' })
-  async author(@Parent() comment: CommentModel): Promise<UserModel | null> {
+  async author(
+    @Parent() comment: CommentModel,
+    @Context() context?: RequestContext,
+  ): Promise<UserModel | null> {
     if (Object.prototype.hasOwnProperty.call(comment, 'author'))
       return comment.author ?? null;
+    if (context?.loaders)
+      return context.loaders.userById.load(comment.authorId);
     return this.prisma.user.findUnique({ where: { id: comment.authorId } });
   }
 
   @ResolveField(() => [UserModel], { name: 'mentionedUsers' })
-  async mentionedUsers(@Parent() comment: CommentModel): Promise<UserModel[]> {
+  async mentionedUsers(
+    @Parent() comment: CommentModel,
+    @Context() context?: RequestContext,
+  ): Promise<UserModel[]> {
     if (Object.prototype.hasOwnProperty.call(comment, 'mentionedUsers'))
       return comment.mentionedUsers ?? [];
+    if (context?.loaders)
+      return context.loaders.commentMentions.load(comment.id);
     const mentions = await this.prisma.commentMention.findMany({
       where: { commentId: comment.id, isDeleted: false },
       include: { user: { include: { profile: true } } },

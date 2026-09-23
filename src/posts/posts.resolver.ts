@@ -23,8 +23,9 @@ import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { PostsCommandService } from './posts-command.service';
 import { PostsQueryService } from './posts-query.service';
+import { GraphqlRequestContext } from '../common/request-loaders';
 
-type RequestContext = { req: { user: { sub: string; username: string } } };
+type RequestContext = GraphqlRequestContext;
 
 @Resolver(() => PostModel)
 export class PostsResolver {
@@ -77,14 +78,22 @@ export class PostsResolver {
   }
 
   @ResolveField(() => UserModel, { name: 'author' })
-  async author(@Parent() post: PostModel): Promise<UserModel | null> {
+  async author(
+    @Parent() post: PostModel,
+    @Context() context?: RequestContext,
+  ): Promise<UserModel | null> {
     if (Object.prototype.hasOwnProperty.call(post, 'author'))
       return post.author ?? null;
+    if (context?.loaders) return context.loaders.userById.load(post.authorId);
     return this.prisma.user.findUnique({ where: { id: post.authorId } });
   }
 
   @ResolveField(() => [CommentModel], { name: 'comments' })
-  comments(@Parent() post: PostModel): Promise<CommentModel[]> {
+  comments(
+    @Parent() post: PostModel,
+    @Context() context?: RequestContext,
+  ): Promise<CommentModel[]> {
+    if (context?.loaders) return context.loaders.commentsByPostId.load(post.id);
     return this.prisma.comment.findMany({
       where: { postId: post.id, isDeleted: false },
       orderBy: { createdAt: 'desc' },
@@ -92,7 +101,11 @@ export class PostsResolver {
   }
 
   @ResolveField(() => [PostLikeModel], { name: 'likes' })
-  likes(@Parent() post: PostModel): Promise<PostLikeModel[]> {
+  likes(
+    @Parent() post: PostModel,
+    @Context() context?: RequestContext,
+  ): Promise<PostLikeModel[]> {
+    if (context?.loaders) return context.loaders.likesByPostId.load(post.id);
     return this.prisma.postLike.findMany({
       where: { postId: post.id, isDeleted: false },
       orderBy: { createdAt: 'desc' },
@@ -143,9 +156,14 @@ export class PostsResolver {
   }
 
   @ResolveField(() => [PostAttachmentModel], { name: 'attachments' })
-  attachments(@Parent() post: PostModel): Promise<PostAttachmentModel[]> {
+  attachments(
+    @Parent() post: PostModel,
+    @Context() context?: RequestContext,
+  ): Promise<PostAttachmentModel[]> {
     if (Object.prototype.hasOwnProperty.call(post, 'attachments'))
       return Promise.resolve(post.attachments ?? []);
+    if (context?.loaders)
+      return context.loaders.attachmentsByPostId.load(post.id);
     return this.prisma.postAttachment.findMany({
       where: { postId: post.id, isDeleted: false },
       orderBy: { position: 'asc' },
@@ -153,9 +171,13 @@ export class PostsResolver {
   }
 
   @ResolveField(() => [UserModel], { name: 'mentionedUsers' })
-  async mentionedUsers(@Parent() post: PostModel): Promise<UserModel[]> {
+  async mentionedUsers(
+    @Parent() post: PostModel,
+    @Context() context?: RequestContext,
+  ): Promise<UserModel[]> {
     if (Object.prototype.hasOwnProperty.call(post, 'mentionedUsers'))
       return post.mentionedUsers ?? [];
+    if (context?.loaders) return context.loaders.postMentions.load(post.id);
     const mentions = await this.prisma.postMention.findMany({
       where: { postId: post.id, isDeleted: false },
       include: { user: { include: { profile: true } } },

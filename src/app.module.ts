@@ -5,6 +5,7 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { PrismaService } from './prisma/prisma.service';
 import { AppResolver } from './app.resolver';
 import { AuthModule } from './auth/auth.module';
 import { formatGraphQLError } from './common/format-graphql-error';
@@ -17,6 +18,7 @@ import { Request, Response } from 'express';
 import { createGraphqlSecurityRule } from './common/graphql-security';
 import { SocialModule } from './social/social.module';
 import { PlaylistsModule } from './playlists/playlists.module';
+import { RequestLoaders } from './common/request-loaders';
 
 @Module({
   imports: [
@@ -40,8 +42,11 @@ import { PlaylistsModule } from './playlists/playlists.module';
     PlaylistsModule,
     GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService): ApolloDriverConfig => ({
+      inject: [ConfigService, PrismaService],
+      useFactory: (
+        config: ConfigService,
+        prisma: PrismaService,
+      ): ApolloDriverConfig => ({
         driver: ApolloDriver,
         autoSchemaFile: true,
         sortSchema: true,
@@ -64,6 +69,7 @@ import { PlaylistsModule } from './playlists/playlists.module';
         context: ({ req, res }: { req: Request; res: Response }) => ({
           req,
           res,
+          loaders: new RequestLoaders(prisma),
         }),
         formatError: formatGraphQLError,
       }),
