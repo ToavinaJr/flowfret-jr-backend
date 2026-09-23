@@ -200,6 +200,7 @@ export class MusicService {
     return {
       provider: track.provider,
       id: track.id,
+      providerTrackId: track.id,
       audiusId: track.id,
       title: track.title,
       artists: track.artists,

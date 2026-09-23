@@ -18,6 +18,11 @@ export class MusicTrack {
   id: string;
 
   @Field(() => ID)
+  providerTrackId: string;
+
+  @Field(() => ID, {
+    deprecationReason: 'Use providerTrackId together with provider.',
+  })
   audiusId: string;
 
   @Field()
