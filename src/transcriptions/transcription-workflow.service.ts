@@ -53,6 +53,7 @@ export class TranscriptionWorkflowService {
       }),
     );
     let item = await this.repository.findCompatible(
+      dto.provider,
       dto.trackId,
       language,
       dto.model,
@@ -63,6 +64,7 @@ export class TranscriptionWorkflowService {
       await this.capacity.ensure(userId);
       try {
         item = await this.repository.create({
+          provider: dto.provider,
           trackId: dto.trackId,
           title: dto.title,
           artist: dto.artist,
@@ -78,6 +80,7 @@ export class TranscriptionWorkflowService {
         )
           throw error;
         item = await this.repository.findCompatible(
+          dto.provider,
           dto.trackId,
           language,
           dto.model,

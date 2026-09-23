@@ -114,6 +114,7 @@ enum PlaylistVisibility {
 
 model Transcription {
   id                String                @id @default(uuid()) @db.Uuid
+  provider          MusicProvider         @default(AUDIUS)
   trackId           String                @map("track_id") @db.VarChar(255)
   title             String?               @db.VarChar(500)
   artist            String?               @db.VarChar(500)
@@ -140,8 +141,8 @@ model Transcription {
   deletedAt         DateTime?             @map("deleted_at") @db.Timestamptz(6)
   accessors         TranscriptionAccess[]
 
-  @@unique([trackId, requestedLanguage, model, engineVersion], map: "transcriptions_cache_key_unique")
-  @@index([trackId])
+  @@unique([provider, trackId, requestedLanguage, model, engineVersion], map: "transcriptions_cache_key_unique")
+  @@index([provider, trackId])
   @@index([status])
   @@map("transcriptions")
 }

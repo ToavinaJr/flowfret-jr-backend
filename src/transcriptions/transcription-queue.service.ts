@@ -46,6 +46,7 @@ export class TranscriptionQueueService {
       dto.language,
       dto.model,
       engineVersion,
+      dto.provider,
     );
     const existing = await this.operation('getJob', this.queue.getJob(jobId));
     if (existing) {
@@ -72,6 +73,7 @@ export class TranscriptionQueueService {
           {
             transcriptionId: item.id,
             trackId: dto.trackId,
+            provider: dto.provider,
             audioUrl: dto.audioUrl,
             language: dto.language,
             model: dto.model,
@@ -128,6 +130,7 @@ export class TranscriptionQueueService {
       language,
       item.model,
       item.engineVersion,
+      item.provider,
     );
     const jobId = `${baseId}-retry-${item.manualRetryCount + 1}`;
     await this.queue.add(
@@ -135,6 +138,7 @@ export class TranscriptionQueueService {
       {
         transcriptionId: item.id,
         trackId: item.trackId,
+        provider: item.provider,
         audioUrl,
         language,
         model: item.model,

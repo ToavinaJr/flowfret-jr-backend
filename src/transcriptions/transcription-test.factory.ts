@@ -14,6 +14,7 @@ import { TranscriptionsService } from './transcriptions.service';
 
 export const transcriptionRecord: Transcription = {
   id: '11111111-1111-4111-8111-111111111111',
+  provider: 'AUDIUS',
   trackId: 'track',
   title: 'Title',
   artist: 'Artist',
@@ -48,6 +49,7 @@ export function createTranscriptionFixture(
     findCompatible: jest.fn().mockResolvedValue(existing),
     create: jest.fn().mockResolvedValue(transcriptionRecord),
     findById: jest.fn().mockResolvedValue(existing ?? transcriptionRecord),
+    listForUser: jest.fn().mockResolvedValue([existing ?? transcriptionRecord]),
     update: jest.fn(),
     grantAccess: jest.fn().mockResolvedValue(undefined),
     hasAccess: jest.fn().mockResolvedValue(true),

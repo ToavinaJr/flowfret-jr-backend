@@ -32,6 +32,7 @@ export interface TranscriptionEvent {
 export interface TranscriptionJobData {
   transcriptionId: string;
   trackId: string;
+  provider: MusicProvider;
   audioUrl: string;
   language?: string;
   model: string;
@@ -66,3 +67,5 @@ import {
   TRANSCRIPTION_EVENT,
   WORKER_MESSAGE,
 } from '../transcriptions.constants';
+import type { MusicProvider } from '@prisma/client';
+

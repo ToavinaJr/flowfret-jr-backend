@@ -15,6 +15,8 @@ import { EmailVerificationService } from './email-verification.service';
 import { GoogleAuthService } from './google-auth.service';
 import { GoogleProfileService } from './google-profile.service';
 import { PasswordResetService } from './password-reset.service';
+import { AuthAccountService } from './auth-account.service';
+import { AccountResolver } from './account.resolver';
 
 @Module({
   imports: [
@@ -41,6 +43,8 @@ import { PasswordResetService } from './password-reset.service';
     GoogleAuthService,
     GoogleProfileService,
     PasswordResetService,
+    AuthAccountService,
+    AccountResolver,
     JwtStrategy,
     {
       provide: APP_GUARD,

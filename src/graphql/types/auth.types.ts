@@ -4,7 +4,13 @@ import {
   InputType,
   ObjectType,
 } from '@nestjs/graphql';
-import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { UserModel } from './models';
 
 @InputType()
@@ -36,6 +42,21 @@ export class ResetPasswordInput {
   @Field() @IsString() @MinLength(64) @MaxLength(64) token!: string;
   @Field() @IsString() @MinLength(8) @MaxLength(72) password!: string;
 }
+@InputType()
+export class ChangePasswordInput {
+  @Field() @IsString() @MinLength(1) @MaxLength(72) currentPassword!: string;
+  @Field() @IsString() @MinLength(8) @MaxLength(72) newPassword!: string;
+}
+@InputType()
+export class DeleteAccountInput {
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(72)
+  currentPassword?: string;
+
+  @Field() @IsString() @MinLength(6) @MaxLength(6) confirmation!: string;
+}
 @ObjectType()
 export class AuthPayload {
   @Field() accessToken!: string;
@@ -47,4 +68,11 @@ export class RegisterPendingPayload {
   @Field() verificationToken!: string;
   @Field(() => GraphQLISODateTime) expiresAt!: Date;
   @Field() message!: string;
+}
+@ObjectType()
+export class AuthSessionModel {
+  @Field() id!: string;
+  @Field(() => GraphQLISODateTime) createdAt!: Date;
+  @Field(() => GraphQLISODateTime) expiresAt!: Date;
+  @Field() current!: boolean;
 }

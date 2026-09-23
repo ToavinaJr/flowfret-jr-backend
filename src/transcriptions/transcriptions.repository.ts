@@ -4,7 +4,12 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, Transcription, TranscriptionStatus } from '@prisma/client';
+import {
+  MusicProvider,
+  Prisma,
+  Transcription,
+  TranscriptionStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { TranscriptionSegment } from './entities/transcription.types';
 import { TRANSCRIPTION_ERROR_CODE } from './transcriptions.constants';
@@ -28,7 +33,20 @@ export class TranscriptionsRepository {
       this.prisma.transcription.findUnique({ where: { id } }),
     );
   }
+  listForUser(userId: string, take: number): Promise<Transcription[]> {
+    return this.execute('listForUser', () =>
+      this.prisma.transcription.findMany({
+        where: {
+          isDeleted: false,
+          accessors: { some: { userId } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: Math.min(50, Math.max(1, take)),
+      }),
+    );
+  }
   findCompatible(
+    provider: MusicProvider,
     trackId: string,
     requestedLanguage: string,
     model: string,
@@ -37,7 +55,8 @@ export class TranscriptionsRepository {
     return this.execute('findCompatible', () =>
       this.prisma.transcription.findUnique({
         where: {
-          trackId_requestedLanguage_model_engineVersion: {
+          provider_trackId_requestedLanguage_model_engineVersion: {
+            provider,
             trackId,
             requestedLanguage,
             model,
@@ -87,6 +106,7 @@ export class TranscriptionsRepository {
     );
   }
   create(data: {
+    provider: MusicProvider;
     trackId: string;
     title?: string;
     artist?: string;

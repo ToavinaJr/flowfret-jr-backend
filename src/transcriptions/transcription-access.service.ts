@@ -27,9 +27,31 @@ export class TranscriptionAccessService {
       item.requestedLanguage === 'auto' ? undefined : item.requestedLanguage,
       item.model,
       item.engineVersion,
+      item.provider,
     );
     const completed = item.status === TranscriptionStatus.COMPLETED;
     return toTranscriptionResponse(item, completed ? null : jobId, completed);
+  }
+
+  async list(userId: string, take = 20): Promise<TranscriptionResponse[]> {
+    const items = await this.repository.listForUser(userId, take);
+    return items.map((item) =>
+      toTranscriptionResponse(
+        item,
+        item.status === TranscriptionStatus.COMPLETED
+          ? null
+          : buildTranscriptionJobId(
+              item.trackId,
+              item.requestedLanguage === 'auto'
+                ? undefined
+                : item.requestedLanguage,
+              item.model,
+              item.engineVersion,
+              item.provider,
+            ),
+        item.status === TranscriptionStatus.COMPLETED,
+      ),
+    );
   }
 
   async snapshot(id: string, userId: string): Promise<TranscriptionEvent> {

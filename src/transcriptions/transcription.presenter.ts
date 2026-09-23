@@ -3,6 +3,11 @@ import type { TranscriptionSegment } from './entities/transcription.types';
 
 export interface TranscriptionResponse {
   transcriptionId: string;
+  trackId: string;
+  title: string | null;
+  artist: string | null;
+  createdAt: Date;
+  updatedAt: Date;
   jobId: string | null;
   status: TranscriptionStatus;
   cached: boolean;
@@ -30,6 +35,11 @@ export function toTranscriptionResponse(
 ): TranscriptionResponse {
   return {
     transcriptionId: item.id,
+    trackId: item.trackId,
+    title: item.title,
+    artist: item.artist,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
     jobId,
     status: item.status,
     cached,

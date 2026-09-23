@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  IsEnum,
   IsIn,
   IsOptional,
   IsString,
@@ -7,12 +8,17 @@ import {
   Length,
   Matches,
 } from 'class-validator';
+import { MusicProvider } from '@prisma/client';
 import {
   ALLOWED_WHISPER_MODELS,
   DEFAULT_WHISPER_MODEL,
 } from '../transcriptions.constants';
 
 export class CreateTranscriptionDto {
+  @Transform(({ value }: { value: unknown }) => value ?? MusicProvider.AUDIUS)
+  @IsEnum(MusicProvider)
+  provider: MusicProvider = MusicProvider.AUDIUS;
+
   @IsString()
   @Length(1, 255)
   trackId: string;

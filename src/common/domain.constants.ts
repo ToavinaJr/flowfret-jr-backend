@@ -27,6 +27,7 @@ export const AUDIT_ACTION = {
   PLAYLIST_TRACK_ADDED: 'PLAYLIST_TRACK_ADDED',
   PLAYLIST_TRACK_REMOVED: 'PLAYLIST_TRACK_REMOVED',
   PLAYLIST_REORDERED: 'PLAYLIST_REORDERED',
+  PASSWORD_CHANGED: 'PASSWORD_CHANGED',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
@@ -40,6 +41,7 @@ export const AUDIT_ENTITY = {
   UPLOAD: 'upload',
   PLAYLIST: 'playlist',
   PLAYLIST_ITEM: 'playlist_item',
+  USER: 'user',
 } as const;
 
 export type AuditEntity = (typeof AUDIT_ENTITY)[keyof typeof AUDIT_ENTITY];

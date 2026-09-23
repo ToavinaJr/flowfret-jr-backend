@@ -11,9 +11,12 @@ export function buildTranscriptionJobId(
   language: string | undefined,
   model: string,
   engineVersion: string,
+  provider = 'AUDIUS',
 ): string {
   return createHash('sha256')
-    .update([trackId, language ?? 'auto', model, engineVersion].join('|'))
+    .update(
+      [provider, trackId, language ?? 'auto', model, engineVersion].join('|'),
+    )
     .digest('hex');
 }
 

@@ -11,6 +11,7 @@ import {
   Res,
   Sse,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
@@ -41,6 +42,18 @@ export class TranscriptionsController {
     @Req() req: { user: { sub: string } },
   ) {
     return this.service.createOrGet(dto, req.user.sub);
+  }
+
+  @Get()
+  list(
+    @Req() req: { user: { sub: string } },
+    @Query('take') take?: string,
+  ) {
+    const parsed = Number(take ?? 20);
+    return this.service.list(
+      req.user.sub,
+      Number.isInteger(parsed) ? parsed : 20,
+    );
   }
 
   @Get('diagnostics/queue')
