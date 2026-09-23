@@ -22,6 +22,7 @@ import {
   readRefreshToken,
   writeSessionCookie,
 } from './auth-cookie.utils';
+import { assertRefreshOrigin } from './refresh-origin';
 
 @Resolver()
 export class AuthResolver {
@@ -175,6 +176,7 @@ export class AuthResolver {
     @Context('req') request: Request,
     @Context('res') response: Response,
   ): Promise<AuthPayload> {
+    assertRefreshOrigin(request, this.configService);
     const refreshToken = readRefreshToken(
       request,
       cookieName(this.configService),
@@ -195,6 +197,7 @@ export class AuthResolver {
     @Context('req') request: Request,
     @Context('res') response: Response,
   ): Promise<boolean> {
+    assertRefreshOrigin(request, this.configService);
     const refreshToken = readRefreshToken(
       request,
       cookieName(this.configService),

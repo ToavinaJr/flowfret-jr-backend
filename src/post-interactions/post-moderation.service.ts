@@ -1,14 +1,12 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 import {
   CreatePostAttachmentInput,
-  CreatePostReportInput,
   PostAttachmentModel,
   PostReportModel,
   UpdatePostAttachmentInput,
@@ -22,19 +20,25 @@ export class PostModerationService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createReport(
-    data: CreatePostReportInput,
+    postId: string,
+    reason: string,
     actorId: string,
   ): Promise<PostReportModel> {
-    if (data.reporterId !== actorId)
-      throw new ForbiddenException('Action interdite.');
-    await requireVisiblePost(this.prisma, data.postId, actorId);
+    const normalizedReason = reason.trim();
+    if (normalizedReason.length < 5 || normalizedReason.length > 1000) {
+      throw new BadRequestException({
+        code: 'POST_REPORT_REASON_INVALID',
+        message: 'Report reason must contain between 5 and 1000 characters.',
+      });
+    }
+    await requireVisiblePost(this.prisma, postId, actorId);
     try {
       return await this.prisma.$transaction(async (tx) => {
         const report = await tx.postReport.create({
           data: {
-            postId: data.postId,
+            postId,
             reporterId: actorId,
-            reason: data.reason,
+            reason: normalizedReason,
           },
         });
         await tx.auditLog.create({
@@ -42,7 +46,7 @@ export class PostModerationService {
             actorId,
             action: AUDIT_ACTION.POST_REPORTED,
             entityType: AUDIT_ENTITY.POST,
-            entityId: data.postId,
+            entityId: postId,
             metadata: { reportId: report.id },
           },
         });

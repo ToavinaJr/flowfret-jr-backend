@@ -1,7 +1,7 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PostInteractionsResolver } from './post-interactions.resolver';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { PostInteractionsQueryService } from './post-interactions-query.service';
 import { PostLikesService } from './post-likes.service';
 import { PostModerationService } from './post-moderation.service';
@@ -53,23 +53,11 @@ describe('PostInteractionsResolver notifications', () => {
     const resolver = resolverWith(prisma, notifications);
 
     await expect(
-      resolver.createPostLike(
-        { postId: 'post-id', userId: 'actor-id' },
-        { req: { user: { sub: 'actor-id', username: 'alice' } } },
-      ),
+      resolver.likePost('post-id', {
+        req: { user: { sub: 'actor-id', username: 'alice' } },
+      }),
     ).resolves.toEqual(like);
     expect(notifications.postLiked).not.toHaveBeenCalled();
-  });
-
-  it('rejects a like created for another user', async () => {
-    const resolver = resolverWith({}, {});
-
-    await expect(
-      resolver.createPostLike(
-        { postId: 'post-id', userId: 'other-id' },
-        { req: { user: { sub: 'actor-id', username: 'alice' } } },
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('soft-deletes an owned like and decrements its post counter', async () => {
@@ -92,7 +80,7 @@ describe('PostInteractionsResolver notifications', () => {
     };
     const resolver = resolverWith(prisma, {});
 
-    await resolver.deletePostLike('like-id', {
+    await resolver.unlikePost('post-id', {
       req: { user: { sub: 'actor-id' } },
     });
 
@@ -114,7 +102,7 @@ describe('PostInteractionsResolver notifications', () => {
     const resolver = resolverWith(prisma, {});
 
     await expect(
-      resolver.deletePostLike('missing', {
+      resolver.unlikePost('post-id', {
         req: { user: { sub: 'actor-id' } },
       }),
     ).rejects.toBeInstanceOf(NotFoundException);

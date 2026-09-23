@@ -54,6 +54,11 @@ import { PlaylistsModule } from './playlists/playlists.module';
             maxDepth: positiveConfig(config, 'GRAPHQL_MAX_DEPTH', 12),
             maxFields: positiveConfig(config, 'GRAPHQL_MAX_FIELDS', 300),
             maxAliases: positiveConfig(config, 'GRAPHQL_MAX_ALIASES', 30),
+            maxComplexity: positiveConfig(
+              config,
+              'GRAPHQL_MAX_COMPLEXITY',
+              200,
+            ),
           }),
         ],
         context: ({ req, res }: { req: Request; res: Response }) => ({

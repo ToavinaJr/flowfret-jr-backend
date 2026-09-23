@@ -11,10 +11,9 @@ import {
 } from '@nestjs/graphql';
 import type { GraphQLResolveInfo } from 'graphql';
 import {
-  CreateUserInput,
   PostModel,
   ProfileModel,
-  UpdateUserInput,
+  UpdateMeInput,
   UserModel,
 } from '../graphql/graphql.types';
 import { UsersService } from './users.service';
@@ -59,28 +58,11 @@ export class UsersResolver {
   }
 
   @Mutation(() => UserModel)
-  createUser(@Args('data') data: CreateUserInput): UserModel {
-    void data;
-    throw new ForbiddenException(
-      'Utilisez le parcours d’inscription sécurisé.',
-    );
-  }
-
-  @Mutation(() => UserModel)
-  updateUser(
-    @Args('id') id: string,
-    @Args('data') data: UpdateUserInput,
+  updateMe(
+    @Args('data') data: UpdateMeInput,
     @Context() context: RequestContext,
   ): Promise<UserModel> {
-    return this.usersService.update(id, data, context.req.user.sub);
-  }
-
-  @Mutation(() => UserModel)
-  deleteUser(
-    @Args('id') id: string,
-    @Context() context: RequestContext,
-  ): Promise<UserModel> {
-    return this.usersService.delete(id, context.req.user.sub);
+    return this.usersService.updateMe(data, context.req.user.sub);
   }
 
   @ResolveField(() => ProfileModel, { name: 'profile', nullable: true })

@@ -1,7 +1,11 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { getRequiredConfig } from '../common/required-config';
+import {
+  ApplicationException,
+  ExternalServiceException,
+} from '../common/application-exception';
 
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 export const MAX_POST_IMAGES = 12;
@@ -42,8 +46,10 @@ export class CloudinaryService {
       file.size > MAX_IMAGE_BYTES ||
       !hasValidSignature(file.buffer, file.mimetype)
     ) {
-      throw new BadRequestException(
-        'Image invalide. Formats acceptés: JPEG, PNG, WebP (8 Mo maximum).',
+      throw new ApplicationException(
+        'UPLOAD_INVALID_FILE',
+        'The image file is invalid.',
+        HttpStatus.BAD_REQUEST,
       );
     }
     const cloudName = getRequiredConfig(this.config, 'CLOUDINARY_CLOUD_NAME');
@@ -84,8 +90,9 @@ export class CloudinaryService {
       this.logger.error(
         `Cloudinary rejected image upload (status=${response.status}, reason=${result.error?.message ?? 'unknown'})`,
       );
-      throw new BadRequestException(
-        result.error?.message ?? 'Échec de l’upload Cloudinary.',
+      throw new ExternalServiceException(
+        'UPLOAD_FAILED',
+        'Unable to upload the file.',
       );
     }
     this.logger.log(`Cloudinary image uploaded (publicId=${result.public_id})`);

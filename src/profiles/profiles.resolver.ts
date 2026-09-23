@@ -17,6 +17,7 @@ import {
   UserModel,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { profilePolicy } from '../policies/profile.policy';
 
 @Resolver(() => ProfileModel)
 export class ProfilesResolver {
@@ -39,13 +40,9 @@ export class ProfilesResolver {
     const profile = await this.prisma.profile.findFirst({
       where: { id, isDeleted: false },
     });
-    if (
-      !profile ||
-      profile.visibility === 'PUBLIC' ||
-      profile.userId === context.req.user.sub
-    )
+    if (!profile) return null;
+    if (profilePolicy.canView(context.req.user.sub, profile, false))
       return profile;
-    if (profile.visibility === 'PRIVATE') return null;
     const isFriend = await this.prisma.friendship.count({
       where: {
         status: FriendshipStatus.ACCEPTED,
@@ -56,7 +53,13 @@ export class ProfilesResolver {
         ],
       },
     });
-    return isFriend ? profile : null;
+    return profilePolicy.canView(
+      context.req.user.sub,
+      profile,
+      Boolean(isFriend),
+    )
+      ? profile
+      : null;
   }
 
   @Query(() => ProfileModel, { name: 'profileByUserId', nullable: true })
@@ -67,13 +70,9 @@ export class ProfilesResolver {
     const profile = await this.prisma.profile.findFirst({
       where: { userId, isDeleted: false },
     });
-    if (
-      !profile ||
-      profile.visibility === 'PUBLIC' ||
-      userId === context.req.user.sub
-    )
+    if (!profile) return null;
+    if (profilePolicy.canView(context.req.user.sub, profile, false))
       return profile;
-    if (profile.visibility === 'PRIVATE') return null;
     const isFriend = await this.prisma.friendship.count({
       where: {
         status: FriendshipStatus.ACCEPTED,
@@ -84,7 +83,13 @@ export class ProfilesResolver {
         ],
       },
     });
-    return isFriend ? profile : null;
+    return profilePolicy.canView(
+      context.req.user.sub,
+      profile,
+      Boolean(isFriend),
+    )
+      ? profile
+      : null;
   }
 
   @Mutation(() => ProfileModel)
@@ -92,8 +97,6 @@ export class ProfilesResolver {
     @Args('data') data: CreateProfileInput,
     @Context() context: { req: { user: { sub: string } } },
   ): Promise<ProfileModel> {
-    if (data.userId !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
     const displayName = data.displayName.trim();
     if (
       !displayName ||
@@ -102,7 +105,8 @@ export class ProfilesResolver {
     )
       throw new ForbiddenException('Profil invalide.');
     return this.prisma.$transaction(async (tx) => {
-      const { userId, ...profileData } = data;
+      const userId = context.req.user.sub;
+      const profileData = data;
       const profile = await tx.profile.upsert({
         where: { userId },
         create: { ...profileData, userId, displayName },
@@ -136,10 +140,8 @@ export class ProfilesResolver {
       where: { id, isDeleted: false },
     });
     if (!profile) throw new NotFoundException('Profil introuvable.');
-    if (profile.userId !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
+    profilePolicy.assertCanMutate(context.req.user.sub, profile);
     const safeData = { ...data };
-    delete safeData.userId;
     if (safeData.displayName !== undefined) {
       safeData.displayName = safeData.displayName.trim();
     }
@@ -175,8 +177,8 @@ export class ProfilesResolver {
     const profile = await this.prisma.profile.findFirst({
       where: { id, isDeleted: false },
     });
-    if (!profile || profile.userId !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
+    if (!profile) throw new NotFoundException('Profil introuvable.');
+    profilePolicy.assertCanMutate(context.req.user.sub, profile);
     return this.prisma.$transaction(async (tx) => {
       const deleted = await tx.profile.update({
         where: { id },

@@ -1,32 +1,21 @@
 import { Field, InputType, PartialType } from '@nestjs/graphql';
-import { ProfileVisibility, UserStatus } from '@prisma/client';
+import { ProfileVisibility } from '@prisma/client';
 import './enums';
 import {
-  IsEmail,
   IsEnum,
   IsOptional,
   IsString,
   IsUrl,
-  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
 
 @InputType()
-export class CreateUserInput {
-  @Field() @IsEmail() @MaxLength(255) email!: string;
-  @Field() @IsString() @MinLength(8) @MaxLength(255) passwordHash!: string;
+export class UpdateMeInput {
   @Field() @IsString() @MinLength(2) @MaxLength(50) username!: string;
-  @Field(() => UserStatus, { nullable: true })
-  @IsOptional()
-  @IsEnum(UserStatus)
-  status?: UserStatus;
 }
 @InputType()
-export class UpdateUserInput extends PartialType(CreateUserInput) {}
-@InputType()
 export class CreateProfileInput {
-  @Field() @IsUUID() userId!: string;
   @Field() @IsString() @MinLength(1) @MaxLength(120) displayName!: string;
   @Field(() => String, { nullable: true })
   @IsOptional()

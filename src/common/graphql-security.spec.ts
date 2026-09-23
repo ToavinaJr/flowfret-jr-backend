@@ -11,6 +11,24 @@ describe('createGraphqlSecurityRule', () => {
     maxDepth: 3,
     maxFields: 5,
     maxAliases: 2,
+    maxComplexity: 50,
+  });
+
+  it('rejects expensive repeated collection fields', () => {
+    const strictRule = createGraphqlSecurityRule({
+      maxDepth: 10,
+      maxFields: 100,
+      maxAliases: 20,
+      maxComplexity: 15,
+    });
+    const document = parse('{ first:user { id } second:user { id } }');
+    expect(validate(schema, document, [strictRule])).toHaveLength(0);
+
+    const expensiveSchema = buildSchema('type Query { searchMusic: String }');
+    expect(
+      validate(expensiveSchema, parse('{ searchMusic }'), [strictRule])[0]
+        ?.message,
+    ).toContain('query complexity');
   });
 
   it('accepts an ordinary operation', () => {

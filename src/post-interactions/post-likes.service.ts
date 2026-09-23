@@ -1,10 +1,6 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
-import { PostLikeModel, UpdatePostLikeInput } from '../graphql/graphql.types';
+import { PostLikeModel } from '../graphql/graphql.types';
 import { requireVisiblePost } from '../common/post-access';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,13 +17,7 @@ export class PostLikesService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  async create(
-    postId: string,
-    requestedUserId: string,
-    actor: LikeActor,
-  ): Promise<PostLikeModel> {
-    if (requestedUserId !== actor.sub)
-      throw new ForbiddenException('Action interdite.');
+  async create(postId: string, actor: LikeActor): Promise<PostLikeModel> {
     await requireVisiblePost(this.prisma, postId, actor.sub);
     const result = await this.prisma.$transaction(async (tx) => {
       const post = await tx.post.findFirst({
@@ -74,20 +64,14 @@ export class PostLikesService {
     return result.like;
   }
 
-  update(id: string, data: UpdatePostLikeInput): Promise<PostLikeModel> {
-    return this.prisma.postLike.update({ where: { id }, data });
-  }
-
-  delete(id: string, actorId: string): Promise<PostLikeModel> {
+  unlike(postId: string, actorId: string): Promise<PostLikeModel> {
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.postLike.findFirst({
-        where: { id, isDeleted: false },
+        where: { postId, userId: actorId, isDeleted: false },
       });
       if (!existing) throw new NotFoundException('Like introuvable.');
-      if (existing.userId !== actorId)
-        throw new ForbiddenException('Action interdite.');
       const like = await tx.postLike.update({
-        where: { id },
+        where: { id: existing.id },
         data: { isDeleted: true, deletedAt: new Date() },
       });
       await tx.post.updateMany({
@@ -100,7 +84,7 @@ export class PostLikesService {
           action: AUDIT_ACTION.POST_UNLIKED,
           entityType: AUDIT_ENTITY.POST,
           entityId: existing.postId,
-          metadata: { likeId: id },
+          metadata: { likeId: existing.id },
         },
       });
       return like;

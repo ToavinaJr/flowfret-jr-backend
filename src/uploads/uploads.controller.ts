@@ -23,6 +23,8 @@ import { ConcurrentUploadsInterceptor } from './concurrent-uploads.interceptor';
 import { ConfigService } from '@nestjs/config';
 import { UploadStatus } from '@prisma/client';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
+import { ApplicationException } from '../common/application-exception';
+import { HttpStatus } from '@nestjs/common';
 
 @Controller('uploads')
 @UseGuards(AuthGuard('jwt'))
@@ -59,8 +61,10 @@ export class UploadsController {
     });
     const quota = BigInt(this.storageQuotaBytes());
     if ((used._sum.fileSize ?? 0n) + BigInt(incomingBytes) > quota) {
-      throw new BadRequestException(
-        'Quota de stockage atteint. Supprimez des fichiers avant de continuer.',
+      throw new ApplicationException(
+        'UPLOAD_QUOTA_EXCEEDED',
+        'The storage quota has been reached.',
+        HttpStatus.BAD_REQUEST,
       );
     }
     this.logger.log(
@@ -82,7 +86,13 @@ export class UploadsController {
     const failed = settled.find((result) => result.status === 'rejected');
     if (failed) {
       await this.cleanupImages(uploaded);
-      throw failed.reason;
+      throw failed.reason instanceof ApplicationException
+        ? failed.reason
+        : new ApplicationException(
+            'UPLOAD_FAILED',
+            'Unable to upload the file.',
+            HttpStatus.BAD_GATEWAY,
+          );
     }
     try {
       const uploads = await this.prisma.$transaction(async (tx) => {

@@ -1,15 +1,11 @@
-import { ForbiddenException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { Args, Context, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
   CreatePostAttachmentInput,
-  CreatePostLikeInput,
-  CreatePostReportInput,
   PostAttachmentModel,
   PostLikeModel,
   PostReportModel,
   UpdatePostAttachmentInput,
-  UpdatePostLikeInput,
   UpdatePostReportInput,
 } from '../graphql/graphql.types';
 import { Roles } from '../auth/roles.decorator';
@@ -67,38 +63,28 @@ export class PostInteractionsResolver {
   }
 
   @Mutation(() => PostLikeModel)
-  createPostLike(
-    @Args('data') data: CreatePostLikeInput,
+  likePost(
+    @Args('postId') postId: string,
     @Context() context: RequestContext,
   ): Promise<PostLikeModel> {
-    return this.likesService.create(data.postId, data.userId, context.req.user);
+    return this.likesService.create(postId, context.req.user);
   }
 
   @Mutation(() => PostLikeModel)
-  @Roles(UserRole.ADMIN)
-  updatePostLike(
-    @Args('id') id: string,
-    @Args('data') data: UpdatePostLikeInput,
-  ): Promise<PostLikeModel> {
-    return this.likesService.update(id, data);
-  }
-
-  @Mutation(() => PostLikeModel)
-  deletePostLike(
-    @Args('id') id: string,
+  unlikePost(
+    @Args('postId') postId: string,
     @Context() context: RequestContext,
   ): Promise<PostLikeModel> {
-    return this.likesService.delete(id, context.req.user.sub);
+    return this.likesService.unlike(postId, context.req.user.sub);
   }
 
   @Mutation(() => PostReportModel)
-  createPostReport(
-    @Args('data') data: CreatePostReportInput,
+  reportPost(
+    @Args('postId') postId: string,
+    @Args('reason') reason: string,
     @Context() context: RequestContext,
   ): Promise<PostReportModel> {
-    if (data.reporterId !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
-    return this.moderation.createReport(data, context.req.user.sub);
+    return this.moderation.createReport(postId, reason, context.req.user.sub);
   }
 
   @Mutation(() => PostReportModel)

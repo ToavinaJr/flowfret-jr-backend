@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -20,6 +19,7 @@ import { syncPostMentions } from '../common/mentions';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadCleanupService } from '../uploads/upload-cleanup.service';
+import { postPolicy } from '../policies/post.policy';
 
 export interface PostActor {
   sub: string;
@@ -35,8 +35,6 @@ export class PostsCommandService {
   ) {}
 
   async create(data: CreatePostInput, actor: PostActor): Promise<PostModel> {
-    if (data.authorId !== actor.sub)
-      throw new ForbiddenException('Vous ne pouvez publier qu’en votre nom.');
     const content = data.content?.trim() || null;
     const imageUploadIds = data.imageUploadIds ?? [];
     if (!content && imageUploadIds.length === 0)
@@ -104,12 +102,8 @@ export class PostsCommandService {
       where: { id, isDeleted: false },
     });
     if (!post) throw new NotFoundException('Publication introuvable.');
-    if (post.authorId !== actorId)
-      throw new ForbiddenException(
-        'Seul le propriétaire peut modifier cette publication.',
-      );
+    postPolicy.assertCanMutate(actorId, post);
     const safeData = { ...data };
-    delete safeData.authorId;
     delete safeData.imageUploadIds;
     delete safeData.status;
     if (safeData.content !== undefined && !safeData.content?.trim()) {
@@ -148,10 +142,7 @@ export class PostsCommandService {
       where: { id, isDeleted: false },
     });
     if (!post) throw new NotFoundException('Publication introuvable.');
-    if (post.authorId !== actorId)
-      throw new ForbiddenException(
-        'Seul le propriétaire peut supprimer cette publication.',
-      );
+    postPolicy.assertCanMutate(actorId, post);
     const result = await this.prisma.$transaction(async (tx) => {
       const attachments = await tx.postAttachment.findMany({
         where: { postId: id, isDeleted: false },

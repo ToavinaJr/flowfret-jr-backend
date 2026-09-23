@@ -12,9 +12,49 @@ export interface GraphqlSecurityLimits {
   maxDepth: number;
   maxFields: number;
   maxAliases: number;
+  maxComplexity: number;
 }
 
-type Metrics = { fields: number; aliases: number; depth: number };
+type Metrics = {
+  fields: number;
+  aliases: number;
+  depth: number;
+  complexity: number;
+};
+
+const RELATION_FIELDS = new Set([
+  'author',
+  'profile',
+  'post',
+  'track',
+  'upload',
+  'user',
+]);
+const COLLECTION_FIELDS = new Set([
+  'attachments',
+  'auditLogs',
+  'authoredPosts',
+  'comments',
+  'commentsByPost',
+  'friendshipsReceived',
+  'friendshipsRequested',
+  'likes',
+  'mentionedUsers',
+  'myFriendships',
+  'myNotifications',
+  'myPlaylists',
+  'notifications',
+  'playlistItems',
+  'postAttachments',
+  'postLikes',
+  'postReports',
+  'posts',
+  'profiles',
+  'reports',
+  'uploads',
+  'users',
+]);
+const EXPENSIVE_FIELDS = new Set(['searchMusic', 'searchUsers']);
 
 export function createGraphqlSecurityRule(
   limits: GraphqlSecurityLimits,
@@ -30,7 +70,12 @@ export function createGraphqlSecurityRule(
 
       for (const definition of node.definitions) {
         if (definition.kind !== Kind.OPERATION_DEFINITION) continue;
-        const metrics: Metrics = { fields: 0, aliases: 0, depth: 0 };
+        const metrics: Metrics = {
+          fields: 0,
+          aliases: 0,
+          depth: 0,
+          complexity: 0,
+        };
         inspectOperation(definition, fragments, metrics);
         if (metrics.depth > limits.maxDepth) {
           context.reportError(
@@ -52,6 +97,14 @@ export function createGraphqlSecurityRule(
           context.reportError(
             new GraphQLError(
               `GraphQL alias count ${metrics.aliases} exceeds the limit of ${limits.maxAliases}.`,
+              { nodes: definition },
+            ),
+          );
+        }
+        if (metrics.complexity > limits.maxComplexity) {
+          context.reportError(
+            new GraphQLError(
+              `GraphQL query complexity ${metrics.complexity} exceeds the limit of ${limits.maxComplexity}.`,
               { nodes: definition },
             ),
           );
@@ -81,6 +134,7 @@ function inspectSelectionSet(
   for (const selection of selectionSet.selections) {
     if (selection.kind === Kind.FIELD) {
       metrics.fields += 1;
+      metrics.complexity += fieldCost(selection.name.value);
       if (selection.alias) metrics.aliases += 1;
       if (selection.selectionSet) {
         inspectSelectionSet(
@@ -116,4 +170,11 @@ function inspectSelectionSet(
       nextStack,
     );
   }
+}
+
+function fieldCost(name: string): number {
+  if (EXPENSIVE_FIELDS.has(name)) return 20;
+  if (COLLECTION_FIELDS.has(name)) return 10;
+  if (RELATION_FIELDS.has(name)) return 2;
+  return 1;
 }

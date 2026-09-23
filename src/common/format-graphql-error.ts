@@ -1,6 +1,7 @@
 import type { GraphQLFormattedError } from 'graphql';
 import { HttpException, Logger } from '@nestjs/common';
 import { errorDetails, isDebugEnabled } from './debug';
+import { PolicyViolationError } from '../policies/policy-violation.error';
 
 const logger = new Logger('GraphQLFormatError');
 
@@ -48,6 +49,18 @@ function graphQLCode(status: number): string {
   }
 }
 
+function responseCode(response: unknown): string | undefined {
+  if (
+    typeof response === 'object' &&
+    response !== null &&
+    'code' in response &&
+    typeof response.code === 'string'
+  ) {
+    return response.code;
+  }
+  return undefined;
+}
+
 function looksLikeInternalMessage(message: string): boolean {
   const lower = message.toLowerCase();
   return (
@@ -77,6 +90,16 @@ export function formatGraphQLError(
   error: unknown,
 ): GraphQLFormattedError {
   const original = getOriginalException(error);
+
+  if (original instanceof PolicyViolationError) {
+    return {
+      message: original.message,
+      extensions: {
+        code: original.code,
+        statusCode: original.statusCode,
+      },
+    };
+  }
 
   if (isDebugEnabled()) {
     const event = JSON.stringify({
@@ -111,7 +134,7 @@ export function formatGraphQLError(
       return {
         message,
         extensions: {
-          code: graphQLCode(status),
+          code: responseCode(response) ?? graphQLCode(status),
           statusCode: status,
         },
       };

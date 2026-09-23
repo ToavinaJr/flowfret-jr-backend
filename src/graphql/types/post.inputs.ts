@@ -27,7 +27,6 @@ import './enums';
 
 @InputType()
 export class CreatePostInput {
-  @Field() @IsUUID() authorId!: string;
   @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
@@ -61,7 +60,6 @@ export class UpdatePostInput extends PartialType(CreatePostInput) {}
 @InputType()
 export class CreateCommentInput {
   @Field() @IsUUID() postId!: string;
-  @Field() @IsUUID() authorId!: string;
   @Field() @IsString() @MinLength(1) @MaxLength(5000) content!: string;
   @Field(() => CommentStatus, { nullable: true })
   @IsOptional()
@@ -71,22 +69,15 @@ export class CreateCommentInput {
 @InputType()
 export class UpdateCommentInput extends PartialType(CreateCommentInput) {}
 @InputType()
-export class CreatePostLikeInput {
-  @Field() @IsUUID() postId!: string;
-  @Field() @IsUUID() userId!: string;
+export class UpdatePostReportInput {
+  @Field(() => ReportStatus, { nullable: true })
+  @IsOptional()
+  @IsEnum(ReportStatus)
+  status?: ReportStatus;
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  @IsOptional()
+  reviewedAt?: Date | null;
 }
-@InputType()
-export class UpdatePostLikeInput extends PartialType(CreatePostLikeInput) {}
-@InputType()
-export class CreatePostReportInput {
-  @Field() @IsUUID() postId!: string;
-  @Field() @IsUUID() reporterId!: string;
-  @Field() @IsString() @MinLength(5) @MaxLength(1000) reason!: string;
-  @Field(() => ReportStatus, { nullable: true }) status?: ReportStatus;
-  @Field(() => GraphQLISODateTime, { nullable: true }) reviewedAt?: Date | null;
-}
-@InputType()
-export class UpdatePostReportInput extends PartialType(CreatePostReportInput) {}
 @InputType()
 export class CreatePostAttachmentInput {
   @Field() postId!: string;

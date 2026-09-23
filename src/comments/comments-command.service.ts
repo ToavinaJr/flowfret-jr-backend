@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CommentStatus } from '@prisma/client';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 import {
@@ -14,6 +10,7 @@ import { syncCommentMentions } from '../common/mentions';
 import { requireVisiblePost } from '../common/post-access';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { commentPolicy } from '../policies/comment.policy';
 
 export interface CommentActor {
   sub: string;
@@ -31,8 +28,6 @@ export class CommentsCommandService {
     data: CreateCommentInput,
     actor: CommentActor,
   ): Promise<CommentModel> {
-    if (data.authorId !== actor.sub)
-      throw new ForbiddenException('Vous ne pouvez commenter qu’en votre nom.');
     const post = await requireVisiblePost(this.prisma, data.postId, actor.sub);
     const created = await this.prisma.$transaction(async (tx) => {
       const comment = await tx.comment.create({
@@ -78,12 +73,8 @@ export class CommentsCommandService {
       where: { id, isDeleted: false },
     });
     if (!comment) throw new NotFoundException('Commentaire introuvable.');
-    if (comment.authorId !== actorId)
-      throw new ForbiddenException(
-        'Seul le propriétaire peut modifier ce commentaire.',
-      );
+    commentPolicy.assertCanMutate(actorId, comment);
     const safeData = { ...data };
-    delete safeData.authorId;
     delete safeData.postId;
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.comment.update({
@@ -111,10 +102,7 @@ export class CommentsCommandService {
         where: { id, isDeleted: false },
       });
       if (!comment) throw new NotFoundException('Commentaire introuvable.');
-      if (comment.authorId !== actorId)
-        throw new ForbiddenException(
-          'Seul le propriétaire peut supprimer ce commentaire.',
-        );
+      commentPolicy.assertCanMutate(actorId, comment);
       const deleted = await tx.comment.update({
         where: { id },
         data: {

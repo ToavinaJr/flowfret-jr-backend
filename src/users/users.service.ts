@@ -1,14 +1,13 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   FriendshipStatus,
   PostVisibility,
   ProfileVisibility,
-  UserStatus,
 } from '@prisma/client';
 import {
   PostModel,
   ProfileModel,
-  UpdateUserInput,
+  UpdateMeInput,
   UserModel,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,29 +27,8 @@ export class UsersService {
     return this.prisma.user.findFirst({ where: { id, isDeleted: false } });
   }
 
-  update(
-    id: string,
-    data: UpdateUserInput,
-    actorId: string,
-  ): Promise<UserModel> {
-    this.requireSelf(id, actorId);
-    const safeData = { ...data };
-    delete safeData.passwordHash;
-    delete safeData.status;
-    delete safeData.email;
-    return this.prisma.user.update({ where: { id }, data: safeData });
-  }
-
-  delete(id: string, actorId: string): Promise<UserModel> {
-    this.requireSelf(id, actorId);
-    return this.prisma.user.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        deletedAt: new Date(),
-        status: UserStatus.DELETED,
-      },
-    });
+  updateMe(data: UpdateMeInput, actorId: string): Promise<UserModel> {
+    return this.prisma.user.update({ where: { id: actorId }, data });
   }
 
   async profile(
@@ -112,10 +90,6 @@ export class UsersService {
       },
     });
     return rows.map(toPostModel);
-  }
-
-  private requireSelf(userId: string, actorId: string): void {
-    if (userId !== actorId) throw new ForbiddenException('Action interdite.');
   }
 
   private async areFriends(userId: string, viewerId: string): Promise<boolean> {

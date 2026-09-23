@@ -1,4 +1,3 @@
-import { ForbiddenException } from '@nestjs/common';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadCleanupService } from '../uploads/upload-cleanup.service';
@@ -64,14 +63,6 @@ describe('PostsResolver contracts', () => {
     ]);
   });
 
-  it('rejects publishing on behalf of another user', async () => {
-    const { resolver } = resolverWith({});
-
-    await expect(
-      resolver.createPost({ authorId: 'other-id', content: 'hello' }, context),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-  });
-
   it('persists audit data before notifying friends', async () => {
     const post = { id: 'post-id', visibility: 'PUBLIC' };
     const tx = {
@@ -87,10 +78,7 @@ describe('PostsResolver contracts', () => {
     const { resolver, notifications } = resolverWith(prisma);
 
     await expect(
-      resolver.createPost(
-        { authorId: 'actor-id', content: ' hello ' },
-        context,
-      ),
+      resolver.createPost({ content: ' hello ' }, context),
     ).resolves.toEqual(post);
     expect(tx.auditLog.create).toHaveBeenCalled();
     expect(notifications.friendPosted).toHaveBeenCalledWith(

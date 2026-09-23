@@ -58,22 +58,13 @@ describe('UsersResolver privacy contracts', () => {
     );
   });
 
-  it('strips privileged fields from self-service updates', async () => {
+  it('derives self-service update ownership from the JWT subject', async () => {
     const prisma = {
       user: { update: jest.fn().mockResolvedValue({ id: 'actor-id' }) },
     };
     const resolver = resolverWith(prisma);
 
-    await resolver.updateUser(
-      'actor-id',
-      {
-        username: 'new-name',
-        email: 'attacker@example.com',
-        passwordHash: 'new-password',
-        status: 'SUSPENDED',
-      },
-      context,
-    );
+    await resolver.updateMe({ username: 'new-name' }, context);
 
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: 'actor-id' },

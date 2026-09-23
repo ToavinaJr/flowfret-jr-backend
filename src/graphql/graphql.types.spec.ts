@@ -53,7 +53,6 @@ describe('auth GraphQL input validation', () => {
 
   it('accepts a valid post payload with the global whitelist enabled', async () => {
     const input = Object.assign(new CreatePostInput(), {
-      authorId: 'd9428888-122b-11e1-b85c-61cd3cbb3210',
       content: 'Mon nouveau morceau',
     });
 
@@ -61,8 +60,21 @@ describe('auth GraphQL input validation', () => {
       validate(input, { whitelist: true, forbidNonWhitelisted: true }),
     ).resolves.toEqual([]);
     expect(input).toMatchObject({
+      content: 'Mon nouveau morceau',
+    });
+  });
+
+  it('rejects a client-controlled post author', async () => {
+    const input = Object.assign(new CreatePostInput(), {
       authorId: 'd9428888-122b-11e1-b85c-61cd3cbb3210',
       content: 'Mon nouveau morceau',
     });
+
+    const errors = await validate(input, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+
+    expect(errors.map((error) => error.property)).toContain('authorId');
   });
 });

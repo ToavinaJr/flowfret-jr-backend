@@ -5,6 +5,11 @@ import {
 } from '@nestjs/common';
 import { MusicProvider, PlaylistVisibility } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlaylistAccessService } from './playlist-access.service';
+import { PlaylistCommandService } from './playlist-command.service';
+import { PlaylistInputService } from './playlist-input.service';
+import { PlaylistItemsCommandService } from './playlist-items-command.service';
+import { PlaylistQueryService } from './playlist-query.service';
 import { PlaylistsService } from './playlists.service';
 
 const ownerId = '00000000-0000-4000-8000-000000000001';
@@ -40,7 +45,14 @@ const trackInput = {
 };
 
 function serviceWith(prisma: Record<string, unknown>) {
-  return new PlaylistsService(prisma as unknown as PrismaService);
+  const client = prisma as unknown as PrismaService;
+  const access = new PlaylistAccessService();
+  const input = new PlaylistInputService();
+  return new PlaylistsService(
+    new PlaylistQueryService(client, access),
+    new PlaylistCommandService(client, access, input),
+    new PlaylistItemsCommandService(client, access, input),
+  );
 }
 
 function transactional(tx: Record<string, unknown>) {

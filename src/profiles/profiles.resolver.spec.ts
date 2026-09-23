@@ -66,10 +66,7 @@ describe('ProfilesResolver', () => {
     };
     const resolver = new ProfilesResolver(prisma as unknown as PrismaService);
 
-    await resolver.createProfile(
-      { userId: 'user-id', displayName: ' Alice ' },
-      context,
-    );
+    await resolver.createProfile({ displayName: ' Alice ' }, context);
 
     expect(tx.profile.upsert).toHaveBeenCalledWith({
       where: { userId: 'user-id' },
