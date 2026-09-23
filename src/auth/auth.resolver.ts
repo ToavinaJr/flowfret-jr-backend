@@ -12,7 +12,7 @@ import {
   ResetPasswordInput,
   VerifyEmailInput,
 } from '../graphql/graphql.types';
-import { AuthService, AuthSessionPayload } from './auth.service';
+import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
 import { isDebugEnabled } from '../common/debug';
 import { RateLimit, RateLimits } from './rate-limit.decorator';
@@ -20,6 +20,7 @@ import {
   cookieName,
   cookieOptions,
   readRefreshToken,
+  writeSessionCookie,
 } from './auth-cookie.utils';
 
 @Resolver()
@@ -89,7 +90,11 @@ export class AuthResolver {
     @Args('data') data: LoginInput,
     @Context('res') response: Response,
   ): Promise<AuthPayload> {
-    return this.setSessionCookie(await this.authService.login(data), response);
+    return writeSessionCookie(
+      response,
+      this.configService,
+      await this.authService.login(data),
+    );
   }
 
   @Public()
@@ -99,9 +104,10 @@ export class AuthResolver {
     @Args('data') data: GoogleAuthInput,
     @Context('res') response: Response,
   ): Promise<AuthPayload> {
-    return this.setSessionCookie(
-      await this.authService.loginWithGoogle(data),
+    return writeSessionCookie(
       response,
+      this.configService,
+      await this.authService.loginWithGoogle(data),
     );
   }
 
@@ -112,9 +118,10 @@ export class AuthResolver {
     @Args('data') data: GoogleAuthInput,
     @Context('res') response: Response,
   ): Promise<AuthPayload> {
-    return this.setSessionCookie(
-      await this.authService.registerWithGoogle(data),
+    return writeSessionCookie(
       response,
+      this.configService,
+      await this.authService.registerWithGoogle(data),
     );
   }
 
@@ -125,9 +132,10 @@ export class AuthResolver {
     @Args('data') data: VerifyEmailInput,
     @Context('res') response: Response,
   ): Promise<AuthPayload> {
-    return this.setSessionCookie(
-      await this.authService.verifyEmail(data),
+    return writeSessionCookie(
       response,
+      this.configService,
+      await this.authService.verifyEmail(data),
     );
   }
 
@@ -174,9 +182,10 @@ export class AuthResolver {
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh session cookie is missing.');
     }
-    return this.setSessionCookie(
-      await this.authService.refreshSession(refreshToken),
+    return writeSessionCookie(
       response,
+      this.configService,
+      await this.authService.refreshSession(refreshToken),
     );
   }
 
@@ -196,17 +205,5 @@ export class AuthResolver {
       cookieOptions(this.configService),
     );
     return true;
-  }
-
-  private setSessionCookie(
-    session: AuthSessionPayload,
-    response: Response,
-  ): AuthPayload {
-    response.cookie(
-      cookieName(this.configService),
-      session.refreshToken,
-      cookieOptions(this.configService, true),
-    );
-    return { accessToken: session.accessToken, user: session.user };
   }
 }

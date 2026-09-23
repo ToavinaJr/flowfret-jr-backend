@@ -1,5 +1,7 @@
 import type { ConfigService } from '@nestjs/config';
-import type { CookieOptions, Request } from 'express';
+import type { CookieOptions, Request, Response } from 'express';
+import type { AuthPayload } from '../graphql/graphql.types';
+import type { AuthSessionPayload } from './auth-session.service';
 
 export function readRefreshToken(
   request: Request,
@@ -35,4 +37,17 @@ export function cookieOptions(
     path: '/graphql',
     ...(withMaxAge ? { maxAge: days * 24 * 60 * 60 * 1000 } : {}),
   };
+}
+
+export function writeSessionCookie(
+  response: Response,
+  config: ConfigService,
+  session: AuthSessionPayload,
+): AuthPayload {
+  response.cookie(
+    cookieName(config),
+    session.refreshToken,
+    cookieOptions(config, true),
+  );
+  return { accessToken: session.accessToken, user: session.user };
 }

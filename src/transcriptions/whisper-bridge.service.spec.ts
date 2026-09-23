@@ -4,6 +4,7 @@ import { PassThrough } from 'node:stream';
 import { spawn } from 'node:child_process';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { WhisperBridgeService } from './whisper-bridge.service';
+import { WhisperWorkerConfigService } from './whisper-worker-config.service';
 
 jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
 
@@ -38,7 +39,9 @@ function setup() {
       return undefined;
     }),
   };
-  const service = new WhisperBridgeService(config as unknown as ConfigService);
+  const service = new WhisperBridgeService(
+    new WhisperWorkerConfigService(config as unknown as ConfigService),
+  );
   const data = {
     transcriptionId: 'transcription-id',
     trackId: 'track-id',

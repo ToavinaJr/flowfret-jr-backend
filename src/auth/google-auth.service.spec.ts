@@ -73,13 +73,15 @@ describe('GoogleAuthService', () => {
     const { service } = setup(prisma);
 
     await expect(service.register('access-token')).resolves.toEqual(created);
-    expect(prisma.user.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        email: 'alice@example.com',
-        username: 'alice_doe',
-        googleId: 'google-id',
-        googleSignupCompleted: true,
-      }),
+    expect(prisma.user.create).toHaveBeenCalled();
+    const calls = prisma.user.create.mock.calls as unknown as Array<
+      [{ data: Record<string, unknown> }]
+    >;
+    expect(calls[0][0].data).toMatchObject({
+      email: 'alice@example.com',
+      username: 'alice_doe',
+      googleId: 'google-id',
+      googleSignupCompleted: true,
     });
   });
 });

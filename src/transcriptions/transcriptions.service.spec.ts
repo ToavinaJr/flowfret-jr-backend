@@ -5,6 +5,11 @@ import type { TranscriptionJobData } from './entities/transcription.types';
 import { TranscriptionEvents } from './transcriptions.events';
 import { TranscriptionsRepository } from './transcriptions.repository';
 import { TranscriptionsService } from './transcriptions.service';
+import { TranscriptionAccessService } from './transcription-access.service';
+import { TranscriptionQueueService } from './transcription-queue.service';
+import { TranscriptionWorkflowService } from './transcription-workflow.service';
+import { TranscriptionQueueDiagnosticsService } from './transcription-queue-diagnostics.service';
+import { TranscriptionCapacityService } from './transcription-capacity.service';
 
 describe('TranscriptionsService', () => {
   const record: Transcription = {
@@ -55,20 +60,40 @@ describe('TranscriptionsService', () => {
       ...queueOverrides,
     };
     const events = { emit: jest.fn() };
-    const service = new TranscriptionsService(
-      repository as unknown as TranscriptionsRepository,
-      events as unknown as TranscriptionEvents,
-      {
-        get: jest.fn((key: string) => {
-          if (key === 'WHISPER_ENGINE_VERSION') return '1';
-          if (key === 'LLM_PROVIDER') return 'whisper';
-          if (key === 'WHISPER_MODEL') return 'small';
-          if (key === 'TRANSCRIPTION_CONCURRENCY') return '2';
-          return undefined;
-        }),
-      } as unknown as ConfigService,
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'WHISPER_ENGINE_VERSION') return '1';
+        if (key === 'LLM_PROVIDER') return 'whisper';
+        if (key === 'WHISPER_MODEL') return 'small';
+        if (key === 'TRANSCRIPTION_CONCURRENCY') return '2';
+        return undefined;
+      }),
+    } as unknown as ConfigService;
+    const repositoryService = repository as unknown as TranscriptionsRepository;
+    const queueService = new TranscriptionQueueService(
+      config,
       queue as unknown as Queue<TranscriptionJobData>,
     );
+    const access = new TranscriptionAccessService(repositoryService);
+    const diagnostics = new TranscriptionQueueDiagnosticsService(
+      config,
+      queue as unknown as Queue<TranscriptionJobData>,
+    );
+    const capacity = new TranscriptionCapacityService(
+      repositoryService,
+      config,
+      queueService,
+    );
+    const workflow = new TranscriptionWorkflowService(
+      repositoryService,
+      events as unknown as TranscriptionEvents,
+      config,
+      queueService,
+      diagnostics,
+      capacity,
+      access,
+    );
+    const service = new TranscriptionsService(workflow, access, diagnostics);
     return { service, repository, queue };
   }
   it('creates and enqueues immediately without invoking Whisper', async () => {

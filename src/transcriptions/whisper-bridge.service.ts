@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import { delimiter, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -8,6 +7,7 @@ import type {
   WorkerMessage,
 } from './entities/transcription.types';
 import { parseWorkerMessage } from './transcriptions.utils';
+import { WhisperWorkerConfigService } from './whisper-worker-config.service';
 
 type WorkerInput = TranscriptionJobData & { title?: string; artist?: string };
 
@@ -23,7 +23,7 @@ export class WhisperBridgeService implements OnModuleDestroy {
     timer: ReturnType<typeof setTimeout>;
   } | null = null;
   private chain = Promise.resolve();
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly workerConfig: WhisperWorkerConfigService) {}
 
   run(
     data: WorkerInput,
@@ -41,19 +41,16 @@ export class WhisperBridgeService implements OnModuleDestroy {
     }
     const child = this.ensureChild();
     return new Promise<void>((resolvePromise, reject) => {
-      const timer = setTimeout(
-        () => {
-          this.active = null;
-          child.kill('SIGKILL');
-          this.child = null;
-          reject(
-            Object.assign(new Error('Whisper timed out'), {
-              code: 'WHISPER_TIMEOUT',
-            }),
-          );
-        },
-        this.numberConfig('TRANSCRIPTION_TIMEOUT_MS', 900_000),
-      );
+      const timer = setTimeout(() => {
+        this.active = null;
+        child.kill('SIGKILL');
+        this.child = null;
+        reject(
+          Object.assign(new Error('Whisper timed out'), {
+            code: 'WHISPER_TIMEOUT',
+          }),
+        );
+      }, this.workerConfig.timeoutMs());
       this.active = {
         onMessage,
         transcriptionId: data.transcriptionId,
@@ -71,7 +68,7 @@ export class WhisperBridgeService implements OnModuleDestroy {
         }),
       );
       child.stdin.write(
-        `${JSON.stringify({ ...data, options: this.workerOptions() })}\n`,
+        `${JSON.stringify({ ...data, options: this.workerConfig.options() })}\n`,
       );
     });
   }
@@ -83,12 +80,12 @@ export class WhisperBridgeService implements OnModuleDestroy {
 
   private ensureChild(): ChildProcessWithoutNullStreams {
     if (this.child && !this.child.killed) return this.child;
-    const python = this.config.get<string>('WHISPER_PYTHON_BIN') ?? 'python3';
+    const python = this.workerConfig.pythonBin();
     const script = resolve(
       process.cwd(),
       'workers/transcription/transcribe.py',
     );
-    const ffmpegBinDir = this.config.get<string>('FFMPEG_BIN_DIR')?.trim();
+    const ffmpegBinDir = this.workerConfig.ffmpegBinDir();
     const child = spawn(python, [script, '--server'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
@@ -193,48 +190,5 @@ export class WhisperBridgeService implements OnModuleDestroy {
     const reject = this.active.reject;
     this.active = null;
     reject(error);
-  }
-  private workerOptions() {
-    const configured = (
-      this.config.get<string>('TRANSCRIPTION_ALLOWED_AUDIO_HOSTS') ?? ''
-    )
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-
-    const defaultHosts = [
-      'audius.co',
-      'audius.work',
-      'audiuscontent.co',
-      'theblueprint.xyz',
-      'zeogrid.com',
-      'staked.cloud',
-      'altego.net',
-    ];
-
-    return {
-      device: this.config.get<string>('WHISPER_DEVICE') ?? 'cpu',
-      computeType: this.config.get<string>('WHISPER_COMPUTE_TYPE') ?? 'int8',
-      initialBufferSeconds: this.numberConfig(
-        'TRANSCRIPTION_INITIAL_BUFFER_SECONDS',
-        45,
-      ),
-      maxAudioSizeMb: this.numberConfig('TRANSCRIPTION_MAX_AUDIO_SIZE_MB', 100),
-      maxDurationSeconds: this.numberConfig(
-        'TRANSCRIPTION_MAX_DURATION_SECONDS',
-        900,
-      ),
-      maxRedirects: this.numberConfig('TRANSCRIPTION_MAX_REDIRECTS', 3),
-      downloadTimeoutMs: this.numberConfig(
-        'TRANSCRIPTION_DOWNLOAD_TIMEOUT_MS',
-        120_000,
-      ),
-      allowedHosts: [...new Set([...defaultHosts, ...configured])],
-      tempDir: this.config.get<string>('TRANSCRIPTION_TEMP_DIR') || undefined,
-    };
-  }
-  private numberConfig(key: string, fallback: number): number {
-    const value = Number(this.config.get(key));
-    return Number.isFinite(value) && value > 0 ? value : fallback;
   }
 }

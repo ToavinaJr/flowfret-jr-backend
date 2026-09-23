@@ -10,6 +10,8 @@ import { TranscriptionsRepository } from './transcriptions.repository';
 import { WhisperBridgeService } from './whisper-bridge.service';
 import { validateEnvironment } from '../common/validate-environment';
 import { getRedisOptions } from '../common/redis-config';
+import { TranscriptionMessageHandler } from './transcription-message-handler.service';
+import { WhisperWorkerConfigService } from './whisper-worker-config.service';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { getRedisOptions } from '../common/redis-config';
     TranscriptionsRepository,
     TranscriptionEvents,
     WhisperBridgeService,
+    WhisperWorkerConfigService,
+    TranscriptionMessageHandler,
     TranscriptionsProcessor,
   ],
 })

@@ -8,6 +8,11 @@ import { TranscriptionsController } from './transcriptions.controller';
 import { TranscriptionEvents } from './transcriptions.events';
 import { TranscriptionsRepository } from './transcriptions.repository';
 import { TranscriptionsService } from './transcriptions.service';
+import { TranscriptionAccessService } from './transcription-access.service';
+import { TranscriptionQueueService } from './transcription-queue.service';
+import { TranscriptionWorkflowService } from './transcription-workflow.service';
+import { TranscriptionQueueDiagnosticsService } from './transcription-queue-diagnostics.service';
+import { TranscriptionCapacityService } from './transcription-capacity.service';
 
 @Module({
   imports: [
@@ -23,6 +28,11 @@ import { TranscriptionsService } from './transcriptions.service';
   controllers: [TranscriptionsController],
   providers: [
     TranscriptionsService,
+    TranscriptionAccessService,
+    TranscriptionQueueService,
+    TranscriptionQueueDiagnosticsService,
+    TranscriptionCapacityService,
+    TranscriptionWorkflowService,
     TranscriptionsRepository,
     TranscriptionEvents,
   ],

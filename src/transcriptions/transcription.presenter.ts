@@ -1,0 +1,51 @@
+import { Prisma, Transcription, TranscriptionStatus } from '@prisma/client';
+import type { TranscriptionSegment } from './entities/transcription.types';
+
+export interface TranscriptionResponse {
+  transcriptionId: string;
+  jobId: string | null;
+  status: TranscriptionStatus;
+  cached: boolean;
+  readyToPlay: boolean;
+  bufferedUntil: number;
+  progress: number;
+  segments: TranscriptionSegment[];
+  language: string | null;
+  detectedLanguage: string | null;
+  lrcAvailable: boolean;
+  processingPhase: string | null;
+  error: { code: string; message: string } | null;
+}
+
+function segments(value: Prisma.JsonValue | null): TranscriptionSegment[] {
+  return Array.isArray(value)
+    ? (value as unknown as TranscriptionSegment[])
+    : [];
+}
+
+export function toTranscriptionResponse(
+  item: Transcription,
+  jobId: string | null,
+  cached: boolean,
+): TranscriptionResponse {
+  return {
+    transcriptionId: item.id,
+    jobId,
+    status: item.status,
+    cached,
+    readyToPlay: item.readyToPlay,
+    bufferedUntil: item.bufferedUntil,
+    progress: item.progress,
+    segments: segments(item.segments),
+    language: item.requestedLanguage === 'auto' ? null : item.requestedLanguage,
+    detectedLanguage: item.detectedLanguage,
+    lrcAvailable: Boolean(item.lrcContent),
+    processingPhase: item.processingPhase,
+    error: item.errorCode
+      ? {
+          code: item.errorCode,
+          message: item.errorMessage ?? 'Transcription failed',
+        }
+      : null,
+  };
+}

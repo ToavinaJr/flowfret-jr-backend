@@ -9,6 +9,7 @@ import type { AudiusService } from '../integrations/audius/audius.service';
 import type { TranscriptionEvents } from './transcriptions.events';
 import type { TranscriptionsRepository } from './transcriptions.repository';
 import type { WhisperBridgeService } from './whisper-bridge.service';
+import { TranscriptionMessageHandler } from './transcription-message-handler.service';
 
 const transcriptionId = '11111111-1111-4111-8111-111111111111';
 const jobData: TranscriptionJobData = {
@@ -79,6 +80,10 @@ function setup() {
     eventBus as unknown as TranscriptionEvents,
     audius as unknown as AudiusService,
     whisper as unknown as WhisperBridgeService,
+    new TranscriptionMessageHandler(
+      repository as unknown as TranscriptionsRepository,
+      eventBus as unknown as TranscriptionEvents,
+    ),
   );
   const job = {
     id: 'job-1',

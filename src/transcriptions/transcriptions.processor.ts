@@ -3,14 +3,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { TranscriptionStatus } from '@prisma/client';
 import type { Job } from 'bullmq';
 import { AudiusService } from '../integrations/audius/audius.service';
-import { TRANSCRIPTION_QUEUE } from './transcriptions.constants';
 import type {
   TranscriptionJobData,
   TranscriptionSegment,
-  WorkerMessage,
 } from './entities/transcription.types';
 import { TranscriptionEvents } from './transcriptions.events';
+import { TranscriptionMessageHandler } from './transcription-message-handler.service';
 import { TranscriptionsRepository } from './transcriptions.repository';
+import { TRANSCRIPTION_QUEUE } from './transcriptions.constants';
 import { WhisperBridgeService } from './whisper-bridge.service';
 
 @Injectable()
@@ -19,11 +19,13 @@ import { WhisperBridgeService } from './whisper-bridge.service';
 })
 export class TranscriptionsProcessor extends WorkerHost {
   private readonly logger = new Logger(TranscriptionsProcessor.name);
+
   constructor(
     private readonly repository: TranscriptionsRepository,
     private readonly events: TranscriptionEvents,
     private readonly audius: AudiusService,
     private readonly whisper: WhisperBridgeService,
+    private readonly messages: TranscriptionMessageHandler,
   ) {
     super();
   }
@@ -75,18 +77,13 @@ export class TranscriptionsProcessor extends WorkerHost {
             title: transcription?.title ?? undefined,
             artist: transcription?.artist ?? undefined,
           },
-          async (message) =>
-            this.handleMessage(transcriptionId, message, segments, job),
+          (message) =>
+            this.messages.handle(transcriptionId, message, segments, job),
         );
       try {
         await run(freshUrl);
       } catch (error) {
-        const retryableDownloadErrors = [
-          'AUDIO_URL_EXPIRED',
-          'AUDIO_DOWNLOAD_FAILED',
-        ];
-        if (!retryableDownloadErrors.includes(this.errorCode(error)))
-          throw error;
+        if (!this.isRetryableDownloadError(error)) throw error;
         this.logger.warn(
           JSON.stringify({
             event: 'transcription.audio_download_retry',
@@ -109,29 +106,37 @@ export class TranscriptionsProcessor extends WorkerHost {
         }),
       );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Transcription failed';
-      const finalAttempt =
-        job.attemptsMade + 1 >= Number(job.opts.attempts ?? 1);
-      if (!finalAttempt) {
-        this.logger.warn(
-          JSON.stringify({
-            event: 'transcription.job_retry_scheduled',
-            transcriptionId,
-            jobId: job.id,
-            trackId,
-            errorCode: this.errorCode(error),
-            error: message,
-            nextAttempt: job.attemptsMade + 2,
-          }),
-        );
-        await this.repository.update(transcriptionId, {
-          status: TranscriptionStatus.PENDING,
-          errorCode: null,
-          errorMessage: null,
-        });
-        throw error;
-      }
+      await this.handleFailure(job, error, startedAt);
+    }
+  }
+
+  private async handleFailure(
+    job: Job<TranscriptionJobData>,
+    error: unknown,
+    startedAt: number,
+  ): Promise<never> {
+    const { transcriptionId, trackId } = job.data;
+    const message =
+      error instanceof Error ? error.message : 'Transcription failed';
+    const finalAttempt = job.attemptsMade + 1 >= Number(job.opts.attempts ?? 1);
+    if (!finalAttempt) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'transcription.job_retry_scheduled',
+          transcriptionId,
+          jobId: job.id,
+          trackId,
+          errorCode: this.errorCode(error),
+          error: message,
+          nextAttempt: job.attemptsMade + 2,
+        }),
+      );
+      await this.repository.update(transcriptionId, {
+        status: TranscriptionStatus.PENDING,
+        errorCode: null,
+        errorMessage: null,
+      });
+    } else {
       await this.repository.markFailed(
         transcriptionId,
         this.errorCode(error),
@@ -154,142 +159,14 @@ export class TranscriptionsProcessor extends WorkerHost {
           elapsedMs: Date.now() - startedAt,
         }),
       );
-      throw error;
     }
+    throw error;
   }
 
-  private async handleMessage(
-    id: string,
-    message: WorkerMessage,
-    segments: TranscriptionSegment[],
-    job: Job<TranscriptionJobData>,
-  ): Promise<void> {
-    switch (message.type) {
-      case 'started':
-        this.logger.log(
-          JSON.stringify({
-            event: 'transcription.whisper_started',
-            transcriptionId: id,
-            jobId: job.id,
-            duration: message.duration,
-          }),
-        );
-        await this.repository.update(id, {
-          status: TranscriptionStatus.PROCESSING,
-          duration: message.duration,
-          processingPhase: 'TRANSCRIBING',
-        });
-        return;
-      case 'model-loading':
-        await this.repository.update(id, { processingPhase: 'MODEL_LOADING' });
-        this.events.emit({
-          type: 'transcription.model-loading',
-          transcriptionId: id,
-          progress: 0,
-          processingPhase: 'MODEL_LOADING',
-        });
-        return;
-      case 'model-ready':
-        await this.repository.update(id, { processingPhase: 'MODEL_READY' });
-        this.events.emit({
-          type: 'transcription.model-ready',
-          transcriptionId: id,
-          progress: 0,
-          processingPhase: 'MODEL_READY',
-        });
-        return;
-      case 'segment':
-        segments.push(message.segment);
-        this.events.emit({
-          type: 'transcription.segment',
-          transcriptionId: id,
-          segment: message.segment,
-          bufferedUntil: message.segment.end,
-        });
-        if (segments.length % 5 === 0)
-          await this.repository.saveSegments(
-            id,
-            segments,
-            message.segment.end,
-            Math.round(job.progress as number) || 0,
-          );
-        return;
-      case 'progress':
-        await job.updateProgress(message.progress);
-        await this.repository.saveSegments(
-          id,
-          segments,
-          message.bufferedUntil,
-          message.progress,
-        );
-        this.events.emit({
-          type: 'transcription.progress',
-          transcriptionId: id,
-          progress: message.progress,
-          bufferedUntil: message.bufferedUntil,
-        });
-        return;
-      case 'ready-to-play':
-        this.logger.log(
-          JSON.stringify({
-            event: 'transcription.ready_to_play',
-            transcriptionId: id,
-            jobId: job.id,
-            bufferedUntil: message.bufferedUntil,
-            segmentCount: segments.length,
-          }),
-        );
-        await this.repository.update(id, {
-          status: TranscriptionStatus.READY_TO_PLAY,
-          readyToPlay: true,
-          bufferedUntil: message.bufferedUntil,
-          segments: segments as never,
-        });
-        this.events.emit({
-          type: 'transcription.ready-to-play',
-          transcriptionId: id,
-          readyToPlay: true,
-          bufferedUntil: message.bufferedUntil,
-        });
-        return;
-      case 'completed':
-        this.logger.log(
-          JSON.stringify({
-            event: 'transcription.whisper_completed',
-            transcriptionId: id,
-            jobId: job.id,
-            duration: message.duration,
-            detectedLanguage: message.detectedLanguage,
-            segmentCount: segments.length,
-          }),
-        );
-        await this.repository.update(id, {
-          status: TranscriptionStatus.COMPLETED,
-          processingPhase: 'COMPLETED',
-          progress: 100,
-          readyToPlay: true,
-          bufferedUntil: message.duration,
-          duration: message.duration,
-          detectedLanguage: message.detectedLanguage,
-          segments: segments as never,
-          lrcContent: message.lrc,
-          completedAt: new Date(),
-          errorCode: null,
-          errorMessage: null,
-        });
-        this.events.emit({
-          type: 'transcription.completed',
-          transcriptionId: id,
-          progress: 100,
-          bufferedUntil: message.duration,
-          readyToPlay: true,
-        });
-        return;
-      case 'failed':
-        throw Object.assign(new Error(message.message), {
-          code: message.errorCode,
-        });
-    }
+  private isRetryableDownloadError(error: unknown): boolean {
+    return ['AUDIO_URL_EXPIRED', 'AUDIO_DOWNLOAD_FAILED'].includes(
+      this.errorCode(error),
+    );
   }
 
   private errorCode(error: unknown): string {
