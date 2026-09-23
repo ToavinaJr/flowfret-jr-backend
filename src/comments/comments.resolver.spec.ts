@@ -2,6 +2,8 @@ import { ForbiddenException } from '@nestjs/common';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CommentsResolver } from './comments.resolver';
+import { CommentsCommandService } from './comments-command.service';
+import { CommentsQueryService } from './comments-query.service';
 
 const context = { req: { user: { sub: 'actor-id', username: 'alice' } } };
 
@@ -12,7 +14,11 @@ function setup(prisma: Record<string, unknown>) {
   return {
     resolver: new CommentsResolver(
       prisma as unknown as PrismaService,
-      notifications as unknown as NotificationsService,
+      new CommentsQueryService(prisma as unknown as PrismaService),
+      new CommentsCommandService(
+        prisma as unknown as PrismaService,
+        notifications as unknown as NotificationsService,
+      ),
     ),
     notifications,
   };

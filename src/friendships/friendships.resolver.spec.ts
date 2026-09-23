@@ -2,6 +2,21 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { FriendshipsResolver } from './friendships.resolver';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { FriendshipsCommandService } from './friendships-command.service';
+import { FriendshipsQueryService } from './friendships-query.service';
+
+function resolverWith(
+  prisma: Record<string, unknown>,
+  notifications: Record<string, unknown>,
+) {
+  const client = prisma as unknown as PrismaService;
+  const notifier = notifications as unknown as NotificationsService;
+  return new FriendshipsResolver(
+    client,
+    new FriendshipsQueryService(client),
+    new FriendshipsCommandService(client, notifier),
+  );
+}
 
 describe('FriendshipsResolver notifications', () => {
   it('emits a notification after persisting a friend request', async () => {
@@ -28,10 +43,7 @@ describe('FriendshipsResolver notifications', () => {
     const notifications = {
       friendRequested: jest.fn().mockResolvedValue(undefined),
     };
-    const resolver = new FriendshipsResolver(
-      prisma as unknown as PrismaService,
-      notifications as unknown as NotificationsService,
-    );
+    const resolver = resolverWith(prisma, notifications);
 
     await expect(
       resolver.sendFriendRequest('recipient-id', {
@@ -47,10 +59,7 @@ describe('FriendshipsResolver notifications', () => {
 
   it('rejects self friendship requests before accessing persistence', async () => {
     const prisma = { user: { findFirst: jest.fn() } };
-    const resolver = new FriendshipsResolver(
-      prisma as unknown as PrismaService,
-      { friendRequested: jest.fn() } as unknown as NotificationsService,
-    );
+    const resolver = resolverWith(prisma, { friendRequested: jest.fn() });
 
     await expect(
       resolver.sendFriendRequest('actor-id', {
@@ -64,10 +73,7 @@ describe('FriendshipsResolver notifications', () => {
     const prisma = {
       friendship: { findFirst: jest.fn().mockResolvedValue(null) },
     };
-    const resolver = new FriendshipsResolver(
-      prisma as unknown as PrismaService,
-      {} as NotificationsService,
-    );
+    const resolver = resolverWith(prisma, {});
 
     await expect(
       resolver.removeFriend('friendship-id', {
@@ -87,10 +93,7 @@ describe('FriendshipsResolver notifications', () => {
       },
       user: { findMany: jest.fn().mockResolvedValue([]) },
     };
-    const resolver = new FriendshipsResolver(
-      prisma as unknown as PrismaService,
-      {} as NotificationsService,
-    );
+    const resolver = resolverWith(prisma, {});
 
     await resolver.searchUsers('bob', 20, {
       req: { user: { sub: 'actor-id' } },

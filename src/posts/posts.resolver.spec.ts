@@ -3,6 +3,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadCleanupService } from '../uploads/upload-cleanup.service';
 import { PostsResolver } from './posts.resolver';
+import { PostsCommandService } from './posts-command.service';
+import { PostsQueryService } from './posts-query.service';
 
 const context = { req: { user: { sub: 'actor-id', username: 'alice' } } };
 
@@ -14,8 +16,12 @@ function resolverWith(prisma: Record<string, unknown>) {
   return {
     resolver: new PostsResolver(
       prisma as unknown as PrismaService,
-      notifications as unknown as NotificationsService,
-      cleanup as unknown as UploadCleanupService,
+      new PostsQueryService(prisma as unknown as PrismaService),
+      new PostsCommandService(
+        prisma as unknown as PrismaService,
+        notifications as unknown as NotificationsService,
+        cleanup as unknown as UploadCleanupService,
+      ),
     ),
     notifications,
     cleanup,

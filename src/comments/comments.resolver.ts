@@ -1,14 +1,13 @@
 import {
   Args,
   Context,
+  Int,
   Mutation,
   Parent,
+  Query,
   ResolveField,
   Resolver,
-  Query,
 } from '@nestjs/graphql';
-import { Int } from '@nestjs/graphql';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import {
   CommentModel,
   CreateCommentInput,
@@ -17,252 +16,69 @@ import {
   UserModel,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { requireVisiblePost, visiblePostWhere } from '../common/post-access';
-import { syncCommentMentions } from '../common/mentions';
+import { CommentsCommandService } from './comments-command.service';
+import { CommentsQueryService } from './comments-query.service';
+
+type RequestContext = { req: { user: { sub: string; username: string } } };
 
 @Resolver(() => CommentModel)
 export class CommentsResolver {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notifications: NotificationsService,
+    private readonly queries: CommentsQueryService,
+    private readonly commands: CommentsCommandService,
   ) {}
 
   @Query(() => [CommentModel], { name: 'comments' })
-  async comments(
-    @Context() context: { req: { user: { sub: string } } },
-  ): Promise<CommentModel[]> {
-    const rows = await this.prisma.comment.findMany({
-      where: {
-        isDeleted: false,
-        post: await visiblePostWhere(this.prisma, context.req.user.sub),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-      include: {
-        author: { include: { profile: true } },
-        mentions: {
-          where: { isDeleted: false },
-          include: { user: { include: { profile: true } } },
-        },
-      },
-    });
-    return rows.map(({ mentions, ...comment }) => ({
-      ...comment,
-      mentionedUsers: mentions.map(({ user }) => user),
-    }));
+  comments(@Context() context: RequestContext): Promise<CommentModel[]> {
+    return this.queries.list(context.req.user.sub);
   }
 
   @Query(() => CommentModel, { name: 'comment', nullable: true })
-  async comment(
+  comment(
     @Args('id') id: string,
-    @Context() context: { req: { user: { sub: string } } },
+    @Context() context: RequestContext,
   ): Promise<CommentModel | null> {
-    const comment = await this.prisma.comment.findFirst({
-      where: { id, isDeleted: false },
-      include: {
-        author: { include: { profile: true } },
-        mentions: {
-          where: { isDeleted: false },
-          include: { user: { include: { profile: true } } },
-        },
-      },
-    });
-    if (comment)
-      await requireVisiblePost(
-        this.prisma,
-        comment.postId,
-        context.req.user.sub,
-      );
-    if (!comment) return null;
-    const { mentions, ...result } = comment;
-    return {
-      ...result,
-      mentionedUsers: mentions.map(({ user }) => user),
-    };
+    return this.queries.find(id, context.req.user.sub);
   }
 
   @Query(() => [CommentModel], { name: 'commentsByPost' })
-  async commentsByPost(
+  commentsByPost(
     @Args('postId') postId: string,
     @Args('skip', { type: () => Int, defaultValue: 0 }) skip: number,
     @Args('take', { type: () => Int, defaultValue: 20 }) take: number,
-    @Context() context: { req: { user: { sub: string } } },
+    @Context() context: RequestContext,
   ): Promise<CommentModel[]> {
-    await requireVisiblePost(this.prisma, postId, context.req.user.sub);
-    const rows = await this.prisma.comment.findMany({
-      where: { postId, isDeleted: false },
-      orderBy: { createdAt: 'desc' },
-      skip: Math.max(0, skip),
-      take: Math.min(50, Math.max(1, take)),
-      include: {
-        author: { include: { profile: true } },
-        mentions: {
-          where: { isDeleted: false },
-          include: { user: { include: { profile: true } } },
-        },
-      },
-    });
-    return rows.map(({ mentions, ...comment }) => ({
-      ...comment,
-      mentionedUsers: mentions.map(({ user }) => user),
-    }));
+    return this.queries.listByPost(postId, context.req.user.sub, skip, take);
   }
 
   @Mutation(() => CommentModel)
-  async createComment(
+  createComment(
     @Args('data') data: CreateCommentInput,
-    @Context() context: { req: { user: { sub: string; username: string } } },
+    @Context() context: RequestContext,
   ): Promise<CommentModel> {
-    if (data.authorId !== context.req.user.sub)
-      throw new ForbiddenException('Vous ne pouvez commenter qu’en votre nom.');
-    const post = await requireVisiblePost(
-      this.prisma,
-      data.postId,
-      context.req.user.sub,
-    );
-    const created = await this.prisma.$transaction(async (tx) => {
-      const comment = await tx.comment.create({
-        data: {
-          postId: data.postId,
-          authorId: context.req.user.sub,
-          content: data.content.trim(),
-          status: 'ACTIVE',
-        },
-      });
-      await syncCommentMentions(
-        tx,
-        comment.id,
-        context.req.user.sub,
-        comment.content,
-      );
-
-      await tx.post.update({
-        where: { id: data.postId },
-        data: {
-          commentCount: {
-            increment: 1,
-          },
-        },
-      });
-
-      await tx.auditLog.create({
-        data: {
-          actorId: context.req.user.sub,
-          action: 'COMMENT_CREATED',
-          entityType: 'comment',
-          entityId: comment.id,
-          metadata: { postId: data.postId },
-        },
-      });
-
-      return comment;
-    });
-    await this.notifications.postCommented(
-      context.req.user.sub,
-      context.req.user.username,
-      data.postId,
-      created.id,
-      post.authorId,
-    );
-    return created;
+    return this.commands.create(data, context.req.user);
   }
 
   @Mutation(() => CommentModel)
-  async updateComment(
+  updateComment(
     @Args('id') id: string,
     @Args('data') data: UpdateCommentInput,
-    @Context() context: { req: { user: { sub: string } } },
+    @Context() context: RequestContext,
   ): Promise<CommentModel> {
-    const comment = await this.prisma.comment.findFirst({
-      where: { id, isDeleted: false },
-    });
-    if (!comment) throw new NotFoundException('Commentaire introuvable.');
-    if (comment.authorId !== context.req.user.sub)
-      throw new ForbiddenException(
-        'Seul le propriétaire peut modifier ce commentaire.',
-      );
-    const safeData = { ...data };
-    delete safeData.authorId;
-    delete safeData.postId;
-    return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.comment.update({
-        where: { id },
-        data: safeData,
-      });
-      if (safeData.content !== undefined)
-        await syncCommentMentions(
-          tx,
-          id,
-          context.req.user.sub,
-          safeData.content,
-        );
-      await tx.auditLog.create({
-        data: {
-          actorId: context.req.user.sub,
-          action: 'COMMENT_UPDATED',
-          entityType: 'comment',
-          entityId: id,
-          metadata: { postId: comment.postId },
-        },
-      });
-      return updated;
-    });
+    return this.commands.update(id, data, context.req.user.sub);
   }
 
   @Mutation(() => CommentModel)
-  async deleteComment(
+  deleteComment(
     @Args('id') id: string,
-    @Context() context: { req: { user: { sub: string } } },
+    @Context() context: RequestContext,
   ): Promise<CommentModel> {
-    return this.prisma.$transaction(async (tx) => {
-      const comment = await tx.comment.findFirst({
-        where: { id, isDeleted: false },
-      });
-      if (!comment) throw new NotFoundException('Commentaire introuvable.');
-      if (comment.authorId !== context.req.user.sub)
-        throw new ForbiddenException(
-          'Seul le propriétaire peut supprimer ce commentaire.',
-        );
-      const deletedComment = await tx.comment.update({
-        where: { id },
-        data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' },
-      });
-      await tx.commentMention.updateMany({
-        where: { commentId: id, isDeleted: false },
-        data: { isDeleted: true, deletedAt: new Date() },
-      });
-
-      await tx.post.updateMany({
-        where: {
-          id: deletedComment.postId,
-          commentCount: {
-            gt: 0,
-          },
-        },
-        data: {
-          commentCount: {
-            decrement: 1,
-          },
-        },
-      });
-
-      await tx.auditLog.create({
-        data: {
-          actorId: context.req.user.sub,
-          action: 'COMMENT_DELETED',
-          entityType: 'comment',
-          entityId: id,
-          metadata: { postId: deletedComment.postId },
-        },
-      });
-
-      return deletedComment;
-    });
+    return this.commands.delete(id, context.req.user.sub);
   }
 
   @ResolveField(() => PostModel, { name: 'post' })
-  async post(@Parent() comment: CommentModel): Promise<PostModel | null> {
+  post(@Parent() comment: CommentModel): Promise<PostModel | null> {
     return this.prisma.post.findUnique({ where: { id: comment.postId } });
   }
 

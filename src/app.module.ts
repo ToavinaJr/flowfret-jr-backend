@@ -6,7 +6,11 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuditLogsResolver } from './audit-logs/audit-logs.resolver';
 import { CommentsResolver } from './comments/comments.resolver';
+import { CommentsCommandService } from './comments/comments-command.service';
+import { CommentsQueryService } from './comments/comments-query.service';
 import { FriendshipsResolver } from './friendships/friendships.resolver';
+import { FriendshipsCommandService } from './friendships/friendships-command.service';
+import { FriendshipsQueryService } from './friendships/friendships-query.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AppResolver } from './app.resolver';
 import { PostInteractionsResolver } from './post-interactions/post-interactions.resolver';
@@ -15,6 +19,8 @@ import { PostReportsResolver } from './post-interactions/post-interactions.resol
 import { AuthModule } from './auth/auth.module';
 import { ProfilesResolver } from './profiles/profiles.resolver';
 import { PostsResolver } from './posts/posts.resolver';
+import { PostsCommandService } from './posts/posts-command.service';
+import { PostsQueryService } from './posts/posts-query.service';
 import { NotificationsResolver } from './notifications/notifications.resolver';
 import { UsersResolver } from './users/users.resolver';
 import { formatGraphQLError } from './common/format-graphql-error';
@@ -80,8 +86,14 @@ import { createGraphqlSecurityRule } from './common/graphql-security';
     UsersResolver,
     ProfilesResolver,
     PostsResolver,
+    PostsCommandService,
+    PostsQueryService,
     CommentsResolver,
+    CommentsCommandService,
+    CommentsQueryService,
     FriendshipsResolver,
+    FriendshipsCommandService,
+    FriendshipsQueryService,
     NotificationsResolver,
     NotificationsService,
     AuditLogsResolver,
