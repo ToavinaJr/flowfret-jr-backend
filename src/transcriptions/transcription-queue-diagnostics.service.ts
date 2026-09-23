@@ -7,7 +7,11 @@ import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import type { TranscriptionJobData } from './entities/transcription.types';
-import { TRANSCRIPTION_QUEUE } from './transcriptions.constants';
+import {
+  QUEUE_DIAGNOSTIC_STATUS,
+  TRANSCRIPTION_ERROR_CODE,
+  TRANSCRIPTION_QUEUE,
+} from './transcriptions.constants';
 
 @Injectable()
 export class TranscriptionQueueDiagnosticsService {
@@ -33,7 +37,7 @@ export class TranscriptionQueueDiagnosticsService {
     )
       return {
         queue: TRANSCRIPTION_QUEUE,
-        status: 'QUEUE_UNAVAILABLE',
+        status: QUEUE_DIAGNOSTIC_STATUS.UNAVAILABLE,
         queueHealthy: false,
         available: false,
         workerCount: null,
@@ -56,7 +60,10 @@ export class TranscriptionQueueDiagnosticsService {
     ]);
     return {
       queue: TRANSCRIPTION_QUEUE,
-      status: workers.length > 0 ? 'READY' : 'NO_WORKER',
+      status:
+        workers.length > 0
+          ? QUEUE_DIAGNOSTIC_STATUS.READY
+          : QUEUE_DIAGNOSTIC_STATUS.NO_WORKER,
       queueHealthy: true,
       counts,
       workerCount: workers.length,
@@ -120,7 +127,7 @@ export class TranscriptionQueueDiagnosticsService {
         }),
       );
       throw new ServiceUnavailableException({
-        code: 'REDIS_UNAVAILABLE',
+        code: TRANSCRIPTION_ERROR_CODE.REDIS_UNAVAILABLE,
         message: 'Transcription queue is unavailable',
       });
     } finally {

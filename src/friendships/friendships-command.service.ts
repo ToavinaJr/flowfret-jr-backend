@@ -5,7 +5,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { FriendshipStatus, Prisma, UserStatus } from '@prisma/client';
+import {
+  AUDIT_ACTION,
+  AUDIT_ENTITY,
+  FRIENDSHIP_CONFLICT_STATUSES,
+} from '../common/domain.constants';
 import { FriendshipModel } from '../graphql/graphql.types';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -31,7 +36,7 @@ export class FriendshipsCommandService {
         'Vous ne pouvez pas vous ajouter vous-même.',
       );
     const receiver = await this.prisma.user.findFirst({
-      where: { id: receiverId, status: 'ACTIVE', isDeleted: false },
+      where: { id: receiverId, status: UserStatus.ACTIVE, isDeleted: false },
     });
     if (!receiver) throw new NotFoundException('Utilisateur introuvable.');
     const reverse = await this.prisma.friendship.findFirst({
@@ -39,7 +44,7 @@ export class FriendshipsCommandService {
         requesterId: receiverId,
         receiverId: actor.sub,
         isDeleted: false,
-        status: { in: ['PENDING', 'ACCEPTED', 'BLOCKED'] },
+        status: { in: [...FRIENDSHIP_CONFLICT_STATUSES] },
       },
     });
     if (reverse)
@@ -57,17 +62,18 @@ export class FriendshipsCommandService {
             },
           },
         });
-        if (
-          previous &&
-          ['PENDING', 'ACCEPTED', 'BLOCKED'].includes(previous.status)
-        )
+        if (previous && FRIENDSHIP_CONFLICT_STATUSES.has(previous.status))
           throw new BadRequestException(
             'Une relation existe déjà avec cet utilisateur.',
           );
         const saved = previous
           ? await tx.friendship.update({
               where: { id: previous.id },
-              data: { status: 'PENDING', isDeleted: false, deletedAt: null },
+              data: {
+                status: FriendshipStatus.PENDING,
+                isDeleted: false,
+                deletedAt: null,
+              },
             })
           : await tx.friendship.create({
               data: { requesterId: actor.sub, receiverId },
@@ -75,8 +81,8 @@ export class FriendshipsCommandService {
         await tx.auditLog.create({
           data: {
             actorId: actor.sub,
-            action: 'FRIEND_REQUESTED',
-            entityType: 'friendship',
+            action: AUDIT_ACTION.FRIEND_REQUESTED,
+            entityType: AUDIT_ENTITY.FRIENDSHIP,
             entityId: saved.id,
             metadata: { receiverId },
           },
@@ -110,7 +116,7 @@ export class FriendshipsCommandService {
       where: {
         id,
         receiverId: actor.sub,
-        status: 'PENDING',
+        status: FriendshipStatus.PENDING,
         isDeleted: false,
       },
     });
@@ -118,13 +124,19 @@ export class FriendshipsCommandService {
     const friendship = await this.prisma.$transaction(async (tx) => {
       const saved = await tx.friendship.update({
         where: { id },
-        data: { status: accept ? 'ACCEPTED' : 'REJECTED' },
+        data: {
+          status: accept
+            ? FriendshipStatus.ACCEPTED
+            : FriendshipStatus.REJECTED,
+        },
       });
       await tx.auditLog.create({
         data: {
           actorId: actor.sub,
-          action: accept ? 'FRIEND_ACCEPTED' : 'FRIEND_REJECTED',
-          entityType: 'friendship',
+          action: accept
+            ? AUDIT_ACTION.FRIEND_ACCEPTED
+            : AUDIT_ACTION.FRIEND_REJECTED,
+          entityType: AUDIT_ENTITY.FRIENDSHIP,
           entityId: id,
           metadata: { requesterId: row.requesterId },
         },
@@ -152,13 +164,17 @@ export class FriendshipsCommandService {
     return this.prisma.$transaction(async (tx) => {
       const friendship = await tx.friendship.update({
         where: { id },
-        data: { status: 'CANCELED', isDeleted: true, deletedAt: new Date() },
+        data: {
+          status: FriendshipStatus.CANCELED,
+          isDeleted: true,
+          deletedAt: new Date(),
+        },
       });
       await tx.auditLog.create({
         data: {
           actorId,
-          action: 'FRIEND_REMOVED',
-          entityType: 'friendship',
+          action: AUDIT_ACTION.FRIEND_REMOVED,
+          entityType: AUDIT_ENTITY.FRIENDSHIP,
           entityId: id,
           metadata: {},
         },

@@ -1,5 +1,6 @@
 import { Args, Context, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { BadRequestException } from '@nestjs/common';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 import { AuditLogModel } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -29,8 +30,10 @@ export class AuditLogsResolver {
     entityId: string | undefined,
     @Context() context: { req: { user: { sub: string } } },
   ): Promise<AuditLogModel> {
-    const allowed = new Set(['TRACK_LISTENED']);
-    if (!allowed.has(action) || entityType !== 'track')
+    if (
+      action !== AUDIT_ACTION.TRACK_LISTENED ||
+      entityType !== AUDIT_ENTITY.TRACK
+    )
       throw new BadRequestException('Activité invalide.');
     if (entityId && entityId.length > 255)
       throw new BadRequestException('Identifiant invalide.');

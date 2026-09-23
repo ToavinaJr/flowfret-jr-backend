@@ -8,6 +8,8 @@ import {
   Query,
 } from '@nestjs/graphql';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { FriendshipStatus, ProfileVisibility } from '@prisma/client';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 import {
   CreateProfileInput,
   ProfileModel,
@@ -23,7 +25,7 @@ export class ProfilesResolver {
   @Query(() => [ProfileModel], { name: 'profiles' })
   async profiles(): Promise<ProfileModel[]> {
     return this.prisma.profile.findMany({
-      where: { isDeleted: false, visibility: 'PUBLIC' },
+      where: { isDeleted: false, visibility: ProfileVisibility.PUBLIC },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
@@ -46,7 +48,7 @@ export class ProfilesResolver {
     if (profile.visibility === 'PRIVATE') return null;
     const isFriend = await this.prisma.friendship.count({
       where: {
-        status: 'ACCEPTED',
+        status: FriendshipStatus.ACCEPTED,
         isDeleted: false,
         OR: [
           { requesterId: profile.userId, receiverId: context.req.user.sub },
@@ -74,7 +76,7 @@ export class ProfilesResolver {
     if (profile.visibility === 'PRIVATE') return null;
     const isFriend = await this.prisma.friendship.count({
       where: {
-        status: 'ACCEPTED',
+        status: FriendshipStatus.ACCEPTED,
         isDeleted: false,
         OR: [
           { requesterId: userId, receiverId: context.req.user.sub },
@@ -114,8 +116,8 @@ export class ProfilesResolver {
       await tx.auditLog.create({
         data: {
           actorId: context.req.user.sub,
-          action: 'PROFILE_UPSERTED',
-          entityType: 'profile',
+          action: AUDIT_ACTION.PROFILE_UPSERTED,
+          entityType: AUDIT_ENTITY.PROFILE,
           entityId: profile.id,
           metadata: {},
         },
@@ -155,8 +157,8 @@ export class ProfilesResolver {
       await tx.auditLog.create({
         data: {
           actorId: context.req.user.sub,
-          action: 'PROFILE_UPDATED',
-          entityType: 'profile',
+          action: AUDIT_ACTION.PROFILE_UPDATED,
+          entityType: AUDIT_ENTITY.PROFILE,
           entityId: id,
           metadata: { fields: Object.keys(safeData) },
         },
@@ -183,8 +185,8 @@ export class ProfilesResolver {
       await tx.auditLog.create({
         data: {
           actorId: context.req.user.sub,
-          action: 'PROFILE_DELETED',
-          entityType: 'profile',
+          action: AUDIT_ACTION.PROFILE_DELETED,
+          entityType: AUDIT_ENTITY.PROFILE,
           entityId: id,
           metadata: {},
         },

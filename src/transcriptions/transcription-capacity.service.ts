@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { TranscriptionsRepository } from './transcriptions.repository';
 import { TranscriptionQueueService } from './transcription-queue.service';
+import { TRANSCRIPTION_ERROR_CODE } from './transcriptions.constants';
 
 @Injectable()
 export class TranscriptionCapacityService {
@@ -20,7 +21,7 @@ export class TranscriptionCapacityService {
     if (active >= this.numberConfig('TRANSCRIPTION_MAX_ACTIVE_PER_USER', 2))
       throw new HttpException(
         {
-          code: 'TRANSCRIPTION_USER_QUOTA_REACHED',
+          code: TRANSCRIPTION_ERROR_CODE.USER_QUOTA_REACHED,
           message: 'Trop de transcriptions sont déjà en cours.',
         },
         429,
@@ -30,7 +31,7 @@ export class TranscriptionCapacityService {
       (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0);
     if (queued >= this.numberConfig('TRANSCRIPTION_MAX_QUEUE_DEPTH', 50))
       throw new ServiceUnavailableException({
-        code: 'TRANSCRIPTION_QUEUE_SATURATED',
+        code: TRANSCRIPTION_ERROR_CODE.QUEUE_SATURATED,
         message: 'La file de transcription est temporairement saturée.',
       });
   }

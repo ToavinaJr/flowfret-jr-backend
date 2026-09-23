@@ -14,16 +14,7 @@ export interface TranscriptionSegment {
 }
 
 export type TranscriptionEventType =
-  | 'transcription.pending'
-  | 'transcription.processing'
-  | 'transcription.model-loading'
-  | 'transcription.model-ready'
-  | 'transcription.progress'
-  | 'transcription.segment'
-  | 'transcription.ready-to-play'
-  | 'transcription.completed'
-  | 'transcription.failed'
-  | 'transcription.heartbeat';
+  (typeof TRANSCRIPTION_EVENT)[keyof typeof TRANSCRIPTION_EVENT];
 
 export interface TranscriptionEvent {
   type: TranscriptionEventType;
@@ -47,16 +38,31 @@ export interface TranscriptionJobData {
 }
 
 export type WorkerMessage =
-  | { type: 'started'; duration: number }
-  | { type: 'model-loading' }
-  | { type: 'model-ready' }
-  | { type: 'segment'; segment: TranscriptionSegment }
-  | { type: 'progress'; progress: number; bufferedUntil: number }
-  | { type: 'ready-to-play'; bufferedUntil: number }
+  | { type: typeof WORKER_MESSAGE.STARTED; duration: number }
+  | { type: typeof WORKER_MESSAGE.MODEL_LOADING }
+  | { type: typeof WORKER_MESSAGE.MODEL_READY }
+  | { type: typeof WORKER_MESSAGE.SEGMENT; segment: TranscriptionSegment }
   | {
-      type: 'completed';
+      type: typeof WORKER_MESSAGE.PROGRESS;
+      progress: number;
+      bufferedUntil: number;
+    }
+  | {
+      type: typeof WORKER_MESSAGE.READY_TO_PLAY;
+      bufferedUntil: number;
+    }
+  | {
+      type: typeof WORKER_MESSAGE.COMPLETED;
       duration: number;
       detectedLanguage: string;
       lrc: string;
     }
-  | { type: 'failed'; errorCode: string; message: string };
+  | {
+      type: typeof WORKER_MESSAGE.FAILED;
+      errorCode: string;
+      message: string;
+    };
+import {
+  TRANSCRIPTION_EVENT,
+  WORKER_MESSAGE,
+} from '../transcriptions.constants';

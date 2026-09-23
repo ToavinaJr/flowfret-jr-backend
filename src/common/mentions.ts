@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { FriendshipStatus, Prisma, UserStatus } from '@prisma/client';
 
 const MENTION_PATTERN = /(^|[^\p{L}\p{N}._%+-])@([\p{L}\p{N}_]{1,50})/gu;
 const MAX_MENTIONS = 10;
@@ -29,7 +29,7 @@ async function mentionedFriendIds(
 
   const friendships = await tx.friendship.findMany({
     where: {
-      status: 'ACCEPTED',
+      status: FriendshipStatus.ACCEPTED,
       isDeleted: false,
       OR: [{ requesterId: actorId }, { receiverId: actorId }],
     },
@@ -47,7 +47,7 @@ async function mentionedFriendIds(
   const users = await tx.user.findMany({
     where: {
       id: { in: [...allowedIds] },
-      status: 'ACTIVE',
+      status: UserStatus.ACTIVE,
       isDeleted: false,
       OR: usernames.map((username) => ({
         username: { equals: username, mode: 'insensitive' },

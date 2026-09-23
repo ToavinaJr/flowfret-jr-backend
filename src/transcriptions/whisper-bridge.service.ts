@@ -7,6 +7,10 @@ import type {
   WorkerMessage,
 } from './entities/transcription.types';
 import { parseWorkerMessage } from './transcriptions.utils';
+import {
+  TRANSCRIPTION_ERROR_CODE,
+  WORKER_MESSAGE,
+} from './transcriptions.constants';
 import { WhisperWorkerConfigService } from './whisper-worker-config.service';
 
 type WorkerInput = TranscriptionJobData & { title?: string; artist?: string };
@@ -47,7 +51,7 @@ export class WhisperBridgeService implements OnModuleDestroy {
         this.child = null;
         reject(
           Object.assign(new Error('Whisper timed out'), {
-            code: 'WHISPER_TIMEOUT',
+            code: TRANSCRIPTION_ERROR_CODE.WHISPER_TIMEOUT,
           }),
         );
       }, this.workerConfig.timeoutMs());
@@ -112,18 +116,20 @@ export class WhisperBridgeService implements OnModuleDestroy {
         .then(async () => {
           if (!this.active) return;
           const message = parseWorkerMessage(line);
-          if (message.type !== 'segment')
+          if (message.type !== WORKER_MESSAGE.SEGMENT)
             this.logger.log(
               JSON.stringify({
                 event: 'whisper.message',
                 transcriptionId: this.active.transcriptionId,
                 type: message.type,
                 progress:
-                  message.type === 'progress' ? message.progress : undefined,
+                  message.type === WORKER_MESSAGE.PROGRESS
+                    ? message.progress
+                    : undefined,
               }),
             );
           await this.active.onMessage(message);
-          if (message.type === 'completed') this.finish();
+          if (message.type === WORKER_MESSAGE.COMPLETED) this.finish();
         })
         .catch((error: unknown) =>
           this.fail(
@@ -170,7 +176,7 @@ export class WhisperBridgeService implements OnModuleDestroy {
         this.fail(
           Object.assign(
             new Error(`Whisper process exited (${code ?? 'unknown'})`),
-            { code: 'WHISPER_FAILED' },
+            { code: TRANSCRIPTION_ERROR_CODE.WHISPER_FAILED },
           ),
         );
     });

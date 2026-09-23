@@ -10,7 +10,13 @@ import type {
 import { TranscriptionEvents } from './transcriptions.events';
 import { TranscriptionMessageHandler } from './transcription-message-handler.service';
 import { TranscriptionsRepository } from './transcriptions.repository';
-import { TRANSCRIPTION_QUEUE } from './transcriptions.constants';
+import {
+  TRANSCRIPTION_ERROR_CODE,
+  TRANSCRIPTION_EVENT,
+  TRANSCRIPTION_PHASE,
+  TRANSCRIPTION_QUEUE,
+  RETRYABLE_TRANSCRIPTION_ERROR_CODES,
+} from './transcriptions.constants';
 import { WhisperBridgeService } from './whisper-bridge.service';
 
 @Injectable()
@@ -47,11 +53,11 @@ export class TranscriptionsProcessor extends WorkerHost {
     const transcription = await this.repository.findById(transcriptionId);
     await this.repository.update(transcriptionId, {
       status: TranscriptionStatus.DOWNLOADING,
-      processingPhase: 'AUDIO_PREPARING',
+      processingPhase: TRANSCRIPTION_PHASE.AUDIO_PREPARING,
       attempts: { increment: 1 },
     });
     this.events.emit({
-      type: 'transcription.processing',
+      type: TRANSCRIPTION_EVENT.PROCESSING,
       transcriptionId,
       progress: 0,
       bufferedUntil: 0,
@@ -100,7 +106,7 @@ export class TranscriptionsProcessor extends WorkerHost {
           transcriptionId,
           jobId: job.id,
           trackId,
-          status: 'COMPLETED',
+          status: TranscriptionStatus.COMPLETED,
           elapsedMs: Date.now() - startedAt,
           model: job.data.model,
         }),
@@ -143,7 +149,7 @@ export class TranscriptionsProcessor extends WorkerHost {
         message,
       );
       this.events.emit({
-        type: 'transcription.failed',
+        type: TRANSCRIPTION_EVENT.FAILED,
         transcriptionId,
         errorCode: this.errorCode(error),
         message: 'Transcription failed',
@@ -153,7 +159,7 @@ export class TranscriptionsProcessor extends WorkerHost {
           transcriptionId,
           jobId: job.id,
           trackId,
-          status: 'FAILED',
+          status: TranscriptionStatus.FAILED,
           errorCode: this.errorCode(error),
           error: message,
           elapsedMs: Date.now() - startedAt,
@@ -164,9 +170,7 @@ export class TranscriptionsProcessor extends WorkerHost {
   }
 
   private isRetryableDownloadError(error: unknown): boolean {
-    return ['AUDIO_URL_EXPIRED', 'AUDIO_DOWNLOAD_FAILED'].includes(
-      this.errorCode(error),
-    );
+    return RETRYABLE_TRANSCRIPTION_ERROR_CODES.has(this.errorCode(error));
   }
 
   private errorCode(error: unknown): string {
@@ -177,6 +181,6 @@ export class TranscriptionsProcessor extends WorkerHost {
       typeof (error as { code?: unknown }).code === 'string'
     )
       return (error as { code: string }).code;
-    return 'TRANSCRIPTION_FAILED';
+    return TRANSCRIPTION_ERROR_CODE.FAILED;
   }
 }

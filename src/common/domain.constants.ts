@@ -1,0 +1,52 @@
+import { FriendshipStatus, NotificationType } from '@prisma/client';
+
+/** Stable names persisted in AuditLog.action and notification payloads. */
+export const AUDIT_ACTION = {
+  TRACK_LISTENED: 'TRACK_LISTENED',
+  FRIEND_REQUESTED: 'FRIEND_REQUESTED',
+  FRIEND_ACCEPTED: 'FRIEND_ACCEPTED',
+  FRIEND_REJECTED: 'FRIEND_REJECTED',
+  FRIEND_REMOVED: 'FRIEND_REMOVED',
+  POST_CREATED: 'POST_CREATED',
+  POST_UPDATED: 'POST_UPDATED',
+  POST_DELETED: 'POST_DELETED',
+  POST_LIKED: 'POST_LIKED',
+  POST_UNLIKED: 'POST_UNLIKED',
+  POST_REPORTED: 'POST_REPORTED',
+  COMMENT_CREATED: 'COMMENT_CREATED',
+  COMMENT_UPDATED: 'COMMENT_UPDATED',
+  COMMENT_DELETED: 'COMMENT_DELETED',
+  PROFILE_UPSERTED: 'PROFILE_UPSERTED',
+  PROFILE_UPDATED: 'PROFILE_UPDATED',
+  PROFILE_DELETED: 'PROFILE_DELETED',
+  FILES_UPLOADED: 'FILES_UPLOADED',
+  UPLOAD_DELETED: 'UPLOAD_DELETED',
+} as const;
+
+export type AuditAction = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
+
+export const AUDIT_ENTITY = {
+  TRACK: 'track',
+  FRIENDSHIP: 'friendship',
+  POST: 'post',
+  COMMENT: 'comment',
+  PROFILE: 'profile',
+  UPLOAD: 'upload',
+} as const;
+
+export type AuditEntity = (typeof AUDIT_ENTITY)[keyof typeof AUDIT_ENTITY];
+
+/** Friendship states that prevent another request between the same users. */
+export const FRIENDSHIP_CONFLICT_STATUSES = new Set<FriendshipStatus>([
+  FriendshipStatus.PENDING,
+  FriendshipStatus.ACCEPTED,
+  FriendshipStatus.BLOCKED,
+]);
+
+export const CONFIGURABLE_NOTIFICATION_TYPES = new Set<NotificationType>([
+  NotificationType.FRIEND_REQUEST,
+  NotificationType.FRIEND_POST,
+  NotificationType.POST_LIKE,
+  NotificationType.POST_COMMENT,
+  NotificationType.FOLLOWED_POST_ACTIVITY,
+]);

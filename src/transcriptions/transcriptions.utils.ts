@@ -4,6 +4,7 @@ import type {
   TranscriptionWord,
   WorkerMessage,
 } from './entities/transcription.types';
+import { WORKER_MESSAGE } from './transcriptions.constants';
 
 export function buildTranscriptionJobId(
   trackId: string,
@@ -56,29 +57,29 @@ export function parseWorkerMessage(line: string): WorkerMessage {
     throw new Error('Invalid worker message');
   const message = value as Record<string, unknown>;
   switch (message.type) {
-    case 'started':
+    case WORKER_MESSAGE.STARTED:
       if (isFiniteNumber(message.duration))
         return message as unknown as WorkerMessage;
       break;
-    case 'model-loading':
-    case 'model-ready':
+    case WORKER_MESSAGE.MODEL_LOADING:
+    case WORKER_MESSAGE.MODEL_READY:
       return message as unknown as WorkerMessage;
-    case 'segment':
+    case WORKER_MESSAGE.SEGMENT:
       if (isSegment(message.segment))
         return message as unknown as WorkerMessage;
       break;
-    case 'progress':
+    case WORKER_MESSAGE.PROGRESS:
       if (
         isFiniteNumber(message.progress) &&
         isFiniteNumber(message.bufferedUntil)
       )
         return message as unknown as WorkerMessage;
       break;
-    case 'ready-to-play':
+    case WORKER_MESSAGE.READY_TO_PLAY:
       if (isFiniteNumber(message.bufferedUntil))
         return message as unknown as WorkerMessage;
       break;
-    case 'completed':
+    case WORKER_MESSAGE.COMPLETED:
       if (
         isFiniteNumber(message.duration) &&
         typeof message.detectedLanguage === 'string' &&
@@ -86,7 +87,7 @@ export function parseWorkerMessage(line: string): WorkerMessage {
       )
         return message as unknown as WorkerMessage;
       break;
-    case 'failed':
+    case WORKER_MESSAGE.FAILED:
       if (
         typeof message.errorCode === 'string' &&
         typeof message.message === 'string'

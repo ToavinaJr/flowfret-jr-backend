@@ -5,6 +5,9 @@ import { CreateTranscriptionDto } from './dto/create-transcription.dto';
 import {
   DEFAULT_ENGINE_VERSION,
   MAX_RETRY_ATTEMPTS,
+  TRANSCRIPTION_EVENT,
+  TRANSCRIPTION_ERROR_CODE,
+  TRANSCRIPTION_PHASE,
 } from './transcriptions.constants';
 import { TranscriptionEvents } from './transcriptions.events';
 import {
@@ -109,7 +112,7 @@ export class TranscriptionWorkflowService {
     await this.queueDiagnostics.log(item.id);
     if (created)
       this.events.emit({
-        type: 'transcription.pending',
+        type: TRANSCRIPTION_EVENT.PENDING,
         transcriptionId: item.id,
         progress: 0,
         bufferedUntil: 0,
@@ -125,12 +128,12 @@ export class TranscriptionWorkflowService {
     const item = await this.access.requireOne(id, userId);
     if (item.status !== TranscriptionStatus.FAILED)
       throw new ConflictException({
-        code: 'TRANSCRIPTION_ALREADY_RUNNING',
+        code: TRANSCRIPTION_ERROR_CODE.ALREADY_RUNNING,
         message: 'Only failed transcriptions can be retried',
       });
     if (item.manualRetryCount >= MAX_RETRY_ATTEMPTS)
       throw new ConflictException({
-        code: 'TRANSCRIPTION_FAILED',
+        code: TRANSCRIPTION_ERROR_CODE.FAILED,
         message: 'Retry limit reached',
       });
     const reset = await this.repository.update(id, {
@@ -139,7 +142,7 @@ export class TranscriptionWorkflowService {
       bufferedUntil: 0,
       readyToPlay: false,
       manualRetryCount: { increment: 1 },
-      processingPhase: 'AUDIO_PREPARING',
+      processingPhase: TRANSCRIPTION_PHASE.AUDIO_PREPARING,
       errorCode: null,
       errorMessage: null,
     });

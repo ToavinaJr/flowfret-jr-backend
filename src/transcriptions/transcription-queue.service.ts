@@ -10,6 +10,7 @@ import type { Queue } from 'bullmq';
 import { CreateTranscriptionDto } from './dto/create-transcription.dto';
 import type { TranscriptionJobData } from './entities/transcription.types';
 import {
+  TRANSCRIPTION_ERROR_CODE,
   TRANSCRIPTION_JOB,
   TRANSCRIPTION_QUEUE,
 } from './transcriptions.constants';
@@ -103,7 +104,7 @@ export class TranscriptionQueueService {
         }),
       );
       throw new ServiceUnavailableException({
-        code: 'REDIS_UNAVAILABLE',
+        code: TRANSCRIPTION_ERROR_CODE.REDIS_UNAVAILABLE,
         message: 'Transcription queue is unavailable',
       });
     }
@@ -176,7 +177,7 @@ export class TranscriptionQueueService {
         }),
       );
       throw new ServiceUnavailableException({
-        code: 'REDIS_UNAVAILABLE',
+        code: TRANSCRIPTION_ERROR_CODE.REDIS_UNAVAILABLE,
         message: 'Transcription queue is unavailable',
       });
     } finally {

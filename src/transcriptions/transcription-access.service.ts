@@ -11,6 +11,10 @@ import {
 } from './transcription.presenter';
 import { TranscriptionsRepository } from './transcriptions.repository';
 import { buildTranscriptionJobId } from './transcriptions.utils';
+import {
+  TRANSCRIPTION_ERROR_CODE,
+  TRANSCRIPTION_EVENT,
+} from './transcriptions.constants';
 
 @Injectable()
 export class TranscriptionAccessService {
@@ -32,12 +36,12 @@ export class TranscriptionAccessService {
     const item = await this.requireOne(id, userId);
     const type =
       item.status === TranscriptionStatus.COMPLETED
-        ? 'transcription.completed'
+        ? TRANSCRIPTION_EVENT.COMPLETED
         : item.status === TranscriptionStatus.FAILED
-          ? 'transcription.failed'
+          ? TRANSCRIPTION_EVENT.FAILED
           : item.readyToPlay
-            ? 'transcription.ready-to-play'
-            : 'transcription.progress';
+            ? TRANSCRIPTION_EVENT.READY_TO_PLAY
+            : TRANSCRIPTION_EVENT.PROGRESS;
     return {
       type,
       transcriptionId: id,
@@ -57,7 +61,7 @@ export class TranscriptionAccessService {
     const item = await this.requireOne(id, userId);
     if (!item.lrcContent)
       throw new ConflictException({
-        code: 'TRANSCRIPTION_NOT_READY',
+        code: TRANSCRIPTION_ERROR_CODE.NOT_READY,
         message: 'LRC is not ready',
       });
     const safe =
@@ -74,7 +78,7 @@ export class TranscriptionAccessService {
     const item = await this.repository.findById(id);
     if (!item || !(await this.repository.hasAccess(userId, id)))
       throw new NotFoundException({
-        code: 'TRANSCRIPTION_NOT_FOUND',
+        code: TRANSCRIPTION_ERROR_CODE.NOT_FOUND,
         message: 'Transcription not found',
       });
     return item;

@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 import { PostLikeModel, UpdatePostLikeInput } from '../graphql/graphql.types';
 import { requireVisiblePost } from '../common/post-access';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -51,8 +52,8 @@ export class PostLikesService {
       await tx.auditLog.create({
         data: {
           actorId: actor.sub,
-          action: 'POST_LIKED',
-          entityType: 'post',
+          action: AUDIT_ACTION.POST_LIKED,
+          entityType: AUDIT_ENTITY.POST,
           entityId: postId,
           metadata: { likeId: like.id },
         },
@@ -96,8 +97,8 @@ export class PostLikesService {
       await tx.auditLog.create({
         data: {
           actorId,
-          action: 'POST_UNLIKED',
-          entityType: 'post',
+          action: AUDIT_ACTION.POST_UNLIKED,
+          entityType: AUDIT_ENTITY.POST,
           entityId: existing.postId,
           metadata: { likeId: id },
         },

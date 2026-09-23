@@ -1,6 +1,7 @@
 import { Args, Context, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { NotificationType } from '@prisma/client';
+import { CONFIGURABLE_NOTIFICATION_TYPES } from '../common/domain.constants';
 import {
   NotificationModel,
   NotificationPreferenceModel,
@@ -70,14 +71,7 @@ export class NotificationsResolver {
     @Args('enabled') enabled: boolean,
     @Context() context: { req: { user: { sub: string } } },
   ) {
-    const allowed: NotificationType[] = [
-      'FRIEND_REQUEST',
-      'FRIEND_POST',
-      'POST_LIKE',
-      'POST_COMMENT',
-      'FOLLOWED_POST_ACTIVITY',
-    ];
-    if (!allowed.includes(type))
+    if (!CONFIGURABLE_NOTIFICATION_TYPES.has(type))
       throw new ForbiddenException('Type de notification non configurable.');
     const userId = context.req.user.sub;
     return this.prisma.notificationPreference.upsert({

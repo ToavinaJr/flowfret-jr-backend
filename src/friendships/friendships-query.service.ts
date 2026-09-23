@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { UserStatus } from '@prisma/client';
+import { FRIENDSHIP_CONFLICT_STATUSES } from '../common/domain.constants';
 import { FriendshipModel, UserModel } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -16,7 +18,7 @@ export class FriendshipsQueryService {
     const relations = await this.prisma.friendship.findMany({
       where: {
         isDeleted: false,
-        status: { in: ['PENDING', 'ACCEPTED', 'BLOCKED'] },
+        status: { in: [...FRIENDSHIP_CONFLICT_STATUSES] },
         OR: [{ requesterId: actorId }, { receiverId: actorId }],
       },
       select: { requesterId: true, receiverId: true },
@@ -28,7 +30,7 @@ export class FriendshipsQueryService {
     return this.prisma.user.findMany({
       where: {
         id: { notIn: excludedIds },
-        status: 'ACTIVE',
+        status: UserStatus.ACTIVE,
         isDeleted: false,
         ...(value
           ? {

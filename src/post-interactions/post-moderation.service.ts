@@ -5,6 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 import {
   CreatePostAttachmentInput,
   CreatePostReportInput,
@@ -39,8 +40,8 @@ export class PostModerationService {
         await tx.auditLog.create({
           data: {
             actorId,
-            action: 'POST_REPORTED',
-            entityType: 'post',
+            action: AUDIT_ACTION.POST_REPORTED,
+            entityType: AUDIT_ENTITY.POST,
             entityId: data.postId,
             metadata: { reportId: report.id },
           },

@@ -15,7 +15,8 @@ import {
   UserModel,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from '@prisma/client';
+import { UploadStatus, UserRole } from '@prisma/client';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 import { Roles } from '../auth/roles.decorator';
 import { UploadCleanupService } from './upload-cleanup.service';
 
@@ -99,15 +100,15 @@ export class UploadsResolver {
         data: {
           isDeleted: true,
           deletedAt: new Date(),
-          status: 'DELETED',
+          status: UploadStatus.DELETED,
           cleanupPending: true,
         },
       });
       await tx.auditLog.create({
         data: {
           actorId: context.req.user.sub,
-          action: 'UPLOAD_DELETED',
-          entityType: 'upload',
+          action: AUDIT_ACTION.UPLOAD_DELETED,
+          entityType: AUDIT_ENTITY.UPLOAD,
           entityId: id,
           metadata: {},
         },

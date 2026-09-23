@@ -1,5 +1,11 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import {
+  FriendshipStatus,
+  PostVisibility,
+  ProfileVisibility,
+  UserStatus,
+} from '@prisma/client';
+import {
   PostModel,
   ProfileModel,
   UpdateUserInput,
@@ -39,7 +45,11 @@ export class UsersService {
     this.requireSelf(id, actorId);
     return this.prisma.user.update({
       where: { id },
-      data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' },
+      data: {
+        isDeleted: true,
+        deletedAt: new Date(),
+        status: UserStatus.DELETED,
+      },
     });
   }
 
@@ -54,9 +64,13 @@ export class UsersService {
           where: { userId: user.id, isDeleted: false },
         });
     if (profile && 'isDeleted' in profile && profile.isDeleted) return null;
-    if (!profile || user.id === viewerId || profile.visibility === 'PUBLIC')
+    if (
+      !profile ||
+      user.id === viewerId ||
+      profile.visibility === ProfileVisibility.PUBLIC
+    )
       return profile;
-    if (profile.visibility === 'PRIVATE') return null;
+    if (profile.visibility === ProfileVisibility.PRIVATE) return null;
     return (await this.areFriends(user.id, viewerId)) ? profile : null;
   }
 
@@ -70,7 +84,11 @@ export class UsersService {
         ...(own
           ? {}
           : {
-              visibility: { in: friend ? ['PUBLIC', 'FRIENDS'] : ['PUBLIC'] },
+              visibility: {
+                in: friend
+                  ? [PostVisibility.PUBLIC, PostVisibility.FRIENDS]
+                  : [PostVisibility.PUBLIC],
+              },
             }),
       },
       orderBy: { createdAt: 'desc' },
@@ -104,7 +122,7 @@ export class UsersService {
     return Boolean(
       await this.prisma.friendship.count({
         where: {
-          status: 'ACCEPTED',
+          status: FriendshipStatus.ACCEPTED,
           isDeleted: false,
           OR: [
             { requesterId: userId, receiverId: viewerId },

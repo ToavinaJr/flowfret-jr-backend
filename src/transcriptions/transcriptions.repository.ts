@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, Transcription, TranscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { TranscriptionSegment } from './entities/transcription.types';
+import { TRANSCRIPTION_ERROR_CODE } from './transcriptions.constants';
 
 @Injectable()
 export class TranscriptionsRepository {
@@ -170,7 +171,7 @@ export class TranscriptionsRepository {
         error.message === 'Database operation timed out'
       )
         throw new ServiceUnavailableException({
-          code: 'DATABASE_UNAVAILABLE',
+          code: TRANSCRIPTION_ERROR_CODE.DATABASE_UNAVAILABLE,
           message: 'The transcription database did not respond in time',
         });
       throw error;

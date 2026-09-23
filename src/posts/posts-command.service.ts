@@ -5,6 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AttachmentKind,
+  PostStatus,
+  PostVisibility,
+  UploadStatus,
+} from '@prisma/client';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
+import {
   CreatePostInput,
   PostModel,
   UpdatePostInput,
@@ -55,13 +62,13 @@ export class PostsCommandService {
           audioUrl: data.audioUrl,
           visibility: data.visibility,
           authorId: actor.sub,
-          status: 'ACTIVE',
+          status: PostStatus.ACTIVE,
           attachments: imageUploadIds.length
             ? {
                 create: imageUploadIds.map((uploadId, position) => ({
                   uploadId,
                   position,
-                  kind: 'IMAGE',
+                  kind: AttachmentKind.IMAGE,
                 })),
               }
             : undefined,
@@ -71,15 +78,15 @@ export class PostsCommandService {
       await tx.auditLog.create({
         data: {
           actorId: actor.sub,
-          action: 'POST_CREATED',
-          entityType: 'post',
+          action: AUDIT_ACTION.POST_CREATED,
+          entityType: AUDIT_ENTITY.POST,
           entityId: created.id,
           metadata: { imageCount: imageUploadIds.length },
         },
       });
       return created;
     });
-    if (post.visibility !== 'PRIVATE')
+    if (post.visibility !== PostVisibility.PRIVATE)
       await this.notifications.friendPosted(
         actor.sub,
         actor.username ?? '',
@@ -107,7 +114,11 @@ export class PostsCommandService {
     delete safeData.status;
     if (safeData.content !== undefined && !safeData.content?.trim()) {
       const imageCount = await this.prisma.postAttachment.count({
-        where: { postId: id, kind: 'IMAGE', isDeleted: false },
+        where: {
+          postId: id,
+          kind: AttachmentKind.IMAGE,
+          isDeleted: false,
+        },
       });
       if (imageCount === 0)
         throw new BadRequestException(
@@ -122,8 +133,8 @@ export class PostsCommandService {
       await tx.auditLog.create({
         data: {
           actorId,
-          action: 'POST_UPDATED',
-          entityType: 'post',
+          action: AUDIT_ACTION.POST_UPDATED,
+          entityType: AUDIT_ENTITY.POST,
           entityId: id,
           metadata: {},
         },
@@ -148,7 +159,11 @@ export class PostsCommandService {
       });
       const deleted = await tx.post.update({
         where: { id },
-        data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          status: PostStatus.DELETED,
+        },
       });
       await tx.postAttachment.updateMany({
         where: { postId: id, isDeleted: false },
@@ -169,7 +184,7 @@ export class PostsCommandService {
             data: {
               isDeleted: true,
               deletedAt: new Date(),
-              status: 'DELETED',
+              status: UploadStatus.DELETED,
               cleanupPending: true,
             },
           });
@@ -179,8 +194,8 @@ export class PostsCommandService {
       await tx.auditLog.create({
         data: {
           actorId,
-          action: 'POST_DELETED',
-          entityType: 'post',
+          action: AUDIT_ACTION.POST_DELETED,
+          entityType: AUDIT_ENTITY.POST,
           entityId: id,
           metadata: {},
         },

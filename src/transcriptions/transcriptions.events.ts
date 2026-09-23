@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import Redis, { RedisOptions } from 'ioredis';
 import { Observable } from 'rxjs';
 import type { TranscriptionEvent } from './entities/transcription.types';
+import { TRANSCRIPTION_EVENT } from './transcriptions.constants';
 import {
   getRedisConnectionSummary,
   getRedisOptions,
@@ -76,7 +77,7 @@ export class TranscriptionEvents implements OnModuleDestroy {
       const heartbeat = setInterval(
         () =>
           subscriber.next({
-            type: 'transcription.heartbeat',
+            type: TRANSCRIPTION_EVENT.HEARTBEAT,
             transcriptionId,
             timestamp: new Date().toISOString(),
           }),
@@ -146,8 +147,8 @@ export class TranscriptionEvents implements OnModuleDestroy {
   }
   private isTerminal(event: TranscriptionEvent): boolean {
     return (
-      event.type === 'transcription.completed' ||
-      event.type === 'transcription.failed'
+      event.type === TRANSCRIPTION_EVENT.COMPLETED ||
+      event.type === TRANSCRIPTION_EVENT.FAILED
     );
   }
   private async ensureConnected(redis: Redis): Promise<void> {

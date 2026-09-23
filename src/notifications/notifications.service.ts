@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { NotificationType, Prisma } from '@prisma/client';
+import { FriendshipStatus, NotificationType, Prisma } from '@prisma/client';
+import { AUDIT_ACTION, type AuditAction } from '../common/domain.constants';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -11,9 +12,9 @@ export class NotificationsService {
     actorUsername: string,
     recipientId: string,
   ): Promise<void> {
-    await this.createMany([recipientId], 'FRIEND_REQUEST', {
+    await this.createMany([recipientId], NotificationType.FRIEND_REQUEST, {
       ...(await this.actorPayload(actorId, actorUsername)),
-      action: 'FRIEND_REQUESTED',
+      action: AUDIT_ACTION.FRIEND_REQUESTED,
     });
   }
 
@@ -23,10 +24,10 @@ export class NotificationsService {
     postId: string,
   ): Promise<void> {
     const friendIds = await this.friendIds(actorId);
-    await this.createMany(friendIds, 'FRIEND_POST', {
+    await this.createMany(friendIds, NotificationType.FRIEND_POST, {
       ...(await this.actorPayload(actorId, actorUsername)),
       postId,
-      action: 'POST_CREATED',
+      action: AUDIT_ACTION.POST_CREATED,
     });
   }
 
@@ -38,18 +39,18 @@ export class NotificationsService {
     postAuthorId: string,
   ): Promise<void> {
     if (postAuthorId !== actorId)
-      await this.createMany([postAuthorId], 'POST_COMMENT', {
+      await this.createMany([postAuthorId], NotificationType.POST_COMMENT, {
         ...(await this.actorPayload(actorId, actorUsername)),
         postId,
         commentId,
-        action: 'COMMENT_CREATED',
+        action: AUDIT_ACTION.COMMENT_CREATED,
       });
     await this.notifyEngagedFriends(
       actorId,
       actorUsername,
       postId,
       postAuthorId,
-      'COMMENT_CREATED',
+      AUDIT_ACTION.COMMENT_CREATED,
     );
   }
 
@@ -60,17 +61,17 @@ export class NotificationsService {
     postAuthorId: string,
   ): Promise<void> {
     if (postAuthorId !== actorId)
-      await this.createMany([postAuthorId], 'POST_LIKE', {
+      await this.createMany([postAuthorId], NotificationType.POST_LIKE, {
         ...(await this.actorPayload(actorId, actorUsername)),
         postId,
-        action: 'POST_LIKED',
+        action: AUDIT_ACTION.POST_LIKED,
       });
     await this.notifyEngagedFriends(
       actorId,
       actorUsername,
       postId,
       postAuthorId,
-      'POST_LIKED',
+      AUDIT_ACTION.POST_LIKED,
     );
   }
 
@@ -79,9 +80,9 @@ export class NotificationsService {
     actorUsername: string,
     recipientId: string,
   ): Promise<void> {
-    await this.createMany([recipientId], 'FRIEND_ACCEPTED', {
+    await this.createMany([recipientId], NotificationType.FRIEND_ACCEPTED, {
       ...(await this.actorPayload(actorId, actorUsername)),
-      action: 'FRIEND_ACCEPTED',
+      action: AUDIT_ACTION.FRIEND_ACCEPTED,
     });
   }
 
@@ -90,7 +91,7 @@ export class NotificationsService {
     actorUsername: string,
     postId: string,
     postAuthorId: string,
-    action: string,
+    action: AuditAction,
   ) {
     const [friendIds, likes, comments, postAuthor] = await Promise.all([
       this.friendIds(actorId),
@@ -114,7 +115,7 @@ export class NotificationsService {
     const recipients = friendIds.filter(
       (id) => id !== actorId && id !== postAuthorId && engaged.has(id),
     );
-    await this.createMany(recipients, 'FOLLOWED_POST_ACTIVITY', {
+    await this.createMany(recipients, NotificationType.FOLLOWED_POST_ACTIVITY, {
       ...(await this.actorPayload(actorId, actorUsername)),
       postId,
       postAuthorUsername: postAuthor?.username ?? null,
@@ -137,7 +138,7 @@ export class NotificationsService {
   private async friendIds(userId: string): Promise<string[]> {
     const rows = await this.prisma.friendship.findMany({
       where: {
-        status: 'ACCEPTED',
+        status: FriendshipStatus.ACCEPTED,
         isDeleted: false,
         OR: [{ requesterId: userId }, { receiverId: userId }],
       },

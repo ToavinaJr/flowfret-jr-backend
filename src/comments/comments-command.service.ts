@@ -3,6 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { CommentStatus } from '@prisma/client';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 import {
   CommentModel,
   CreateCommentInput,
@@ -38,7 +40,7 @@ export class CommentsCommandService {
           postId: data.postId,
           authorId: actor.sub,
           content: data.content.trim(),
-          status: 'ACTIVE',
+          status: CommentStatus.ACTIVE,
         },
       });
       await syncCommentMentions(tx, comment.id, actor.sub, comment.content);
@@ -49,8 +51,8 @@ export class CommentsCommandService {
       await tx.auditLog.create({
         data: {
           actorId: actor.sub,
-          action: 'COMMENT_CREATED',
-          entityType: 'comment',
+          action: AUDIT_ACTION.COMMENT_CREATED,
+          entityType: AUDIT_ENTITY.COMMENT,
           entityId: comment.id,
           metadata: { postId: data.postId },
         },
@@ -93,8 +95,8 @@ export class CommentsCommandService {
       await tx.auditLog.create({
         data: {
           actorId,
-          action: 'COMMENT_UPDATED',
-          entityType: 'comment',
+          action: AUDIT_ACTION.COMMENT_UPDATED,
+          entityType: AUDIT_ENTITY.COMMENT,
           entityId: id,
           metadata: { postId: comment.postId },
         },
@@ -115,7 +117,11 @@ export class CommentsCommandService {
         );
       const deleted = await tx.comment.update({
         where: { id },
-        data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          status: CommentStatus.DELETED,
+        },
       });
       await tx.commentMention.updateMany({
         where: { commentId: id, isDeleted: false },
@@ -128,8 +134,8 @@ export class CommentsCommandService {
       await tx.auditLog.create({
         data: {
           actorId,
-          action: 'COMMENT_DELETED',
-          entityType: 'comment',
+          action: AUDIT_ACTION.COMMENT_DELETED,
+          entityType: AUDIT_ENTITY.COMMENT,
           entityId: id,
           metadata: { postId: deleted.postId },
         },

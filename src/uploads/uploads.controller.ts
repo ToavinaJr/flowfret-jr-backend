@@ -21,6 +21,8 @@ import {
 import { RateLimits } from '../auth/rate-limit.decorator';
 import { ConcurrentUploadsInterceptor } from './concurrent-uploads.interceptor';
 import { ConfigService } from '@nestjs/config';
+import { UploadStatus } from '@prisma/client';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 
 @Controller('uploads')
 @UseGuards(AuthGuard('jwt'))
@@ -94,7 +96,7 @@ export class UploadsController {
                 fileSize: BigInt(files[index].size),
                 storagePath: result.url,
                 storagePublicId: result.publicId,
-                status: 'AVAILABLE',
+                status: UploadStatus.AVAILABLE,
                 sourceType: 'POST',
               },
               select: { id: true, storagePath: true },
@@ -104,8 +106,8 @@ export class UploadsController {
         await tx.auditLog.create({
           data: {
             actorId: req.user.sub,
-            action: 'FILES_UPLOADED',
-            entityType: 'upload',
+            action: AUDIT_ACTION.FILES_UPLOADED,
+            entityType: AUDIT_ENTITY.UPLOAD,
             metadata: {
               uploadIds: records.map(({ id }) => id),
               count: records.length,
