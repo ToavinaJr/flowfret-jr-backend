@@ -45,10 +45,7 @@ export class TranscriptionsController {
   }
 
   @Get()
-  list(
-    @Req() req: { user: { sub: string } },
-    @Query('take') take?: string,
-  ) {
+  list(@Req() req: { user: { sub: string } }, @Query('take') take?: string) {
     const parsed = Number(take ?? 20);
     return this.service.list(
       req.user.sub,

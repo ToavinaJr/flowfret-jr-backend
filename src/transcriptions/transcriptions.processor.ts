@@ -1,8 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
-import { TranscriptionStatus } from '@prisma/client';
+import { MusicProvider, TranscriptionStatus } from '@prisma/client';
 import type { Job } from 'bullmq';
-import { AudiusService } from '../integrations/audius/audius.service';
 import type {
   TranscriptionJobData,
   TranscriptionSegment,
@@ -18,6 +17,7 @@ import {
   RETRYABLE_TRANSCRIPTION_ERROR_CODES,
 } from './transcriptions.constants';
 import { WhisperBridgeService } from './whisper-bridge.service';
+import { TranscriptionAudioSourceService } from './transcription-audio-source.service';
 
 @Injectable()
 @Processor(TRANSCRIPTION_QUEUE, {
@@ -29,7 +29,7 @@ export class TranscriptionsProcessor extends WorkerHost {
   constructor(
     private readonly repository: TranscriptionsRepository,
     private readonly events: TranscriptionEvents,
-    private readonly audius: AudiusService,
+    private readonly audioSources: TranscriptionAudioSourceService,
     private readonly whisper: WhisperBridgeService,
     private readonly messages: TranscriptionMessageHandler,
   ) {
@@ -38,6 +38,7 @@ export class TranscriptionsProcessor extends WorkerHost {
 
   async process(job: Job<TranscriptionJobData>): Promise<void> {
     const { transcriptionId, trackId } = job.data;
+    const provider = job.data.provider ?? MusicProvider.AUDIUS;
     const startedAt = Date.now();
     const segments: TranscriptionSegment[] = [];
     this.logger.log(
@@ -63,13 +64,15 @@ export class TranscriptionsProcessor extends WorkerHost {
       bufferedUntil: 0,
     });
     try {
-      const freshUrl = await this.audius.getFreshStreamUrl(
+      const freshUrl = await this.audioSources.resolve(
+        provider,
         trackId,
         job.data.audioUrl,
       );
       this.logger.log(
         JSON.stringify({
-          event: 'transcription.audius_stream_resolved',
+          event: 'transcription.audio_source_resolved',
+          provider,
           transcriptionId,
           trackId,
           streamHost: new URL(freshUrl).hostname,
@@ -99,7 +102,9 @@ export class TranscriptionsProcessor extends WorkerHost {
             error: error instanceof Error ? error.message : String(error),
           }),
         );
-        await run(await this.audius.getFreshStreamUrl(trackId));
+        await run(
+          await this.audioSources.resolve(provider, trackId, job.data.audioUrl),
+        );
       }
       this.logger.log(
         JSON.stringify({

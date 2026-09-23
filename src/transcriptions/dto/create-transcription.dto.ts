@@ -17,7 +17,7 @@ import {
 export class CreateTranscriptionDto {
   @Transform(({ value }: { value: unknown }) => value ?? MusicProvider.AUDIUS)
   @IsEnum(MusicProvider)
-  provider: MusicProvider = MusicProvider.AUDIUS;
+  provider?: MusicProvider = MusicProvider.AUDIUS;
 
   @IsString()
   @Length(1, 255)

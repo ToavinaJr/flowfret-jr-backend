@@ -6,6 +6,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { TRANSCRIPTION_QUEUE } from './transcriptions.constants';
 import { TranscriptionEvents } from './transcriptions.events';
 import { TranscriptionsProcessor } from './transcriptions.processor';
+import { TranscriptionAudioSourceService } from './transcription-audio-source.service';
 import { TranscriptionsRepository } from './transcriptions.repository';
 import { WhisperBridgeService } from './whisper-bridge.service';
 import { validateEnvironment } from '../common/validate-environment';
@@ -43,6 +44,7 @@ import { WhisperWorkerConfigService } from './whisper-worker-config.service';
     WhisperWorkerConfigService,
     TranscriptionMessageHandler,
     TranscriptionsProcessor,
+    TranscriptionAudioSourceService,
   ],
 })
 export class TranscriptionsWorkerModule {}

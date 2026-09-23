@@ -1,11 +1,11 @@
-import { TranscriptionStatus } from '@prisma/client';
+import { MusicProvider, TranscriptionStatus } from '@prisma/client';
 import type { Job } from 'bullmq';
 import type {
   TranscriptionJobData,
   WorkerMessage,
 } from './entities/transcription.types';
 import { TranscriptionsProcessor } from './transcriptions.processor';
-import type { AudiusService } from '../integrations/audius/audius.service';
+import type { TranscriptionAudioSourceService } from './transcription-audio-source.service';
 import type { TranscriptionEvents } from './transcriptions.events';
 import type { TranscriptionsRepository } from './transcriptions.repository';
 import type { WhisperBridgeService } from './whisper-bridge.service';
@@ -15,6 +15,7 @@ const transcriptionId = '11111111-1111-4111-8111-111111111111';
 const jobData: TranscriptionJobData = {
   transcriptionId,
   trackId: 'track',
+  provider: MusicProvider.AUDIUS,
   audioUrl: 'https://api.audius.co/audio',
   model: 'small',
 };
@@ -38,10 +39,8 @@ function setup() {
       events.push(event);
     }),
   };
-  const audius = {
-    getFreshStreamUrl: jest
-      .fn()
-      .mockResolvedValue('https://audio.audius.co/fresh.mp3'),
+  const audioSources = {
+    resolve: jest.fn().mockResolvedValue('https://audio.audius.co/fresh.mp3'),
   };
   const whisper = {
     run: jest
@@ -78,7 +77,7 @@ function setup() {
   const processor = new TranscriptionsProcessor(
     repository as unknown as TranscriptionsRepository,
     eventBus as unknown as TranscriptionEvents,
-    audius as unknown as AudiusService,
+    audioSources as unknown as TranscriptionAudioSourceService,
     whisper as unknown as WhisperBridgeService,
     new TranscriptionMessageHandler(
       repository as unknown as TranscriptionsRepository,

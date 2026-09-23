@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, TranscriptionStatus } from '@prisma/client';
+import { MusicProvider, Prisma, TranscriptionStatus } from '@prisma/client';
 import { CreateTranscriptionDto } from './dto/create-transcription.dto';
 import {
   DEFAULT_ENGINE_VERSION,
@@ -44,6 +44,7 @@ export class TranscriptionWorkflowService {
     userId: string,
   ): Promise<TranscriptionResponse> {
     const language = dto.language ?? 'auto';
+    const provider = dto.provider ?? MusicProvider.AUDIUS;
     this.logger.log(
       JSON.stringify({
         event: 'transcription.requested',
@@ -53,7 +54,7 @@ export class TranscriptionWorkflowService {
       }),
     );
     let item = await this.repository.findCompatible(
-      dto.provider,
+      provider,
       dto.trackId,
       language,
       dto.model,
@@ -64,7 +65,7 @@ export class TranscriptionWorkflowService {
       await this.capacity.ensure(userId);
       try {
         item = await this.repository.create({
-          provider: dto.provider,
+          provider,
           trackId: dto.trackId,
           title: dto.title,
           artist: dto.artist,
@@ -80,7 +81,7 @@ export class TranscriptionWorkflowService {
         )
           throw error;
         item = await this.repository.findCompatible(
-          dto.provider,
+          provider,
           dto.trackId,
           language,
           dto.model,

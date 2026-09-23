@@ -8,6 +8,7 @@ import { TranscriptionsController } from './transcriptions.controller';
 import { TranscriptionEvents } from './transcriptions.events';
 import { TranscriptionsRepository } from './transcriptions.repository';
 import { TranscriptionsService } from './transcriptions.service';
+import { TranscriptionAudioSourceService } from './transcription-audio-source.service';
 import { TranscriptionAccessService } from './transcription-access.service';
 import { TranscriptionQueueService } from './transcription-queue.service';
 import { TranscriptionWorkflowService } from './transcription-workflow.service';
@@ -28,6 +29,7 @@ import { TranscriptionCapacityService } from './transcription-capacity.service';
   controllers: [TranscriptionsController],
   providers: [
     TranscriptionsService,
+    TranscriptionAudioSourceService,
     TranscriptionAccessService,
     TranscriptionQueueService,
     TranscriptionQueueDiagnosticsService,

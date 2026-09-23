@@ -1,8 +1,14 @@
-import { Prisma, Transcription, TranscriptionStatus } from '@prisma/client';
+import {
+  MusicProvider,
+  Prisma,
+  Transcription,
+  TranscriptionStatus,
+} from '@prisma/client';
 import type { TranscriptionSegment } from './entities/transcription.types';
 
 export interface TranscriptionResponse {
   transcriptionId: string;
+  provider: MusicProvider;
   trackId: string;
   title: string | null;
   artist: string | null;
@@ -35,6 +41,7 @@ export function toTranscriptionResponse(
 ): TranscriptionResponse {
   return {
     transcriptionId: item.id,
+    provider: item.provider,
     trackId: item.trackId,
     title: item.title,
     artist: item.artist,

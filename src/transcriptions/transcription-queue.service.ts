@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Transcription } from '@prisma/client';
+import { MusicProvider, Transcription } from '@prisma/client';
 import type { Queue } from 'bullmq';
 import { CreateTranscriptionDto } from './dto/create-transcription.dto';
 import type { TranscriptionJobData } from './entities/transcription.types';
@@ -46,7 +46,7 @@ export class TranscriptionQueueService {
       dto.language,
       dto.model,
       engineVersion,
-      dto.provider,
+      dto.provider ?? MusicProvider.AUDIUS,
     );
     const existing = await this.operation('getJob', this.queue.getJob(jobId));
     if (existing) {
@@ -73,7 +73,7 @@ export class TranscriptionQueueService {
           {
             transcriptionId: item.id,
             trackId: dto.trackId,
-            provider: dto.provider,
+            provider: dto.provider ?? MusicProvider.AUDIUS,
             audioUrl: dto.audioUrl,
             language: dto.language,
             model: dto.model,
