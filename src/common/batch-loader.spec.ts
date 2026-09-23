@@ -2,11 +2,8 @@ import { BatchLoader } from './batch-loader';
 
 describe('BatchLoader', () => {
   it('batches keys requested during the same event-loop turn', async () => {
-    const batch = jest.fn(
-      (keys: readonly string[]) =>
-        Promise.resolve(
-          new Map(keys.map((key) => [key, key.toUpperCase()])),
-        ),
+    const batch = jest.fn((keys: readonly string[]) =>
+      Promise.resolve(new Map(keys.map((key) => [key, key.toUpperCase()]))),
     );
     const loader = new BatchLoader(batch, () => 'missing');
 
@@ -18,9 +15,8 @@ describe('BatchLoader', () => {
   });
 
   it('caches values for the lifetime of one loader instance', async () => {
-    const batch = jest.fn(
-      (keys: readonly string[]) =>
-        Promise.resolve(new Map(keys.map((key) => [key, key]))),
+    const batch = jest.fn((keys: readonly string[]) =>
+      Promise.resolve(new Map(keys.map((key) => [key, key]))),
     );
     const loader = new BatchLoader(batch, () => 'missing');
 
