@@ -10,6 +10,11 @@ import { JwtStrategy } from './jwt.strategy';
 import { RolesGuard } from './roles.guard';
 import { MailModule } from '../mail/mail.module';
 import { RateLimitGuard } from './rate-limit.guard';
+import { AuthSessionService } from './auth-session.service';
+import { EmailVerificationService } from './email-verification.service';
+import { GoogleAuthService } from './google-auth.service';
+import { GoogleProfileService } from './google-profile.service';
+import { PasswordResetService } from './password-reset.service';
 
 @Module({
   imports: [
@@ -31,6 +36,11 @@ import { RateLimitGuard } from './rate-limit.guard';
   providers: [
     AuthResolver,
     AuthService,
+    AuthSessionService,
+    EmailVerificationService,
+    GoogleAuthService,
+    GoogleProfileService,
+    PasswordResetService,
     JwtStrategy,
     {
       provide: APP_GUARD,

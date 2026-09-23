@@ -10,6 +10,11 @@ import * as bcrypt from 'bcrypt';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from './auth.service';
+import { AuthSessionService } from './auth-session.service';
+import { EmailVerificationService } from './email-verification.service';
+import { GoogleAuthService } from './google-auth.service';
+import { GoogleProfileService } from './google-profile.service';
+import { PasswordResetService } from './password-reset.service';
 
 const activeUser = {
   id: 'user-id',
@@ -70,9 +75,25 @@ function setup() {
   };
   const service = new AuthService(
     prisma as unknown as PrismaService,
-    jwt as unknown as JwtService,
-    mail as unknown as MailService,
-    config as unknown as ConfigService,
+    new AuthSessionService(
+      prisma as unknown as PrismaService,
+      jwt as unknown as JwtService,
+      config as unknown as ConfigService,
+    ),
+    new EmailVerificationService(
+      prisma as unknown as PrismaService,
+      mail as unknown as MailService,
+      config as unknown as ConfigService,
+    ),
+    new PasswordResetService(
+      prisma as unknown as PrismaService,
+      mail as unknown as MailService,
+      config as unknown as ConfigService,
+    ),
+    new GoogleAuthService(
+      prisma as unknown as PrismaService,
+      new GoogleProfileService(config as unknown as ConfigService),
+    ),
   );
   return { service, prisma, tx, jwt, mail };
 }
