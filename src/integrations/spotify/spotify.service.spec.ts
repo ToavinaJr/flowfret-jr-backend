@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   HttpException,
   HttpStatus,
+  ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
@@ -132,6 +133,27 @@ describe('SpotifyService', () => {
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
+  });
+
+  it('maps a forbidden development-mode app to a stable 403 error', async () => {
+    mockToken();
+    const forbidden = new AxiosError('Forbidden');
+    forbidden.response = {
+      status: 403,
+      data: { error: { message: 'Access denied' } },
+      statusText: 'Forbidden',
+      headers: {},
+      config: { headers: new AxiosHeaders() },
+    };
+    httpService.get.mockReturnValue(throwError(() => forbidden));
+
+    await expect(service.searchTracks('q', 1)).rejects.toMatchObject({
+      constructor: ForbiddenException,
+      response: {
+        code: 'SPOTIFY_ACCESS_FORBIDDEN',
+        message: 'Spotify search is unavailable for this application',
+      },
+    });
   });
 
   it('clamps limit between 1 and 10', async () => {

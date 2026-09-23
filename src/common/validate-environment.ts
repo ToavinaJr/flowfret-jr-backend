@@ -74,6 +74,13 @@ export function validateEnvironment(
       .map((origin) => origin.trim())
       .filter(Boolean);
     for (const origin of origins) requireHttpsUrl(origin, 'CORS_ORIGINS');
+    if (environment.MUSIC_PROVIDER === 'SPOTIFY') {
+      requireNonEmpty(environment.SPOTIFY_CLIENT_ID, 'SPOTIFY_CLIENT_ID');
+      requireNonEmpty(
+        environment.SPOTIFY_CLIENT_SECRET,
+        'SPOTIFY_CLIENT_SECRET',
+      );
+    }
     if (options.requireMail !== false) {
       requireNonEmpty(environment.SENDGRID_API_KEY, 'SENDGRID_API_KEY');
       requireEmail(environment.SENDGRID_FROM_EMAIL, 'SENDGRID_FROM_EMAIL');

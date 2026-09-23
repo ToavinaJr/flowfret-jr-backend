@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { MusicService } from './music.service';
 import { AudiusService } from '../audius/audius.service';
 import { GeniusService } from '../genius/genius.service';
@@ -104,6 +104,28 @@ describe('MusicService', () => {
 
     expect(audiusService.searchTracks).toHaveBeenCalledWith('query', 10);
     expect(result.provider).toBe('AUDIUS');
+  });
+
+  it('falls back to Audius when Spotify refuses API access', async () => {
+    configService.get.mockReturnValue('SPOTIFY');
+    spotifyService.searchTracks.mockRejectedValue(
+      new ForbiddenException({ code: 'SPOTIFY_ACCESS_FORBIDDEN' }),
+    );
+    audiusService.searchTracks.mockResolvedValue({
+      tracks: [track('fallback', 'Fallback song')],
+      total: 1,
+    });
+    geniusService.searchBestSong.mockResolvedValue(null);
+
+    const result = await service.searchMusic('query', 10);
+
+    expect(spotifyService.searchTracks).toHaveBeenCalledWith('query', 10);
+    expect(audiusService.searchTracks).toHaveBeenCalledWith('query', 10);
+    expect(result.provider).toBe('AUDIUS');
+    expect(result.tracks[0]).toMatchObject({
+      provider: 'AUDIUS',
+      audiusId: 'fallback',
+    });
   });
 
   it('preserves Audius order and deduplicates', async () => {

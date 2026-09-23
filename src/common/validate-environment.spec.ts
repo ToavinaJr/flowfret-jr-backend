@@ -67,6 +67,26 @@ describe('validateEnvironment', () => {
     );
   });
 
+  it('requires Spotify credentials when Spotify is selected in production', () => {
+    const environment = {
+      NODE_ENV: 'production',
+      JWT_SECRET: 'a-secure-secret-containing-32-chars',
+      APP_URL: 'https://fretflow.app',
+      MUSIC_PROVIDER: 'SPOTIFY',
+    };
+
+    expect(() =>
+      validateEnvironment(environment, { requireMail: false }),
+    ).toThrow('SPOTIFY_CLIENT_ID must be configured in production');
+
+    expect(() =>
+      validateEnvironment(
+        { ...environment, SPOTIFY_CLIENT_ID: 'client-id' },
+        { requireMail: false },
+      ),
+    ).toThrow('SPOTIFY_CLIENT_SECRET must be configured in production');
+  });
+
   it('rejects unknown transcription providers', () => {
     expect(() => validateEnvironment({ LLM_PROVIDER: 'openai' })).toThrow(
       'LLM_PROVIDER must be one of: whisper, azure',

@@ -1,5 +1,6 @@
 import {
   BadGatewayException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -192,6 +193,14 @@ export class SpotifyService {
         `Spotify rate limit exceeded.${suffix}`,
         HttpStatus.TOO_MANY_REQUESTS,
       );
+    }
+
+    if (status === 403) {
+      this.logger.warn(`Spotify access forbidden (status=403)${detailSuffix}`);
+      return new ForbiddenException({
+        code: 'SPOTIFY_ACCESS_FORBIDDEN',
+        message: 'Spotify search is unavailable for this application',
+      });
     }
 
     this.logger.error(
