@@ -6,11 +6,11 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "postinstall": "prisma generate",
+    "postinstall": "npm run prisma:generate",
     "prebuild": "npm run prisma:generate",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "prisma:generate": "cross-env NODE_ENV=development prisma generate",
+    "prisma:generate": "cross-env NODE_ENV=development PRISMA_GENERATE_ONLY=1 prisma generate",
     "prisma:migrate": "cross-env NODE_ENV=development prisma migrate dev",
     "prisma:deploy": "cross-env NODE_ENV=development prisma migrate deploy",
     "prisma:seed": "cross-env NODE_ENV=development ts-node prisma/seed.ts",

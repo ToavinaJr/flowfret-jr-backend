@@ -10,7 +10,8 @@ config({ path: resolve(process.cwd(), '.env.local') });
 config({ path: resolve(process.cwd(), '.env') });
 
 const databaseUrl = process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL;
-if (!databaseUrl) {
+const generateOnly = process.env.PRISMA_GENERATE_ONLY === '1';
+if (!databaseUrl && !generateOnly) {
   throw new Error(
     `DATABASE_URL or DIRECT_DATABASE_URL is missing. Set it in .env.${nodeEnv} (or .env).`,
   );
@@ -22,6 +23,10 @@ export default defineConfig({
     path: 'prisma/migrations',
   },
   datasource: {
-    url: databaseUrl,
+    // Generation needs the schema but does not connect to PostgreSQL.
+    // Migrations and all other commands still require a real URL above.
+    url:
+      databaseUrl ??
+      'postgresql://prisma-generate:prisma-generate@localhost:5432/prisma-generate',
   },
 });
