@@ -100,13 +100,21 @@ export class ProfilesResolver {
     )
       throw new ForbiddenException('Profil invalide.');
     return this.prisma.$transaction(async (tx) => {
-      const profile = await tx.profile.create({
-        data: { ...data, displayName },
+      const { userId, ...profileData } = data;
+      const profile = await tx.profile.upsert({
+        where: { userId },
+        create: { ...profileData, userId, displayName },
+        update: {
+          ...profileData,
+          displayName,
+          isDeleted: false,
+          deletedAt: null,
+        },
       });
       await tx.auditLog.create({
         data: {
           actorId: context.req.user.sub,
-          action: 'PROFILE_CREATED',
+          action: 'PROFILE_UPSERTED',
           entityType: 'profile',
           entityId: profile.id,
           metadata: {},

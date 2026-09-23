@@ -20,10 +20,13 @@ export class UploadCleanupService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    this.timer = setInterval(
-      () => void this.processPending(),
-      CLEANUP_INTERVAL_MS,
-    );
+    this.timer = setInterval(() => {
+      void this.processPending().catch((error: unknown) => {
+        this.logger.error(
+          `Scheduled upload cleanup failed: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
+      });
+    }, CLEANUP_INTERVAL_MS);
     this.timer.unref();
   }
 
