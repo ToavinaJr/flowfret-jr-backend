@@ -4,9 +4,16 @@ import { UserRole, UserStatus } from '@prisma/client';
 import { UserModel } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersResolver } from './users.resolver';
+import { UsersService } from './users.service';
 
 const context = { req: { user: { sub: 'actor-id' } } };
 const now = new Date('2026-01-01T00:00:00.000Z');
+
+function resolverWith(prisma: Record<string, unknown>) {
+  return new UsersResolver(
+    new UsersService(prisma as unknown as PrismaService),
+  );
+}
 
 function user(id: string, email = 'alice@example.com'): UserModel {
   return {
@@ -23,7 +30,7 @@ function user(id: string, email = 'alice@example.com'): UserModel {
 
 describe('UsersResolver privacy contracts', () => {
   it('returns email only to its owner', () => {
-    const resolver = new UsersResolver({} as PrismaService);
+    const resolver = resolverWith({});
     const info = { path: { prev: null } } as unknown as GraphQLResolveInfo;
 
     expect(resolver.email(user('actor-id'), context, info)).toBe(
@@ -35,7 +42,7 @@ describe('UsersResolver privacy contracts', () => {
   });
 
   it('allows email in authenticated public auth payloads only', () => {
-    const resolver = new UsersResolver({} as PrismaService);
+    const resolver = resolverWith({});
     const loginInfo = {
       path: { prev: { prev: { key: 'login' } } },
     } as unknown as GraphQLResolveInfo;
@@ -55,7 +62,7 @@ describe('UsersResolver privacy contracts', () => {
     const prisma = {
       user: { update: jest.fn().mockResolvedValue({ id: 'actor-id' }) },
     };
-    const resolver = new UsersResolver(prisma as unknown as PrismaService);
+    const resolver = resolverWith(prisma);
 
     await resolver.updateUser(
       'actor-id',
@@ -85,7 +92,7 @@ describe('UsersResolver privacy contracts', () => {
         }),
       },
     };
-    const resolver = new UsersResolver(prisma as unknown as PrismaService);
+    const resolver = resolverWith(prisma);
 
     await expect(
       resolver.profile(user('other-id'), context),
@@ -111,7 +118,7 @@ describe('UsersResolver privacy contracts', () => {
         ]),
       },
     };
-    const resolver = new UsersResolver(prisma as unknown as PrismaService);
+    const resolver = resolverWith(prisma);
 
     await expect(
       resolver.authoredPosts(user('other-id'), context),

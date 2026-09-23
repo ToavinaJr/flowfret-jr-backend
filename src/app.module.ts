@@ -14,8 +14,12 @@ import { FriendshipsQueryService } from './friendships/friendships-query.service
 import { PrismaModule } from './prisma/prisma.module';
 import { AppResolver } from './app.resolver';
 import { PostInteractionsResolver } from './post-interactions/post-interactions.resolver';
-import { PostAttachmentsResolver } from './post-interactions/post-interactions.resolver';
-import { PostReportsResolver } from './post-interactions/post-interactions.resolver';
+import { PostAttachmentsResolver } from './post-interactions/post-attachment-fields.resolver';
+import { PostReportsResolver } from './post-interactions/post-report-fields.resolver';
+import { PostLikeFieldsResolver } from './post-interactions/post-like-fields.resolver';
+import { PostInteractionsQueryService } from './post-interactions/post-interactions-query.service';
+import { PostLikesService } from './post-interactions/post-likes.service';
+import { PostModerationService } from './post-interactions/post-moderation.service';
 import { AuthModule } from './auth/auth.module';
 import { ProfilesResolver } from './profiles/profiles.resolver';
 import { PostsResolver } from './posts/posts.resolver';
@@ -23,6 +27,8 @@ import { PostsCommandService } from './posts/posts-command.service';
 import { PostsQueryService } from './posts/posts-query.service';
 import { NotificationsResolver } from './notifications/notifications.resolver';
 import { UsersResolver } from './users/users.resolver';
+import { UserRelationsResolver } from './users/user-relations.resolver';
+import { UsersService } from './users/users.service';
 import { formatGraphQLError } from './common/format-graphql-error';
 import { MusicModule } from './integrations/music/music.module';
 import { TranscriptionsModule } from './transcriptions/transcriptions.module';
@@ -84,6 +90,8 @@ import { createGraphqlSecurityRule } from './common/graphql-security';
     AppService,
     AppResolver,
     UsersResolver,
+    UserRelationsResolver,
+    UsersService,
     ProfilesResolver,
     PostsResolver,
     PostsCommandService,
@@ -98,6 +106,10 @@ import { createGraphqlSecurityRule } from './common/graphql-security';
     NotificationsService,
     AuditLogsResolver,
     PostInteractionsResolver,
+    PostInteractionsQueryService,
+    PostLikesService,
+    PostModerationService,
+    PostLikeFieldsResolver,
     PostReportsResolver,
     PostAttachmentsResolver,
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },

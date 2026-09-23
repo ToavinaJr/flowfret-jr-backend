@@ -1,36 +1,36 @@
+import { ForbiddenException } from '@nestjs/common';
 import {
   Args,
   Context,
   Info,
   Mutation,
   Parent,
+  Query,
   ResolveField,
   Resolver,
-  Query,
 } from '@nestjs/graphql';
+import type { GraphQLResolveInfo } from 'graphql';
 import {
-  AuditLogModel,
-  CommentModel,
   CreateUserInput,
-  FriendshipModel,
-  NotificationModel,
-  PostLikeModel,
   PostModel,
-  PostReportModel,
   ProfileModel,
   UpdateUserInput,
-  UploadModel,
   UserModel,
 } from '../graphql/graphql.types';
-import { PrismaService } from '../prisma/prisma.service';
-import { ForbiddenException } from '@nestjs/common';
-import type { GraphQLResolveInfo } from 'graphql';
-import { UserRole } from '@prisma/client';
-import { Roles } from '../auth/roles.decorator';
+import { UsersService } from './users.service';
+
+type RequestContext = { req: { user: { sub: string } } };
+const AUTH_PAYLOAD_FIELDS = new Set([
+  'login',
+  'loginWithGoogle',
+  'registerWithGoogle',
+  'verifyEmail',
+  'refreshSession',
+]);
 
 @Resolver(() => UserModel)
 export class UsersResolver {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly usersService: UsersService) {}
 
   @ResolveField(() => String, { name: 'email' })
   email(
@@ -38,19 +38,10 @@ export class UsersResolver {
     @Context() context: { req?: { user?: { sub?: string } } },
     @Info() info: GraphQLResolveInfo,
   ): string {
-    // Public authentication mutations already prove ownership through Google
-    // or the signed refresh cookie, before returning their AuthPayload.
     const requesterId = context.req?.user?.sub;
     const rootField = info.path.prev?.prev?.key;
-    const authenticatedPayloads = new Set([
-      'login',
-      'loginWithGoogle',
-      'registerWithGoogle',
-      'verifyEmail',
-      'refreshSession',
-    ]);
     if (
-      (!requesterId && !authenticatedPayloads.has(String(rootField))) ||
+      (!requesterId && !AUTH_PAYLOAD_FIELDS.has(String(rootField))) ||
       (requesterId && user.id !== requesterId)
     )
       throw new ForbiddenException('Information privée.');
@@ -58,17 +49,13 @@ export class UsersResolver {
   }
 
   @Query(() => [UserModel], { name: 'users' })
-  async users(
-    @Context() context: { req: { user: { sub: string } } },
-  ): Promise<UserModel[]> {
-    return this.prisma.user.findMany({
-      where: { id: context.req.user.sub, isDeleted: false },
-    });
+  users(@Context() context: RequestContext): Promise<UserModel[]> {
+    return this.usersService.listSelf(context.req.user.sub);
   }
 
   @Query(() => UserModel, { name: 'user', nullable: true })
-  async user(@Args('id') id: string): Promise<UserModel | null> {
-    return this.prisma.user.findFirst({ where: { id, isDeleted: false } });
+  user(@Args('id') id: string): Promise<UserModel | null> {
+    return this.usersService.find(id);
   }
 
   @Mutation(() => UserModel)
@@ -80,232 +67,35 @@ export class UsersResolver {
   }
 
   @Mutation(() => UserModel)
-  async updateUser(
+  updateUser(
     @Args('id') id: string,
     @Args('data') data: UpdateUserInput,
-    @Context() context: { req: { user: { sub: string } } },
+    @Context() context: RequestContext,
   ): Promise<UserModel> {
-    if (id !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
-    const safeData = { ...data };
-    delete safeData.passwordHash;
-    delete safeData.status;
-    delete safeData.email;
-    return this.prisma.user.update({ where: { id }, data: safeData });
+    return this.usersService.update(id, data, context.req.user.sub);
   }
 
   @Mutation(() => UserModel)
-  async deleteUser(
+  deleteUser(
     @Args('id') id: string,
-    @Context() context: { req: { user: { sub: string } } },
+    @Context() context: RequestContext,
   ): Promise<UserModel> {
-    if (id !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
-    return this.prisma.user.update({
-      where: { id },
-      data: { isDeleted: true, deletedAt: new Date(), status: 'DELETED' },
-    });
+    return this.usersService.delete(id, context.req.user.sub);
   }
 
   @ResolveField(() => ProfileModel, { name: 'profile', nullable: true })
-  async profile(
+  profile(
     @Parent() user: UserModel,
-    @Context() context: { req: { user: { sub: string } } },
+    @Context() context: RequestContext,
   ): Promise<ProfileModel | null> {
-    const preloaded = 'profile' in user;
-    const profile = preloaded
-      ? (user.profile ?? null)
-      : await this.prisma.profile.findFirst({
-          where: { userId: user.id, isDeleted: false },
-        });
-    if (profile && 'isDeleted' in profile && profile.isDeleted) return null;
-    if (
-      !profile ||
-      user.id === context.req.user.sub ||
-      profile.visibility === 'PUBLIC'
-    )
-      return profile;
-    if (profile.visibility === 'PRIVATE') return null;
-    const friend = await this.prisma.friendship.count({
-      where: {
-        status: 'ACCEPTED',
-        isDeleted: false,
-        OR: [
-          { requesterId: user.id, receiverId: context.req.user.sub },
-          { requesterId: context.req.user.sub, receiverId: user.id },
-        ],
-      },
-    });
-    return friend ? profile : null;
+    return this.usersService.profile(user, context.req.user.sub);
   }
 
   @ResolveField(() => [PostModel], { name: 'authoredPosts' })
-  async authoredPosts(
+  authoredPosts(
     @Parent() user: UserModel,
-    @Context() context: { req: { user: { sub: string } } },
+    @Context() context: RequestContext,
   ): Promise<PostModel[]> {
-    const own = user.id === context.req.user.sub;
-    const friend = own
-      ? true
-      : Boolean(
-          await this.prisma.friendship.count({
-            where: {
-              status: 'ACCEPTED',
-              isDeleted: false,
-              OR: [
-                { requesterId: user.id, receiverId: context.req.user.sub },
-                { requesterId: context.req.user.sub, receiverId: user.id },
-              ],
-            },
-          }),
-        );
-    const rows = await this.prisma.post.findMany({
-      where: {
-        authorId: user.id,
-        isDeleted: false,
-        ...(own
-          ? {}
-          : {
-              visibility: { in: friend ? ['PUBLIC', 'FRIENDS'] : ['PUBLIC'] },
-            }),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-      include: {
-        author: { include: { profile: true } },
-        likes: {
-          where: { userId: context.req.user.sub, isDeleted: false },
-          select: { id: true },
-          take: 1,
-        },
-        attachments: {
-          where: { isDeleted: false },
-          orderBy: { position: 'asc' },
-          include: { upload: true },
-        },
-        mentions: {
-          where: { isDeleted: false },
-          include: { user: { include: { profile: true } } },
-        },
-      },
-    });
-    return rows.map((row) => {
-      const { likes, mentions, ...post } = row;
-      return {
-        ...post,
-        attachments: post.attachments.map(({ upload, ...attachment }) => ({
-          ...attachment,
-          upload: { ...upload, fileSize: upload.fileSize.toString() },
-        })),
-        viewerHasLiked: likes.length > 0,
-        viewerLikeId: likes[0]?.id ?? null,
-        mentionedUsers: mentions.map(({ user }) => user),
-      };
-    });
-  }
-
-  @ResolveField(() => [CommentModel], { name: 'comments' })
-  async comments(
-    @Parent() user: UserModel,
-    @Context() context: { req: { user: { sub: string } } },
-  ): Promise<CommentModel[]> {
-    if (user.id !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
-    return this.prisma.comment.findMany({
-      where: { authorId: user.id, isDeleted: false },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  @ResolveField(() => [UploadModel], { name: 'uploads' })
-  async uploads(
-    @Parent() user: UserModel,
-    @Context() context: { req: { user: { sub: string } } },
-  ): Promise<UploadModel[]> {
-    if (user.id !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
-    const uploads = await this.prisma.upload.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return uploads.map((upload) => ({
-      ...upload,
-      fileSize: upload.fileSize.toString(),
-    }));
-  }
-
-  @ResolveField(() => [NotificationModel], { name: 'notifications' })
-  async notifications(
-    @Parent() user: UserModel,
-    @Context() context: { req: { user: { sub: string } } },
-  ): Promise<NotificationModel[]> {
-    if (user.id !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
-    return this.prisma.notification.findMany({
-      where: { userId: user.id, isDeleted: false },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  @ResolveField(() => [AuditLogModel], { name: 'auditLogs' })
-  async auditLogs(
-    @Parent() user: UserModel,
-    @Context() context: { req: { user: { sub: string } } },
-  ): Promise<AuditLogModel[]> {
-    if (user.id !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
-    return this.prisma.auditLog.findMany({
-      where: { actorId: user.id },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  @ResolveField(() => [FriendshipModel], { name: 'friendshipsRequested' })
-  async friendshipsRequested(
-    @Parent() user: UserModel,
-    @Context() context: { req: { user: { sub: string } } },
-  ): Promise<FriendshipModel[]> {
-    if (user.id !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
-    return this.prisma.friendship.findMany({
-      where: { requesterId: user.id, isDeleted: false },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  @ResolveField(() => [FriendshipModel], { name: 'friendshipsReceived' })
-  async friendshipsReceived(
-    @Parent() user: UserModel,
-    @Context() context: { req: { user: { sub: string } } },
-  ): Promise<FriendshipModel[]> {
-    if (user.id !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
-    return this.prisma.friendship.findMany({
-      where: { receiverId: user.id, isDeleted: false },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  @ResolveField(() => [PostLikeModel], { name: 'likes' })
-  async likes(
-    @Parent() user: UserModel,
-    @Context() context: { req: { user: { sub: string } } },
-  ): Promise<PostLikeModel[]> {
-    if (user.id !== context.req.user.sub)
-      throw new ForbiddenException('Action interdite.');
-    return this.prisma.postLike.findMany({
-      where: { userId: user.id, isDeleted: false },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  @ResolveField(() => [PostReportModel], { name: 'reports' })
-  @Roles(UserRole.ADMIN)
-  async reports(@Parent() user: UserModel): Promise<PostReportModel[]> {
-    return this.prisma.postReport.findMany({
-      where: { reporterId: user.id },
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.usersService.authoredPosts(user.id, context.req.user.sub);
   }
 }

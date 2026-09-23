@@ -2,6 +2,24 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PostInteractionsResolver } from './post-interactions.resolver';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { PostInteractionsQueryService } from './post-interactions-query.service';
+import { PostLikesService } from './post-likes.service';
+import { PostModerationService } from './post-moderation.service';
+
+function resolverWith(
+  prisma: Record<string, unknown>,
+  notifications: Record<string, unknown>,
+) {
+  const client = prisma as unknown as PrismaService;
+  return new PostInteractionsResolver(
+    new PostInteractionsQueryService(client),
+    new PostLikesService(
+      client,
+      notifications as unknown as NotificationsService,
+    ),
+    new PostModerationService(client),
+  );
+}
 
 describe('PostInteractionsResolver notifications', () => {
   it('does not notify twice when an active like already exists', async () => {
@@ -32,10 +50,7 @@ describe('PostInteractionsResolver notifications', () => {
       ),
     };
     const notifications = { postLiked: jest.fn() };
-    const resolver = new PostInteractionsResolver(
-      prisma as unknown as PrismaService,
-      notifications as unknown as NotificationsService,
-    );
+    const resolver = resolverWith(prisma, notifications);
 
     await expect(
       resolver.createPostLike(
@@ -47,10 +62,7 @@ describe('PostInteractionsResolver notifications', () => {
   });
 
   it('rejects a like created for another user', async () => {
-    const resolver = new PostInteractionsResolver(
-      {} as PrismaService,
-      {} as NotificationsService,
-    );
+    const resolver = resolverWith({}, {});
 
     await expect(
       resolver.createPostLike(
@@ -78,10 +90,7 @@ describe('PostInteractionsResolver notifications', () => {
         callback(tx),
       ),
     };
-    const resolver = new PostInteractionsResolver(
-      prisma as unknown as PrismaService,
-      {} as NotificationsService,
-    );
+    const resolver = resolverWith(prisma, {});
 
     await resolver.deletePostLike('like-id', {
       req: { user: { sub: 'actor-id' } },
@@ -102,10 +111,7 @@ describe('PostInteractionsResolver notifications', () => {
         callback(tx),
       ),
     };
-    const resolver = new PostInteractionsResolver(
-      prisma as unknown as PrismaService,
-      {} as NotificationsService,
-    );
+    const resolver = resolverWith(prisma, {});
 
     await expect(
       resolver.deletePostLike('missing', {

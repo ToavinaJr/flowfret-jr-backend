@@ -1,0 +1,108 @@
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PostLikeModel, UpdatePostLikeInput } from '../graphql/graphql.types';
+import { requireVisiblePost } from '../common/post-access';
+import { NotificationsService } from '../notifications/notifications.service';
+import { PrismaService } from '../prisma/prisma.service';
+
+export interface LikeActor {
+  sub: string;
+  username?: string;
+}
+
+@Injectable()
+export class PostLikesService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
+
+  async create(
+    postId: string,
+    requestedUserId: string,
+    actor: LikeActor,
+  ): Promise<PostLikeModel> {
+    if (requestedUserId !== actor.sub)
+      throw new ForbiddenException('Action interdite.');
+    await requireVisiblePost(this.prisma, postId, actor.sub);
+    const result = await this.prisma.$transaction(async (tx) => {
+      const post = await tx.post.findFirst({
+        where: { id: postId, isDeleted: false },
+      });
+      if (!post) throw new NotFoundException('Publication introuvable.');
+      const previous = await tx.postLike.findUnique({
+        where: { postId_userId: { postId, userId: actor.sub } },
+      });
+      if (previous && !previous.isDeleted)
+        return { like: previous, shouldNotify: false };
+      const like = previous
+        ? await tx.postLike.update({
+            where: { id: previous.id },
+            data: { isDeleted: false, deletedAt: null },
+          })
+        : await tx.postLike.create({ data: { postId, userId: actor.sub } });
+      await tx.post.update({
+        where: { id: postId },
+        data: { likeCount: { increment: 1 } },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: actor.sub,
+          action: 'POST_LIKED',
+          entityType: 'post',
+          entityId: postId,
+          metadata: { likeId: like.id },
+        },
+      });
+      return { like, shouldNotify: true };
+    });
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      select: { authorId: true },
+    });
+    if (post && result.shouldNotify)
+      await this.notifications.postLiked(
+        actor.sub,
+        actor.username ?? '',
+        postId,
+        post.authorId,
+      );
+    return result.like;
+  }
+
+  update(id: string, data: UpdatePostLikeInput): Promise<PostLikeModel> {
+    return this.prisma.postLike.update({ where: { id }, data });
+  }
+
+  delete(id: string, actorId: string): Promise<PostLikeModel> {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.postLike.findFirst({
+        where: { id, isDeleted: false },
+      });
+      if (!existing) throw new NotFoundException('Like introuvable.');
+      if (existing.userId !== actorId)
+        throw new ForbiddenException('Action interdite.');
+      const like = await tx.postLike.update({
+        where: { id },
+        data: { isDeleted: true, deletedAt: new Date() },
+      });
+      await tx.post.updateMany({
+        where: { id: existing.postId, likeCount: { gt: 0 } },
+        data: { likeCount: { decrement: 1 } },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: 'POST_UNLIKED',
+          entityType: 'post',
+          entityId: existing.postId,
+          metadata: { likeId: id },
+        },
+      });
+      return like;
+    });
+  }
+}
