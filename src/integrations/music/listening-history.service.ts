@@ -8,7 +8,10 @@ import { MusicTrack } from './music.types';
 export class ListeningHistoryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async record(userId: string, input: RecordTrackListenInput): Promise<boolean> {
+  async record(
+    userId: string,
+    input: RecordTrackListenInput,
+  ): Promise<boolean> {
     const providerTrackId = input.providerTrackId.trim();
     const snapshot = {
       title: input.title.trim(),
@@ -70,7 +73,9 @@ export class ListeningHistoryService {
     }));
   }
 
-  private readArtists(value: Prisma.JsonValue): Array<{ id: string; name: string }> {
+  private readArtists(
+    value: Prisma.JsonValue,
+  ): Array<{ id: string; name: string }> {
     if (!Array.isArray(value)) return [];
     return value.flatMap((artist) => {
       if (

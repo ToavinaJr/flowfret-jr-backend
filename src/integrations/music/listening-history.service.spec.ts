@@ -18,26 +18,37 @@ const track = {
 
 describe('ListeningHistoryService', () => {
   it('upserts a user track and increments its play count', async () => {
+    let capturedInput: unknown;
     const prisma = {
-      listeningHistory: { upsert: jest.fn().mockResolvedValue({}) },
+      listeningHistory: {
+        upsert: jest.fn((input: unknown) => {
+          capturedInput = input;
+          return Promise.resolve({});
+        }),
+      },
     };
     const service = new ListeningHistoryService(
       prisma as unknown as PrismaService,
     );
 
     await expect(service.record('user-id', track)).resolves.toBe(true);
-    expect(prisma.listeningHistory.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          userId_provider_providerTrackId: {
-            userId: 'user-id',
-            provider: MusicProvider.YOUTUBE,
-            providerTrackId: 'video-id',
-          },
-        },
-        update: expect.objectContaining({ playCount: { increment: 1 } }),
-      }),
-    );
+    expect(prisma.listeningHistory.upsert).toHaveBeenCalledTimes(1);
+    const input = capturedInput as {
+      where: {
+        userId_provider_providerTrackId: {
+          userId: string;
+          provider: MusicProvider;
+          providerTrackId: string;
+        };
+      };
+      update: { playCount: { increment: number } };
+    };
+    expect(input.where.userId_provider_providerTrackId).toEqual({
+      userId: 'user-id',
+      provider: MusicProvider.YOUTUBE,
+      providerTrackId: 'video-id',
+    });
+    expect(input.update.playCount).toEqual({ increment: 1 });
   });
 
   it('returns the most recently played tracks as playable music tracks', async () => {
