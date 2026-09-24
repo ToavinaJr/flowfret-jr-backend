@@ -120,6 +120,7 @@ The initial player waits for `TRANSCRIPTION_INITIAL_BUFFER_SECONDS` (or the whol
 - Python 3.11+
 - FFmpeg and ffprobe on `PATH`
 - `pip install -r workers/transcription/requirements.txt`
+- `pip install -r requirements.youtube.txt` pour l’analyse éphémère des pistes YouTube autorisées
 
 For CPU deployments, `small` with `int8` is the default. The first model load downloads model files and may require several GB of disk/RAM. Docker persists the Hugging Face cache in `whisper_models`. To use Azure OpenAI Whisper instead, set `LLM_PROVIDER=azure`, configure `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_DEPLOYMENT` to an Azure Whisper deployment. `gpt-35-turbo` cannot process audio and must not be used for this setting. Azure processing returns the transcription after the complete audio upload, so progressive segments are emitted only after the Azure response.
 
