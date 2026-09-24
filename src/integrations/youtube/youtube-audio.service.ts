@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { spawn } from 'node:child_process';
-import { delimiter, resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { delimiter, isAbsolute, resolve } from 'node:path';
 import { PassThrough, type Readable } from 'node:stream';
 import { YOUTUBE_VIDEO_ID_PATTERN } from './youtube.constants';
 
@@ -28,6 +29,7 @@ export class YouTubeAudioService {
       throw new BadRequestException('Invalid YouTube video id');
     }
     const maxConcurrent = this.number('YOUTUBE_AUDIO_MAX_CONCURRENT', 2);
+    const cookieFile = this.cookieFile();
     if (this.activeExtractions >= maxConcurrent) {
       throw new ServiceUnavailableException(
         'YouTube audio extraction capacity is full',
@@ -64,6 +66,7 @@ export class YouTubeAudioService {
         '--no-progress',
         '--js-runtimes',
         'node',
+        ...(cookieFile ? ['--cookies', cookieFile] : []),
         '--format',
         'ba[ext=m4a]/ba[ext=webm]/ba/b',
         '--match-filter',
@@ -154,5 +157,19 @@ export class YouTubeAudioService {
   private number(key: string, fallback: number): number {
     const value = Number(this.config.get(key));
     return Number.isInteger(value) && value > 0 ? value : fallback;
+  }
+
+  private cookieFile(): string | undefined {
+    const configured = this.config.get<string>('YOUTUBE_COOKIES_FILE')?.trim();
+    if (!configured) return undefined;
+    const path = isAbsolute(configured)
+      ? configured
+      : resolve(process.cwd(), configured);
+    if (!existsSync(path)) {
+      throw new ServiceUnavailableException(
+        'Configured YouTube cookies file is unavailable',
+      );
+    }
+    return path;
   }
 }

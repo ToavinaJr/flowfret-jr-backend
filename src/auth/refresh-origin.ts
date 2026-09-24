@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 
 type OriginRequest = {
@@ -13,6 +13,7 @@ const DEVELOPMENT_ORIGINS = [
   'http://localhost:8080',
   'http://127.0.0.1:8080',
 ];
+const logger = new Logger('RefreshOrigin');
 
 export const AUTH_ORIGIN_FORBIDDEN = 'AUTH_ORIGIN_FORBIDDEN';
 
@@ -25,7 +26,12 @@ export function assertRefreshOrigin(
   const origin = Array.isArray(rawOrigin) ? rawOrigin[0] : rawOrigin;
 
   if (!origin) {
-    if (production) throw forbiddenOrigin();
+    if (production) {
+      logger.warn(
+        JSON.stringify({ event: 'auth.origin_rejected', origin: '<missing>' }),
+      );
+      throw forbiddenOrigin();
+    }
     return;
   }
 
@@ -37,6 +43,9 @@ export function assertRefreshOrigin(
   }
 
   if (!allowedOrigins(config, production).has(normalized)) {
+    logger.warn(
+      JSON.stringify({ event: 'auth.origin_rejected', origin: normalized }),
+    );
     throw forbiddenOrigin();
   }
 }

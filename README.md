@@ -191,6 +191,12 @@ when extracting authorized YouTube audio. A plain `npm run build` does not
 install Python dependencies and makes chord analysis fail with
 `No module named yt_dlp`.
 
+YouTube may challenge requests from Render datacenter IP addresses with
+`Sign in to confirm you're not a bot`. In that case, add a Render Secret File
+named `youtube-cookies.txt` containing authorized cookies in Netscape format,
+then configure `YOUTUBE_COOKIES_FILE=/etc/secrets/youtube-cookies.txt`. Never
+commit this file or print its contents in application logs.
+
 `start:render` performs a narrowly scoped recovery for the corrected
 `20260923180000_transcription_provider` migration. This allows an existing
 Render/Neon database left in Prisma state `P3009` to recover without an
