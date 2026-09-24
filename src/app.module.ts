@@ -19,6 +19,7 @@ import { createGraphqlSecurityRule } from './common/graphql-security';
 import { SocialModule } from './social/social.module';
 import { PlaylistsModule } from './playlists/playlists.module';
 import { RequestLoaders } from './common/request-loaders';
+import { ChordTranscriptionsModule } from './chord-transcriptions/chord-transcriptions.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { RequestLoaders } from './common/request-loaders';
     UploadsModule,
     SocialModule,
     PlaylistsModule,
+    ChordTranscriptionsModule,
     GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
       inject: [ConfigService, PrismaService],

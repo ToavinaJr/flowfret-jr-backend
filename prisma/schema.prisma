@@ -181,8 +181,52 @@ model User {
   transcriptionAccess     TranscriptionAccess[]
   playlists               Playlist[]               @relation("UserPlaylists")
   playlistItemsAdded      PlaylistItem[]           @relation("PlaylistItemsAddedByUser")
+  listeningHistory        ListeningHistory[]
 
   @@map("users")
+}
+
+model ChordTranscription {
+  id              String        @id @default(uuid()) @db.Uuid
+  provider        MusicProvider
+  providerTrackId String        @map("provider_track_id") @db.VarChar(255)
+  title           String?       @db.VarChar(500)
+  artist          String?       @db.VarChar(500)
+  duration        Float
+  cues            Json          @db.JsonB
+  engineVersion   String        @map("engine_version") @db.VarChar(64)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([provider, providerTrackId], map: "chord_transcriptions_provider_track_unique")
+  @@index([provider, providerTrackId])
+  @@map("chord_transcriptions")
+}
+
+model ListeningHistory {
+  id              String        @id @default(uuid()) @db.Uuid
+  userId          String        @map("user_id") @db.Uuid
+  provider        MusicProvider
+  providerTrackId String        @map("provider_track_id") @db.VarChar(255)
+  title           String        @db.VarChar(500)
+  artists         Json          @db.JsonB
+  imageUrl        String?       @map("image_url") @db.Text
+  externalUrl     String        @map("external_url") @db.Text
+  streamUrl       String        @map("stream_url") @db.Text
+  album           String?       @db.VarChar(500)
+  genre           String?       @db.VarChar(120)
+  isrc            String?       @db.VarChar(32)
+  durationMs      Int           @map("duration_ms")
+  playCount       Int           @default(1) @map("play_count")
+  lastPlayedAt    DateTime      @default(now()) @map("last_played_at") @db.Timestamptz(6)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, providerTrackId], map: "listening_history_user_provider_track_unique")
+  @@index([userId, lastPlayedAt(sort: Desc)])
+  @@map("listening_history")
 }
 
 model CatalogTrack {
