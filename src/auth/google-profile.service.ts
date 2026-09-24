@@ -14,6 +14,8 @@ export interface GoogleUserInfo {
 interface GoogleTokenInfo {
   aud?: string;
   expires_in?: string;
+  sub?: string;
+  /** Legacy access-token responses used this name instead of the OIDC `sub`. */
   user_id?: string;
   scope?: string;
 }
@@ -34,16 +36,17 @@ export class GoogleProfileService {
       if (!tokenResponse.ok)
         throw new UnauthorizedException('Invalid Google access token.');
       const tokenInfo = (await tokenResponse.json()) as GoogleTokenInfo;
+      const tokenSubject = tokenInfo.sub ?? tokenInfo.user_id;
       if (
         tokenInfo.aud !== clientId ||
-        !tokenInfo.user_id ||
+        !tokenSubject ||
         !Number.isFinite(Number(tokenInfo.expires_in)) ||
         Number(tokenInfo.expires_in) <= 0 ||
         !tokenInfo.scope?.split(' ').includes('openid')
       )
         throw new UnauthorizedException('Invalid Google access token.');
       const profileResponse = await fetch(
-        'https://www.googleapis.com/oauth2/v3/userinfo',
+        'https://openidconnect.googleapis.com/v1/userinfo',
         {
           headers: { Authorization: `Bearer ${accessToken}` },
           signal: AbortSignal.timeout(this.timeoutMs()),
@@ -52,7 +55,7 @@ export class GoogleProfileService {
       if (!profileResponse.ok)
         throw new UnauthorizedException('Invalid Google access token.');
       const profile = (await profileResponse.json()) as GoogleUserInfo;
-      if (!profile.sub || profile.sub !== tokenInfo.user_id)
+      if (!profile.sub || profile.sub !== tokenSubject)
         throw new UnauthorizedException('Invalid Google profile.');
       return profile;
     } catch (error) {
