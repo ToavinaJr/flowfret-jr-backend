@@ -99,7 +99,7 @@ export class TranscriptionsProcessor extends WorkerHost {
             transcriptionId,
             trackId,
             errorCode: this.errorCode(error),
-            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : 'UnknownError',
           }),
         );
         await run(
@@ -127,8 +127,6 @@ export class TranscriptionsProcessor extends WorkerHost {
     startedAt: number,
   ): Promise<never> {
     const { transcriptionId, trackId } = job.data;
-    const message =
-      error instanceof Error ? error.message : 'Transcription failed';
     const finalAttempt = job.attemptsMade + 1 >= Number(job.opts.attempts ?? 1);
     if (!finalAttempt) {
       this.logger.warn(
@@ -138,7 +136,7 @@ export class TranscriptionsProcessor extends WorkerHost {
           jobId: job.id,
           trackId,
           errorCode: this.errorCode(error),
-          error: message,
+          errorName: error instanceof Error ? error.name : 'UnknownError',
           nextAttempt: job.attemptsMade + 2,
         }),
       );
@@ -151,7 +149,7 @@ export class TranscriptionsProcessor extends WorkerHost {
       await this.repository.markFailed(
         transcriptionId,
         this.errorCode(error),
-        message,
+        'Transcription failed',
       );
       this.events.emit({
         type: TRANSCRIPTION_EVENT.FAILED,
@@ -166,7 +164,7 @@ export class TranscriptionsProcessor extends WorkerHost {
           trackId,
           status: TranscriptionStatus.FAILED,
           errorCode: this.errorCode(error),
-          error: message,
+          errorName: error instanceof Error ? error.name : 'UnknownError',
           elapsedMs: Date.now() - startedAt,
         }),
       );

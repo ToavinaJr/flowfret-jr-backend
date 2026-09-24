@@ -1,23 +1,15 @@
-export function readSpotifyErrorDetail(data: unknown): string | undefined {
-  if (!data || typeof data !== 'object') return undefined;
+import {
+  SPOTIFY_SEARCH_DEFAULT_LIMIT,
+  SPOTIFY_SEARCH_MAX_LIMIT,
+  SPOTIFY_SEARCH_MIN_LIMIT,
+} from './spotify.constants';
 
-  const body = data as Record<string, unknown>;
-  const apiError = body.error;
-  if (apiError && typeof apiError === 'object') {
-    const error = apiError as Record<string, unknown>;
-    const parts: string[] = [];
-    if (typeof error.message === 'string') parts.push(error.message);
-    if (typeof error.reason === 'string') parts.push(`reason=${error.reason}`);
-    if (parts.length > 0) return parts.join(', ');
-  }
-
-  if (typeof body.error === 'string') {
-    const parts = [body.error];
-    if (typeof body.error_description === 'string')
-      parts.push(body.error_description);
-    return parts.join(': ');
-  }
-  return undefined;
+export function clampSpotifySearchLimit(limit: number): number {
+  if (!Number.isFinite(limit)) return SPOTIFY_SEARCH_DEFAULT_LIMIT;
+  return Math.min(
+    SPOTIFY_SEARCH_MAX_LIMIT,
+    Math.max(SPOTIFY_SEARCH_MIN_LIMIT, Math.trunc(limit)),
+  );
 }
 
 export function readRetryAfterHeader(headers: unknown): string | undefined {

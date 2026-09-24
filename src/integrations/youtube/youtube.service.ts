@@ -23,9 +23,14 @@ import {
 import type {
   YouTubeSearchResponse,
   YouTubeSearchResult,
-  YouTubeThumbnail,
   YouTubeVideosResponse,
 } from './youtube.types';
+import {
+  decodeYouTubeHtml,
+  parseYouTubeDuration,
+  pickYouTubeThumbnail,
+  readYouTubeErrorReason,
+} from './youtube.utils';
 
 @Injectable()
 export class YouTubeService {
@@ -74,11 +79,11 @@ export class YouTubeService {
       return {
         videos: items.map((item) => ({
           id: item.id.videoId as string,
-          title: this.decodeHtml(item.snippet.title),
+          title: decodeYouTubeHtml(item.snippet.title),
           channelId: item.snippet.channelId,
-          channelTitle: this.decodeHtml(item.snippet.channelTitle),
+          channelTitle: decodeYouTubeHtml(item.snippet.channelTitle),
           thumbnailUrl:
-            this.pickThumbnail(item.snippet.thumbnails)?.url ?? null,
+            pickYouTubeThumbnail(item.snippet.thumbnails)?.url ?? null,
           durationMs: durations.get(item.id.videoId as string) ?? 0,
         })),
         total: searchResponse.data.pageInfo?.totalResults ?? items.length,
@@ -112,62 +117,8 @@ export class YouTubeService {
     return new Map(
       (response.data.items ?? []).map((item) => [
         item.id,
-        this.parseDuration(item.contentDetails?.duration),
+        parseYouTubeDuration(item.contentDetails?.duration),
       ]),
-    );
-  }
-
-  private parseDuration(value?: string): number {
-    if (!value) return 0;
-    const match = value.match(
-      /^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/,
-    );
-    if (!match) return 0;
-    const [, days = '0', hours = '0', minutes = '0', seconds = '0'] = match;
-    return (
-      (Number(days) * 86400 +
-        Number(hours) * 3600 +
-        Number(minutes) * 60 +
-        Number(seconds)) *
-      1000
-    );
-  }
-
-  private pickThumbnail(
-    thumbnails: Record<string, YouTubeThumbnail | undefined>,
-  ): YouTubeThumbnail | undefined {
-    return (
-      thumbnails.maxres ??
-      thumbnails.standard ??
-      thumbnails.high ??
-      thumbnails.medium ??
-      thumbnails.default
-    );
-  }
-
-  private decodeHtml(value: string): string {
-    const named: Record<string, string> = {
-      amp: '&',
-      apos: "'",
-      gt: '>',
-      lt: '<',
-      quot: '"',
-    };
-    return value.replace(
-      /&(#x?[0-9a-f]+|[a-z]+);/gi,
-      (entity: string, code: string) => {
-        if (code.startsWith('#')) {
-          const hexadecimal = code[1]?.toLowerCase() === 'x';
-          const parsed = Number.parseInt(
-            code.slice(hexadecimal ? 2 : 1),
-            hexadecimal ? 16 : 10,
-          );
-          return Number.isFinite(parsed)
-            ? String.fromCodePoint(parsed)
-            : entity;
-        }
-        return named[code.toLowerCase()] ?? entity;
-      },
     );
   }
 
@@ -178,7 +129,7 @@ export class YouTubeService {
     }
 
     const status = error.response?.status;
-    const reason = this.readReason(error.response?.data);
+    const reason = readYouTubeErrorReason(error.response?.data);
     const detail = reason ? ` reason=${reason}` : '';
     if (status === 403 && /quota/i.test(reason ?? '')) {
       this.logger.warn(`YouTube quota exceeded.${detail}`);
@@ -192,17 +143,5 @@ export class YouTubeService {
       `YouTube search failed (status=${status ?? 'network'})${detail}`,
     );
     return new BadGatewayException('YouTube search failed');
-  }
-
-  private readReason(data: unknown): string | undefined {
-    if (!data || typeof data !== 'object') return undefined;
-    const error = (data as Record<string, unknown>).error;
-    if (!error || typeof error !== 'object') return undefined;
-    const errors = (error as Record<string, unknown>).errors;
-    if (!Array.isArray(errors)) return undefined;
-    const first: unknown = errors[0];
-    if (!first || typeof first !== 'object') return undefined;
-    const reason = (first as Record<string, unknown>).reason;
-    return typeof reason === 'string' ? reason : undefined;
   }
 }

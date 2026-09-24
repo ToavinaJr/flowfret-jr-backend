@@ -6,6 +6,7 @@ import { SpotifyService } from '../spotify/spotify.service';
 import { YouTubeService } from '../youtube/youtube.service';
 import { ConfigService } from '@nestjs/config';
 import type { AudiusTrack } from '../audius/audius.types';
+import { MusicEnrichmentService } from './music-enrichment.service';
 
 describe('MusicService', () => {
   let service: MusicService;
@@ -36,7 +37,7 @@ describe('MusicService', () => {
       audiusService as unknown as AudiusService,
       spotifyService as unknown as SpotifyService,
       youtubeService as unknown as YouTubeService,
-      geniusService as unknown as GeniusService,
+      new MusicEnrichmentService(geniusService as unknown as GeniusService),
       configService as unknown as ConfigService,
     );
   });

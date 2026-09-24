@@ -167,7 +167,7 @@ describe('TranscriptionsProcessor deterministic flow', () => {
     expect(repository.markFailed).toHaveBeenCalledWith(
       transcriptionId,
       'WORKER_FAILED',
-      'sensitive detail',
+      'Transcription failed',
     );
     expect(events).toContainEqual(
       expect.objectContaining({

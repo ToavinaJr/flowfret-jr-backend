@@ -88,7 +88,7 @@ export class CloudinaryService {
     };
     if (!response.ok || !result.secure_url || !result.public_id) {
       this.logger.error(
-        `Cloudinary rejected image upload (status=${response.status}, reason=${result.error?.message ?? 'unknown'})`,
+        `Cloudinary rejected image upload (status=${response.status})`,
       );
       throw new ExternalServiceException(
         'UPLOAD_FAILED',

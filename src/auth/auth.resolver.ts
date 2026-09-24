@@ -1,4 +1,4 @@
-import { Logger, UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Args, Context, Mutation, Resolver } from '@nestjs/graphql';
 import type { Request, Response } from 'express';
@@ -14,7 +14,6 @@ import {
 } from '../graphql/graphql.types';
 import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
-import { isDebugEnabled } from '../common/debug';
 import { RateLimit, RateLimits } from './rate-limit.decorator';
 import {
   cookieName,
@@ -26,8 +25,6 @@ import { assertRefreshOrigin } from './refresh-origin';
 
 @Resolver()
 export class AuthResolver {
-  private readonly logger = new Logger(AuthResolver.name);
-
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
@@ -42,46 +39,7 @@ export class AuthResolver {
   async register(
     @Args('data') data: RegisterInput,
   ): Promise<RegisterPendingPayload> {
-    const startedAt = Date.now();
-    // Never write identifiers or credentials to authentication logs.
-    const details = { flow: 'password_registration' };
-    if (isDebugEnabled()) {
-      this.logger.debug(
-        JSON.stringify({ event: 'register.started', ...details }),
-      );
-    }
-    try {
-      const result = await this.authService.register(data);
-      if (isDebugEnabled()) {
-        this.logger.debug(
-          JSON.stringify({
-            event: 'register.completed',
-            ...details,
-            durationMs: Date.now() - startedAt,
-          }),
-        );
-      }
-      return result;
-    } catch (error) {
-      if (isDebugEnabled()) {
-        this.logger.error(
-          JSON.stringify({
-            event: 'register.failed',
-            ...details,
-            durationMs: Date.now() - startedAt,
-            errorName: error instanceof Error ? error.name : 'UnknownError',
-            errorCode:
-              error && typeof error === 'object' && 'code' in error
-                ? String((error as { code?: unknown }).code)
-                : undefined,
-            errorMessage:
-              error instanceof Error ? error.message : String(error),
-          }),
-          undefined,
-        );
-      }
-      throw error;
-    }
+    return this.authService.register(data);
   }
 
   @Public()

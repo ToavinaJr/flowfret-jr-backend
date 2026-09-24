@@ -5,11 +5,12 @@ import { SpotifyModule } from '../spotify/spotify.module';
 import { YouTubeModule } from '../youtube/youtube.module';
 import { MusicResolver } from './music.resolver';
 import { MusicService } from './music.service';
+import { MusicEnrichmentService } from './music-enrichment.service';
 
 @Module({
   // MusicService selects the active provider through MUSIC_PROVIDER.
   imports: [AudiusModule, SpotifyModule, YouTubeModule, GeniusModule],
-  providers: [MusicService, MusicResolver],
+  providers: [MusicService, MusicEnrichmentService, MusicResolver],
   exports: [MusicService],
 })
 export class MusicModule {}

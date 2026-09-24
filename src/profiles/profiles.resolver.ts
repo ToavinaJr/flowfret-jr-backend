@@ -1,12 +1,4 @@
-import {
-  Args,
-  Context,
-  Mutation,
-  Parent,
-  ResolveField,
-  Resolver,
-  Query,
-} from '@nestjs/graphql';
+import { Args, Context, Mutation, Resolver, Query } from '@nestjs/graphql';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { FriendshipStatus, ProfileVisibility } from '@prisma/client';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
@@ -14,7 +6,6 @@ import {
   CreateProfileInput,
   ProfileModel,
   UpdateProfileInput,
-  UserModel,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { profilePolicy } from '../policies/profile.policy';
@@ -195,10 +186,5 @@ export class ProfilesResolver {
       });
       return deleted;
     });
-  }
-
-  @ResolveField(() => UserModel, { name: 'user' })
-  async user(@Parent() profile: ProfileModel): Promise<UserModel | null> {
-    return this.prisma.user.findUnique({ where: { id: profile.userId } });
   }
 }

@@ -7,17 +7,16 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AudiusService } from '../audius/audius.service';
-import { GENIUS_MAX_CONCURRENCY } from '../genius/genius.constants';
-import { GeniusService } from '../genius/genius.service';
 import { SpotifyService } from '../spotify/spotify.service';
 import { YouTubeService } from '../youtube/youtube.service';
-import type { MusicSearchResult, MusicTrack } from './music.types';
+import type { MusicSearchResult } from './music.types';
 import {
   mapAudius,
   mapSpotify,
   mapYouTube,
   type ProviderTrack,
 } from './music-track-mappers';
+import { MusicEnrichmentService } from './music-enrichment.service';
 
 export const MUSIC_PROVIDER_KEY = 'MUSIC_PROVIDER';
 export const MUSIC_PROVIDERS = ['YOUTUBE', 'AUDIUS', 'SPOTIFY'] as const;
@@ -40,7 +39,7 @@ export class MusicService {
     private readonly audiusService: AudiusService,
     private readonly spotifyService: SpotifyService,
     private readonly youtubeService: YouTubeService,
-    private readonly geniusService: GeniusService,
+    private readonly enrichment: MusicEnrichmentService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -56,7 +55,7 @@ export class MusicService {
       normalizedQuery,
       limit,
     );
-    const enrichedTracks = await this.enrichWithGenius(result.tracks);
+    const enrichedTracks = await this.enrichment.enrich(result.tracks);
 
     return {
       provider: result.provider,
@@ -155,65 +154,5 @@ export class MusicService {
     }
 
     return unique;
-  }
-
-  private async enrichWithGenius(
-    tracks: ProviderTrack[],
-  ): Promise<MusicTrack[]> {
-    const results: MusicTrack[] = [];
-
-    for (
-      let index = 0;
-      index < tracks.length;
-      index += GENIUS_MAX_CONCURRENCY
-    ) {
-      const chunk = tracks.slice(index, index + GENIUS_MAX_CONCURRENCY);
-      const mappedChunk = await Promise.all(
-        chunk.map((track) => this.mapTrack(track)),
-      );
-      results.push(...mappedChunk);
-    }
-
-    return results;
-  }
-
-  private async mapTrack(track: ProviderTrack): Promise<MusicTrack> {
-    const primaryArtist = track.artists[0]?.name ?? '';
-    let geniusUrl: string | null = null;
-    let geniusMatchScore: number | null = null;
-
-    try {
-      const geniusMatch = await this.geniusService.searchBestSong(
-        track.title,
-        primaryArtist,
-      );
-      if (geniusMatch) {
-        geniusUrl = geniusMatch.url;
-        geniusMatchScore = geniusMatch.matchScore;
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Genius match failed for track ${track.id}: ${String(error)}`,
-      );
-    }
-
-    return {
-      provider: track.provider,
-      id: track.id,
-      providerTrackId: track.id,
-      audiusId: track.id,
-      title: track.title,
-      artists: track.artists,
-      imageUrl: track.imageUrl,
-      audiusUrl: track.externalUrl,
-      externalUrl: track.externalUrl,
-      album: track.album,
-      isrc: track.isrc,
-      streamUrl: track.streamUrl,
-      genre: track.genre,
-      geniusUrl,
-      geniusMatchScore,
-      durationMs: track.durationMs,
-    };
   }
 }

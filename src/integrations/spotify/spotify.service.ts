@@ -19,8 +19,6 @@ import {
   SPOTIFY_CLIENT_SECRET_KEY,
   SPOTIFY_HTTP_TIMEOUT_MS,
   SPOTIFY_SEARCH_DEFAULT_LIMIT,
-  SPOTIFY_SEARCH_MAX_LIMIT,
-  SPOTIFY_SEARCH_MIN_LIMIT,
   SPOTIFY_SEARCH_PATH,
   SPOTIFY_TOKEN_EXPIRY_SKEW_MS,
   SPOTIFY_TOKEN_PATH,
@@ -32,8 +30,8 @@ import type {
   SpotifyTokenResponse,
 } from './spotify.types';
 import {
+  clampSpotifySearchLimit,
   readRetryAfterHeader,
-  readSpotifyErrorDetail,
 } from './spotify-http.utils';
 
 @Injectable()
@@ -51,7 +49,7 @@ export class SpotifyService {
     query: string,
     limit: number = SPOTIFY_SEARCH_DEFAULT_LIMIT,
   ): Promise<SpotifySearchResult> {
-    const clampedLimit = this.clampLimit(limit);
+    const clampedLimit = clampSpotifySearchLimit(limit);
     const accessToken = await this.getAccessToken();
 
     try {
@@ -64,16 +62,6 @@ export class SpotifyService {
       }
       throw error;
     }
-  }
-
-  private clampLimit(limit: number): number {
-    if (!Number.isFinite(limit)) {
-      return SPOTIFY_SEARCH_DEFAULT_LIMIT;
-    }
-    return Math.min(
-      SPOTIFY_SEARCH_MAX_LIMIT,
-      Math.max(SPOTIFY_SEARCH_MIN_LIMIT, Math.trunc(limit)),
-    );
   }
 
   private async getAccessToken(forceRefresh = false): Promise<string> {
@@ -176,19 +164,14 @@ export class SpotifyService {
 
     const status = error.response?.status;
     const retryAfter = readRetryAfterHeader(error.response?.headers);
-    const spotifyDetail = readSpotifyErrorDetail(error.response?.data);
-    const detailSuffix = spotifyDetail ? ` detail="${spotifyDetail}"` : '';
-
     if (status === 401) {
-      this.logger.error(
-        `Spotify authentication failed (status=401)${detailSuffix}`,
-      );
+      this.logger.error('Spotify authentication failed (status=401)');
       return new UnauthorizedException('Spotify authentication failed');
     }
 
     if (status === 429) {
       const suffix = retryAfter ? ` Retry after ${retryAfter}s.` : '';
-      this.logger.warn(`Spotify rate limited.${suffix}${detailSuffix}`);
+      this.logger.warn(`Spotify rate limited.${suffix}`);
       return new HttpException(
         `Spotify rate limit exceeded.${suffix}`,
         HttpStatus.TOO_MANY_REQUESTS,
@@ -196,16 +179,14 @@ export class SpotifyService {
     }
 
     if (status === 403) {
-      this.logger.warn(`Spotify access forbidden (status=403)${detailSuffix}`);
+      this.logger.warn('Spotify access forbidden (status=403)');
       return new ForbiddenException({
         code: 'SPOTIFY_ACCESS_FORBIDDEN',
         message: 'Spotify search is unavailable for this application',
       });
     }
 
-    this.logger.error(
-      `${fallbackMessage} (status=${status ?? 'network'})${detailSuffix}`,
-    );
+    this.logger.error(`${fallbackMessage} (status=${status ?? 'network'})`);
     return new BadGatewayException(fallbackMessage);
   }
 }
