@@ -183,6 +183,11 @@ The API and worker are separate services; restarting the worker does not stop HT
 
 ### Render deployment
 
+`start:render` performs a narrowly scoped recovery for the corrected
+`20260923180000_transcription_provider` migration. This allows an existing
+Render/Neon database left in Prisma state `P3009` to recover without an
+interactive shell. Unknown failed migrations are never resolved automatically.
+
 `start:render` starts only the HTTP API. Configure Render's **Pre-Deploy Command** as `npx prisma migrate deploy` so migrations run once before the new web instance starts. The start command must remain `npm run start:render` (or `node dist/main.js`). The API cannot process transcription jobs by itself. Create the background worker from `render.yaml` (Render Dashboard **Blueprints > New Blueprint Instance**) or create a Background Worker manually with `Dockerfile.worker`.
 
 Set a randomly generated `JWT_SECRET` of at least 32 characters in Render for the web service and worker. Copy the exact same `DATABASE_URL`, `JWT_SECRET`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS`, and Audius variables from the web service to the worker. The API and worker must point to the same PostgreSQL database and Redis instance. A worker is a paid Render service; keep at least the `standard` plan for the `small` Whisper model. After deployment, its logs must contain `TranscriptionsWorkerModule dependencies initialized` and the BullMQ worker must remain running.

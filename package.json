@@ -21,7 +21,7 @@
     "start:dev": "cross-env NODE_ENV=development nest start --watch",
     "start:debug": "cross-env NODE_ENV=development nest start --debug --watch",
     "start:prod": "cross-env NODE_ENV=production node dist/main.js",
-    "start:render": "npm run prisma:deploy:prod && npm run start:prod",
+    "start:render": "cross-env NODE_ENV=production node scripts/recover-known-migration.mjs && npm run start:prod",
     "start:worker": "node dist/worker.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
