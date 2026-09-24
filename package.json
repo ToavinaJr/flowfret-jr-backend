@@ -9,6 +9,8 @@
     "postinstall": "npm run prisma:generate",
     "prebuild": "npm run prisma:generate",
     "build": "nest build",
+    "render:install:youtube": "python3 -m pip install --upgrade --target .python-packages -r requirements.youtube.txt && cross-env PYTHONPATH=.python-packages python3 -c \"import yt_dlp\"",
+    "build:render": "npm run build && npm run render:install:youtube",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "prisma:generate": "cross-env NODE_ENV=development PRISMA_GENERATE_ONLY=1 prisma generate",
     "prisma:migrate": "cross-env NODE_ENV=development prisma migrate dev",

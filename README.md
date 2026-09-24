@@ -184,6 +184,13 @@ The API and worker are separate services; restarting the worker does not stop HT
 
 ### Render deployment
 
+For a native Node Render service, use `npm ci && npm run build:render` as the
+**Build Command**. Besides compiling Nest, this installs the pinned `yt-dlp`
+module into `.python-packages`; the API adds that directory to `PYTHONPATH`
+when extracting authorized YouTube audio. A plain `npm run build` does not
+install Python dependencies and makes chord analysis fail with
+`No module named yt_dlp`.
+
 `start:render` performs a narrowly scoped recovery for the corrected
 `20260923180000_transcription_provider` migration. This allows an existing
 Render/Neon database left in Prisma state `P3009` to recover without an

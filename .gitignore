@@ -1,6 +1,7 @@
 # compiled output
 /dist
 /dist-dev
+/.python-packages
 /node_modules
 /build
 __pycache__/

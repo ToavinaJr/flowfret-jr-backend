@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { spawn } from 'node:child_process';
+import { delimiter, resolve } from 'node:path';
 import { PassThrough, type Readable } from 'node:stream';
 import { YOUTUBE_VIDEO_ID_PATTERN } from './youtube.constants';
 
@@ -48,6 +49,10 @@ export class YouTubeAudioService {
     const maxDuration = this.number('YOUTUBE_AUDIO_MAX_DURATION_SECONDS', 600);
     const timeoutMs = this.number('YOUTUBE_AUDIO_DOWNLOAD_TIMEOUT_MS', 120_000);
     const url = `https://www.youtube.com/watch?v=${videoId}`;
+    const bundledPythonPackages = resolve(process.cwd(), '.python-packages');
+    const pythonPath = [bundledPythonPackages, process.env.PYTHONPATH]
+      .filter(Boolean)
+      .join(delimiter);
     const child = spawn(
       python,
       [
@@ -69,7 +74,11 @@ export class YouTubeAudioService {
         '-',
         url,
       ],
-      { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
+      {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+        env: { ...process.env, PYTHONPATH: pythonPath },
+      },
     );
     const output = new PassThrough();
     let bytes = 0;
