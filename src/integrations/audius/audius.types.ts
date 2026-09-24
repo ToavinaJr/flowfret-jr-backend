@@ -40,4 +40,5 @@ export interface AudiusTrackResponse {
 export interface AudiusSearchResult {
   tracks: AudiusTrack[];
   total: number;
+  nextOffset: number | null;
 }

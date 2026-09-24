@@ -44,6 +44,7 @@ export class YouTubeService {
   async searchMusic(
     query: string,
     limit: number,
+    pageToken?: string,
   ): Promise<YouTubeSearchResult> {
     const apiKey = getRequiredConfig(this.configService, YOUTUBE_API_KEY_KEY);
     const maxResults = Math.min(
@@ -64,6 +65,7 @@ export class YouTubeService {
               topicId: YOUTUBE_MUSIC_TOPIC_ID,
               videoEmbeddable: 'true',
               maxResults,
+              ...(pageToken ? { pageToken } : {}),
             },
             timeout: YOUTUBE_HTTP_TIMEOUT_MS,
           },
@@ -87,6 +89,7 @@ export class YouTubeService {
           durationMs: durations.get(item.id.videoId as string) ?? 0,
         })),
         total: searchResponse.data.pageInfo?.totalResults ?? items.length,
+        nextPageToken: searchResponse.data.nextPageToken ?? null,
       };
     } catch (error) {
       if (error instanceof HttpException) {

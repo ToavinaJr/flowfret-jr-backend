@@ -37,6 +37,7 @@ export class AudiusService {
   async searchTracks(
     query: string,
     limit: number,
+    offset = 0,
   ): Promise<AudiusSearchResult> {
     const accessToken = getRequiredConfig(
       this.configService,
@@ -55,6 +56,7 @@ export class AudiusService {
             params: {
               query,
               limit: clampedLimit,
+              offset,
               sort_method: 'relevant',
             },
             headers: { Authorization: `Bearer ${accessToken}` },
@@ -65,7 +67,14 @@ export class AudiusService {
       const tracks = (response.data.data ?? []).filter((track) =>
         this.isStreamable(track.isStreamable, track.is_streamable),
       );
-      return { tracks, total: tracks.length };
+      return {
+        tracks,
+        total: offset + tracks.length,
+        nextOffset:
+          (response.data.data ?? []).length === clampedLimit
+            ? offset + clampedLimit
+            : null,
+      };
     } catch (error) {
       throw this.mapHttpError(error);
     }

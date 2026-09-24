@@ -72,4 +72,7 @@ export class MusicSearchResult {
 
   @Field(() => Int)
   total: number;
+
+  @Field(() => String, { nullable: true })
+  nextCursor: string | null;
 }

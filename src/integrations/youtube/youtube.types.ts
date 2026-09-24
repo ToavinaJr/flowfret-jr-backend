@@ -16,6 +16,7 @@ export interface YouTubeSearchItem {
 
 export interface YouTubeSearchResponse {
   pageInfo?: { totalResults?: number };
+  nextPageToken?: string;
   items?: YouTubeSearchItem[];
 }
 
@@ -40,4 +41,5 @@ export interface YouTubeVideo {
 export interface YouTubeSearchResult {
   videos: YouTubeVideo[];
   total: number;
+  nextPageToken: string | null;
 }

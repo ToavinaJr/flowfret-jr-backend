@@ -95,7 +95,11 @@ describe('MusicService', () => {
 
     const result = await service.searchMusic('query', 10);
 
-    expect(youtubeService.searchMusic).toHaveBeenCalledWith('query', 10);
+    expect(youtubeService.searchMusic).toHaveBeenCalledWith(
+      'query',
+      10,
+      undefined,
+    );
     expect(audiusService.searchTracks).not.toHaveBeenCalled();
     expect(result.provider).toBe('YOUTUBE');
     expect(result.tracks[0].provider).toBe('YOUTUBE');
@@ -107,7 +111,7 @@ describe('MusicService', () => {
 
     const result = await service.searchMusic('query', 10);
 
-    expect(audiusService.searchTracks).toHaveBeenCalledWith('query', 10);
+    expect(audiusService.searchTracks).toHaveBeenCalledWith('query', 10, 0);
     expect(result.provider).toBe('AUDIUS');
   });
 
@@ -124,8 +128,8 @@ describe('MusicService', () => {
 
     const result = await service.searchMusic('query', 10);
 
-    expect(spotifyService.searchTracks).toHaveBeenCalledWith('query', 10);
-    expect(audiusService.searchTracks).toHaveBeenCalledWith('query', 10);
+    expect(spotifyService.searchTracks).toHaveBeenCalledWith('query', 10, 0);
+    expect(audiusService.searchTracks).toHaveBeenCalledWith('query', 10, 0);
     expect(result.provider).toBe('AUDIUS');
     expect(result.tracks[0]).toMatchObject({
       provider: 'AUDIUS',

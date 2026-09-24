@@ -17,6 +17,11 @@ import {
   type ProviderTrack,
 } from './music-track-mappers';
 import { MusicEnrichmentService } from './music-enrichment.service';
+import {
+  decodeMusicCursor,
+  encodeMusicCursor,
+  parseMusicOffset,
+} from './music-search-cursor';
 
 export const MUSIC_PROVIDER_KEY = 'MUSIC_PROVIDER';
 export const MUSIC_PROVIDERS = ['YOUTUBE', 'AUDIUS', 'SPOTIFY'] as const;
@@ -43,17 +48,23 @@ export class MusicService {
     private readonly configService: ConfigService,
   ) {}
 
-  async searchMusic(query: string, limit: number): Promise<MusicSearchResult> {
+  async searchMusic(
+    query: string,
+    limit: number,
+    cursor?: string,
+  ): Promise<MusicSearchResult> {
     const normalizedQuery = query.trim();
     if (!normalizedQuery) {
       throw new BadRequestException('Search query cannot be empty');
     }
 
     const requestedProvider = this.getProvider();
+    const providerCursor = decodeMusicCursor(cursor, requestedProvider);
     const result = await this.searchProvider(
       requestedProvider,
       normalizedQuery,
       limit,
+      providerCursor,
     );
     const enrichedTracks = await this.enrichment.enrich(result.tracks);
 
@@ -61,6 +72,7 @@ export class MusicService {
       provider: result.provider,
       tracks: enrichedTracks,
       total: result.total,
+      nextCursor: encodeMusicCursor(result.provider, result.nextCursor),
     };
   }
 
@@ -83,29 +95,43 @@ export class MusicService {
     provider: MusicProvider,
     query: string,
     limit: number,
+    cursor?: string,
   ): Promise<{
     provider: MusicProvider;
     tracks: ProviderTrack[];
     total: number;
+    nextCursor: string | null;
   }> {
     if (provider === 'YOUTUBE') {
-      const result = await this.youtubeService.searchMusic(query, limit);
+      const result = await this.youtubeService.searchMusic(
+        query,
+        limit,
+        cursor,
+      );
       return {
         provider: 'YOUTUBE',
         tracks: this.dedupeTracks(result.videos.map(mapYouTube)),
         total: result.total,
+        nextCursor: result.nextPageToken,
       };
     }
     if (provider === 'SPOTIFY') {
       try {
-        const result = await this.spotifyService.searchTracks(query, limit);
+        const result = await this.spotifyService.searchTracks(
+          query,
+          limit,
+          parseMusicOffset(cursor),
+        );
         return {
           provider: 'SPOTIFY',
           tracks: this.dedupeTracks(result.tracks.map(mapSpotify)),
           total: result.total,
+          nextCursor:
+            result.nextOffset == null ? null : String(result.nextOffset),
         };
       } catch (error) {
-        if (!this.canFallbackFromSpotify(error)) throw error;
+        if (cursor !== undefined || !this.canFallbackFromSpotify(error))
+          throw error;
         this.logger.warn(
           JSON.stringify({
             event: 'music.provider_fallback',
@@ -117,22 +143,29 @@ export class MusicService {
         return this.searchAudius(query, limit);
       }
     }
-    return this.searchAudius(query, limit);
+    return this.searchAudius(query, limit, cursor);
   }
 
   private async searchAudius(
     query: string,
     limit: number,
+    cursor?: string,
   ): Promise<{
     provider: typeof DEFAULT_MUSIC_PROVIDER;
     tracks: ProviderTrack[];
     total: number;
+    nextCursor: string | null;
   }> {
-    const result = await this.audiusService.searchTracks(query, limit);
+    const result = await this.audiusService.searchTracks(
+      query,
+      limit,
+      parseMusicOffset(cursor),
+    );
     return {
       provider: DEFAULT_MUSIC_PROVIDER,
       tracks: this.dedupeTracks(result.tracks.map(mapAudius)),
       total: result.total,
+      nextCursor: result.nextOffset == null ? null : String(result.nextOffset),
     };
   }
 

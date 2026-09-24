@@ -2,6 +2,7 @@ import { ArgsType, Field, Int } from '@nestjs/graphql';
 import { Transform } from 'class-transformer';
 import {
   IsInt,
+  IsOptional,
   IsString,
   Max,
   MaxLength,
@@ -29,4 +30,10 @@ export class SearchMusicArgs {
   @Min(1)
   @Max(10)
   limit: number = SPOTIFY_SEARCH_DEFAULT_LIMIT;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  cursor?: string;
 }

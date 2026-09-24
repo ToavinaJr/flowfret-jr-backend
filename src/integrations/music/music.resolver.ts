@@ -14,6 +14,6 @@ export class MusicResolver {
     { limit: 300, windowSeconds: 86_400, failClosed: true },
   )
   searchMusic(@Args() args: SearchMusicArgs): Promise<MusicSearchResult> {
-    return this.musicService.searchMusic(args.query, args.limit);
+    return this.musicService.searchMusic(args.query, args.limit, args.cursor);
   }
 }

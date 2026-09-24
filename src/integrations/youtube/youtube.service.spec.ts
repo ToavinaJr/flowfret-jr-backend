@@ -12,6 +12,7 @@ describe('YouTubeService', () => {
           of({
             data: {
               pageInfo: { totalResults: 42 },
+              nextPageToken: 'next-page',
               items: [
                 {
                   id: { videoId: 'video-1' },
@@ -42,8 +43,11 @@ describe('YouTubeService', () => {
       configService as unknown as ConfigService,
     );
 
-    await expect(service.searchMusic('song', 10)).resolves.toEqual({
+    await expect(
+      service.searchMusic('song', 10, 'current-page'),
+    ).resolves.toEqual({
       total: 42,
+      nextPageToken: 'next-page',
       videos: [
         {
           id: 'video-1',
@@ -54,6 +58,13 @@ describe('YouTubeService', () => {
           durationMs: 192000,
         },
       ],
+    });
+    const [, requestConfig] = httpService.get.mock.calls[0] as [
+      string,
+      { params: { pageToken?: string; maxResults: number } },
+    ];
+    expect(requestConfig).toMatchObject({
+      params: { pageToken: 'current-page', maxResults: 10 },
     });
   });
 });

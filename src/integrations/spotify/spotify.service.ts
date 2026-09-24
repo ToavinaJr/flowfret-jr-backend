@@ -48,17 +48,18 @@ export class SpotifyService {
   async searchTracks(
     query: string,
     limit: number = SPOTIFY_SEARCH_DEFAULT_LIMIT,
+    offset = 0,
   ): Promise<SpotifySearchResult> {
     const clampedLimit = clampSpotifySearchLimit(limit);
     const accessToken = await this.getAccessToken();
 
     try {
-      return await this.executeSearch(query, clampedLimit, accessToken);
+      return await this.executeSearch(query, clampedLimit, offset, accessToken);
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         this.cachedToken = null;
         const refreshedToken = await this.getAccessToken(true);
-        return this.executeSearch(query, clampedLimit, refreshedToken);
+        return this.executeSearch(query, clampedLimit, offset, refreshedToken);
       }
       throw error;
     }
@@ -127,6 +128,7 @@ export class SpotifyService {
   private async executeSearch(
     query: string,
     limit: number,
+    offset: number,
     accessToken: string,
   ): Promise<SpotifySearchResult> {
     try {
@@ -138,6 +140,7 @@ export class SpotifyService {
               q: query,
               type: 'track',
               limit,
+              offset,
             },
             headers: {
               Authorization: `Bearer ${accessToken}`,
@@ -147,9 +150,13 @@ export class SpotifyService {
         ),
       );
 
+      const tracks = response.data.tracks?.items ?? [];
+      const total = response.data.tracks?.total ?? 0;
       return {
-        tracks: response.data.tracks?.items ?? [],
-        total: response.data.tracks?.total ?? 0,
+        tracks,
+        total,
+        nextOffset:
+          offset + tracks.length < total ? offset + tracks.length : null,
       };
     } catch (error) {
       throw this.mapHttpError(error, 'Spotify search failed');

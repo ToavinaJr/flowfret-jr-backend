@@ -108,6 +108,7 @@ describe('SpotifyService', () => {
     await expect(service.searchTracks('q', 1)).resolves.toEqual({
       tracks: [],
       total: 0,
+      nextOffset: null,
     });
     expect(httpService.post).toHaveBeenCalledTimes(2);
   });

@@ -47,6 +47,7 @@ export interface SpotifySearchTracksResponse {
 export interface SpotifySearchResult {
   tracks: SpotifyTrack[];
   total: number;
+  nextOffset: number | null;
 }
 
 export interface CachedSpotifyToken {
