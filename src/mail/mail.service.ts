@@ -99,7 +99,7 @@ export class MailService {
 
     await sgMail.send({
       to: payload.to,
-      from: this.fromEmail,
+      from: { email: this.fromEmail, name: 'FlowFret' },
       subject,
       text,
       html,
@@ -140,7 +140,7 @@ export class MailService {
 
     await sgMail.send({
       to: payload.to,
-      from: this.fromEmail,
+      from: { email: this.fromEmail, name: 'FlowFret' },
       subject,
       text,
       html,
