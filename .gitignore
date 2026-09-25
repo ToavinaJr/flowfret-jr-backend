@@ -2,6 +2,8 @@
 /dist
 /dist-dev
 /.python-packages
+/.venv
+/youtube-cookies.txt
 /node_modules
 /build
 __pycache__/
