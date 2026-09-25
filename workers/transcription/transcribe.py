@@ -35,7 +35,7 @@ def download_audio(url: str, destination: Path, options: dict[str, Any]) -> None
     current = url
     for redirect_count in range(max_redirects + 1):
         validate_public_https_url(current, allowed_hosts)
-        request = urllib.request.Request(current, headers={"User-Agent": "FretFlow-Transcription/1.0", "Accept": "audio/*"})
+        request = urllib.request.Request(current, headers={"User-Agent": "FlowFret-Transcription/1.0", "Accept": "audio/*"})
         try:
             response = opener.open(request, timeout=timeout)
         except urllib.error.HTTPError as error:
@@ -97,7 +97,7 @@ def convert_audio(source: Path, destination: Path) -> None:
 
 
 def azure_multipart(fields: dict[str, str], file_path: Path) -> tuple[bytes, str]:
-    boundary = f"----FretFlow{os.urandom(16).hex()}"
+    boundary = f"----FlowFret{os.urandom(16).hex()}"
     chunks: list[bytes] = []
     for name, value in fields.items():
         chunks.extend([
@@ -173,7 +173,7 @@ def process_request(request: dict[str, Any]) -> int:
     temp_root: Path | None = None
     try:
         options = request.get("options", {})
-        temp_root = Path(tempfile.mkdtemp(prefix="fretflow-transcription-", dir=options.get("tempDir") or None))
+        temp_root = Path(tempfile.mkdtemp(prefix="flowfret-transcription-", dir=options.get("tempDir") or None))
         downloaded = temp_root / "source.audio"
         prepared = temp_root / "prepared.wav"
         download_audio(str(request["audioUrl"]), downloaded, options)

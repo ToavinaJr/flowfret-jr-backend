@@ -41,7 +41,7 @@ export class MailService {
     const apiKey = this.configService.get<string>('SENDGRID_API_KEY') ?? '';
     this.fromEmail =
       this.configService.get<string>('SENDGRID_FROM_EMAIL') ??
-      'noreply@fretflow.app';
+      'noreply@flowfret.app';
     this.isConfigured = apiKey.length > 0;
 
     if (this.isConfigured) {
@@ -54,7 +54,7 @@ export class MailService {
   }
 
   async sendOtpVerificationEmail(payload: OtpEmailPayload): Promise<void> {
-    const subject = 'FretFlow — Vérifiez votre compte';
+    const subject = 'FlowFret — Vérifiez votre compte';
     const text = [
       `Bonjour ${payload.username},`,
       '',
@@ -72,7 +72,7 @@ export class MailService {
     const safeLink = escapeHtml(payload.verificationLink);
     const html = `
       <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #111;">FretFlow</h2>
+        <h2 style="color: #111;">FlowFret</h2>
         <p>Bonjour <strong>${safeUsername}</strong>,</p>
         <p>Votre code de vérification à 4 chiffres :</p>
         <p style="font-size: 28px; letter-spacing: 8px; font-weight: 700; color: #111;">
@@ -109,7 +109,7 @@ export class MailService {
   async sendPasswordResetEmail(
     payload: PasswordResetEmailPayload,
   ): Promise<void> {
-    const subject = 'FretFlow — Réinitialisez votre mot de passe';
+    const subject = 'FlowFret — Réinitialisez votre mot de passe';
     const text = [
       `Bonjour ${payload.username},`,
       '',
@@ -123,7 +123,7 @@ export class MailService {
     const safeLink = escapeHtml(payload.resetLink);
     const html = `
       <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2>FretFlow</h2>
+        <h2>FlowFret</h2>
         <p>Bonjour <strong>${safeUsername}</strong>,</p>
         <p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
         <p><a href="${safeLink}" style="display:inline-block;padding:12px 20px;background:#e11d48;color:#fff;text-decoration:none;border-radius:8px;">Choisir un nouveau mot de passe</a></p>

@@ -6,7 +6,7 @@ Apply Prisma migrations before starting a newly deployed API version. The full
 architecture and deployment changes are documented in
 [`../REFACTOR_REPORT.md`](../REFACTOR_REPORT.md).
 
-NestJS GraphQL API for FretFlow (auth, social CRUD, music search).
+NestJS GraphQL API for FlowFret (auth, social CRUD, music search).
 
 ## Setup
 

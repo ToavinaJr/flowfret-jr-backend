@@ -14,10 +14,10 @@ describe('validateEnvironment', () => {
     const environment = {
       NODE_ENV: 'production',
       JWT_SECRET: 'a-secure-secret-containing-32-chars',
-      APP_URL: 'https://fretflow.app',
-      CORS_ORIGINS: 'https://www.fretflow.app',
+      APP_URL: 'https://flowfret.app',
+      CORS_ORIGINS: 'https://www.flowfret.app',
       SENDGRID_API_KEY: 'sendgrid-test-key',
-      SENDGRID_FROM_EMAIL: 'noreply@fretflow.app',
+      SENDGRID_FROM_EMAIL: 'noreply@flowfret.app',
     };
 
     expect(validateEnvironment(environment)).toBe(environment);
@@ -28,7 +28,7 @@ describe('validateEnvironment', () => {
       validateEnvironment({
         NODE_ENV: 'production',
         JWT_SECRET: 'a-secure-secret-containing-32-chars',
-        APP_URL: 'https://fretflow.app',
+        APP_URL: 'https://flowfret.app',
       }),
     ).toThrow('SENDGRID_API_KEY must be configured in production');
 
@@ -36,7 +36,7 @@ describe('validateEnvironment', () => {
       validateEnvironment({
         NODE_ENV: 'production',
         JWT_SECRET: 'a-secure-secret-containing-32-chars',
-        APP_URL: 'https://fretflow.app',
+        APP_URL: 'https://flowfret.app',
         SENDGRID_API_KEY: 'sendgrid-test-key',
         SENDGRID_FROM_EMAIL: 'invalid',
       }),
@@ -48,7 +48,7 @@ describe('validateEnvironment', () => {
       validateEnvironment({
         NODE_ENV: 'production',
         JWT_SECRET: 'a-secure-secret-containing-32-chars',
-        APP_URL: 'http://fretflow.app',
+        APP_URL: 'http://flowfret.app',
       }),
     ).toThrow('APP_URL must use HTTPS in production');
   });
@@ -71,7 +71,7 @@ describe('validateEnvironment', () => {
     const environment = {
       NODE_ENV: 'production',
       JWT_SECRET: 'a-secure-secret-containing-32-chars',
-      APP_URL: 'https://fretflow.app',
+      APP_URL: 'https://flowfret.app',
       MUSIC_PROVIDER: 'SPOTIFY',
     };
 

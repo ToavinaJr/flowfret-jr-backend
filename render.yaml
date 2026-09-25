@@ -51,7 +51,7 @@ services:
       - key: HF_HOME
         value: /models
       - key: TRANSCRIPTION_TEMP_DIR
-        value: /tmp/fretflow-transcriptions
+        value: /tmp/flowfret-transcriptions
       - key: TRANSCRIPTION_CONCURRENCY
         value: '1'
       - key: WHISPER_MODEL

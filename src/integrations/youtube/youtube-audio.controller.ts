@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { Response } from 'express';
-import { RateLimits } from '../../auth/rate-limit.decorator';
 import { YouTubeAudioService } from './youtube-audio.service';
 
 @Controller('api/youtube')
@@ -21,10 +20,6 @@ export class YouTubeAudioController {
   @Get(':videoId/audio')
   @Header('Cache-Control', 'private, no-store, max-age=0')
   @Header('Pragma', 'no-cache')
-  @RateLimits(
-    { limit: 3, windowSeconds: 60, failClosed: true },
-    { limit: 20, windowSeconds: 86_400, failClosed: true },
-  )
   stream(
     @Param('videoId') videoId: string,
     @Res({ passthrough: true }) response: Response,
