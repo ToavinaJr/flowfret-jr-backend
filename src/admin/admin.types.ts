@@ -26,11 +26,13 @@ import {
   IsEnum,
   IsInt,
   IsOptional,
+  IsNotEmpty,
   IsString,
   IsUUID,
   Max,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 import '../graphql/types/enums';
 
@@ -171,6 +173,56 @@ export class AdminAuditInput extends AdminListInput {
   entityType?: string;
 }
 
+@InputType()
+export class AdminSetUserRoleInput {
+  @Field()
+  @IsUUID()
+  userId!: string;
+
+  @Field(() => UserRole)
+  @IsEnum(UserRole)
+  role!: UserRole;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(3)
+  @MaxLength(500)
+  reason!: string;
+}
+
+@InputType()
+export class AdminSetUserStatusInput {
+  @Field()
+  @IsUUID()
+  userId!: string;
+
+  @Field(() => UserStatus)
+  @IsEnum(UserStatus)
+  status!: UserStatus;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(3)
+  @MaxLength(500)
+  reason!: string;
+}
+
+@InputType()
+export class AdminUserActionInput {
+  @Field()
+  @IsUUID()
+  userId!: string;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(3)
+  @MaxLength(500)
+  reason!: string;
+}
+
 @ObjectType()
 export class AdminPageInfo {
   @Field() hasNextPage!: boolean;
@@ -205,6 +257,13 @@ export class AdminUserConnection {
   @Field(() => [AdminUser]) nodes!: AdminUser[];
   @Field(() => Int) totalCount!: number;
   @Field(() => AdminPageInfo) pageInfo!: AdminPageInfo;
+}
+
+@ObjectType()
+export class AdminUserSecurityResult {
+  @Field(() => AdminUser) user!: AdminUser;
+  @Field(() => Int) revokedSessionCount!: number;
+  @Field() auditLogId!: string;
 }
 
 @ObjectType()

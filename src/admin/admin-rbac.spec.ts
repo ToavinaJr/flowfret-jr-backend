@@ -7,6 +7,7 @@ import { AdminDashboardResolver } from './admin-dashboard.resolver';
 import { AdminMediaResolver } from './admin-media.resolver';
 import { AdminMusicResolver } from './admin-music.resolver';
 import { AdminUsersResolver } from './admin-users.resolver';
+import { AdminSecurityResolver } from './admin-security.resolver';
 
 describe('admin resolver authorization metadata', () => {
   it.each([
@@ -16,6 +17,7 @@ describe('admin resolver authorization metadata', () => {
     AdminMediaResolver,
     AdminMusicResolver,
     AdminAuditResolver,
+    AdminSecurityResolver,
   ])('requires ADMIN for %p', (resolver) => {
     expect(Reflect.getMetadata(ROLES_KEY, resolver)).toEqual([UserRole.ADMIN]);
   });

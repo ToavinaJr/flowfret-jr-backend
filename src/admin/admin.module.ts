@@ -5,6 +5,8 @@ import { AdminDashboardResolver } from './admin-dashboard.resolver';
 import { AdminMediaResolver } from './admin-media.resolver';
 import { AdminMusicResolver } from './admin-music.resolver';
 import { AdminUsersResolver } from './admin-users.resolver';
+import { AdminSecurityResolver } from './admin-security.resolver';
+import { AdminSecurityService } from './admin-security.service';
 
 @Module({
   providers: [
@@ -14,6 +16,8 @@ import { AdminUsersResolver } from './admin-users.resolver';
     AdminMediaResolver,
     AdminMusicResolver,
     AdminAuditResolver,
+    AdminSecurityResolver,
+    AdminSecurityService,
   ],
 })
 export class AdminModule {}

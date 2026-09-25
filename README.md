@@ -260,9 +260,18 @@ Available foundations:
 - `adminPlaylists`, `adminCatalogTracks`, and `adminListeningHistory`
 - `adminAuditLogs`
 
-These queries are read-only. Administrative mutations belong to the next
-security phase so destructive actions can enforce last-admin protection,
-session revocation, mandatory reasons, and transactional audit records.
+Sensitive administrative user operations are also available:
+
+- `adminSetUserRole`
+- `adminSetUserStatus`
+- `adminDeleteUser`
+- `adminRevokeUserSessions`
+
+Every operation requires a reason, revokes the target user's active refresh
+sessions, and writes an audit record in the same serializable database
+transaction. The final active administrator cannot be demoted, suspended, or
+deleted. Audit records remain append-only and admin-only through the dedicated
+admin API.
 
 ### REST endpoints
 

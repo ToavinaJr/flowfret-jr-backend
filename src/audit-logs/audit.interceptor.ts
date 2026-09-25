@@ -29,6 +29,10 @@ export class AuditInterceptor implements NestInterceptor {
     'deleteProfile',
     'deleteUpload',
     'recordActivity',
+    'adminSetUserRole',
+    'adminSetUserStatus',
+    'adminDeleteUser',
+    'adminRevokeUserSessions',
   ]);
 
   constructor(private readonly prisma: PrismaService) {}
