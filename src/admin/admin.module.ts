@@ -7,6 +7,7 @@ import { AdminMusicResolver } from './admin-music.resolver';
 import { AdminUsersResolver } from './admin-users.resolver';
 import { AdminSecurityResolver } from './admin-security.resolver';
 import { AdminSecurityService } from './admin-security.service';
+import { AdminStatisticsService } from './admin-statistics.service';
 
 @Module({
   providers: [
@@ -18,6 +19,7 @@ import { AdminSecurityService } from './admin-security.service';
     AdminAuditResolver,
     AdminSecurityResolver,
     AdminSecurityService,
+    AdminStatisticsService,
   ],
 })
 export class AdminModule {}

@@ -1,5 +1,6 @@
 import {
   Field,
+  Float,
   GraphQLISODateTime,
   InputType,
   Int,
@@ -51,6 +52,16 @@ export enum AdminUserSortField {
 
 registerEnumType(AdminSortDirection, { name: 'AdminSortDirection' });
 registerEnumType(AdminUserSortField, { name: 'AdminUserSortField' });
+
+@InputType()
+export class AdminStatisticsInput {
+  @Field(() => Int, { defaultValue: 30 })
+  @IsOptional()
+  @IsInt()
+  @Min(7)
+  @Max(365)
+  days?: number;
+}
 
 @InputType()
 export class AdminListInput {
@@ -234,6 +245,66 @@ export class AdminPageInfo {
 export class AdminBackendStatus {
   @Field() databaseReachable!: boolean;
   @Field(() => GraphQLISODateTime) serverTime!: Date;
+}
+
+@ObjectType()
+export class AdminDashboardTotals {
+  @Field(() => Int) users!: number;
+  @Field(() => Int) activeUsers!: number;
+  @Field(() => Int) posts!: number;
+  @Field(() => Int) comments!: number;
+  @Field(() => Int) openReports!: number;
+  @Field(() => Int) uploads!: number;
+  @Field(() => Int) transcriptions!: number;
+  @Field(() => Int) chordTranscriptions!: number;
+  @Field(() => Int) playlists!: number;
+  @Field(() => Int) catalogTracks!: number;
+  @Field(() => Float) trackPlays!: number;
+}
+
+@ObjectType()
+export class AdminDashboardPeriodTotals {
+  @Field(() => Int) newUsers!: number;
+  @Field(() => Int) newPosts!: number;
+  @Field(() => Int) newComments!: number;
+  @Field(() => Int) newUploads!: number;
+  @Field(() => Int) newTranscriptions!: number;
+  @Field(() => Int) reportsCreated!: number;
+  @Field(() => Int) trackPlays!: number;
+}
+
+@ObjectType()
+export class AdminDailyStatistic {
+  @Field() date!: string;
+  @Field(() => Int) users!: number;
+  @Field(() => Int) posts!: number;
+  @Field(() => Int) comments!: number;
+  @Field(() => Int) reports!: number;
+  @Field(() => Int) trackPlays!: number;
+}
+
+@ObjectType()
+export class AdminCategoryStatistic {
+  @Field() key!: string;
+  @Field(() => Float) count!: number;
+}
+
+@ObjectType()
+export class AdminDashboardStatistics {
+  @Field(() => GraphQLISODateTime) generatedAt!: Date;
+  @Field(() => GraphQLISODateTime) periodStart!: Date;
+  @Field(() => GraphQLISODateTime) periodEnd!: Date;
+  @Field(() => Int) days!: number;
+  @Field(() => AdminDashboardTotals) totals!: AdminDashboardTotals;
+  @Field(() => AdminDashboardPeriodTotals)
+  period!: AdminDashboardPeriodTotals;
+  @Field(() => [AdminDailyStatistic]) daily!: AdminDailyStatistic[];
+  @Field(() => [AdminCategoryStatistic])
+  usersByStatus!: AdminCategoryStatistic[];
+  @Field(() => [AdminCategoryStatistic])
+  transcriptionsByStatus!: AdminCategoryStatistic[];
+  @Field(() => [AdminCategoryStatistic])
+  playsByProvider!: AdminCategoryStatistic[];
 }
 
 @ObjectType()
