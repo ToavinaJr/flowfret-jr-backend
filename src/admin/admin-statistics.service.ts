@@ -1,11 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, ReportStatus, UserStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  AdminCategoryStatistic,
-  AdminDailyStatistic,
-  AdminDashboardStatistics,
-} from './admin.types';
+import { AdminDailyStatistic, AdminDashboardStatistics } from './admin.types';
 
 const TRACK_LISTEN_MUTATION = 'MUTATION_RECORDTRACKLISTEN';
 

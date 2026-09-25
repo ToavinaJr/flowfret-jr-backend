@@ -144,6 +144,7 @@ model Transcription {
   @@unique([provider, trackId, requestedLanguage, model, engineVersion], map: "transcriptions_cache_key_unique")
   @@index([provider, trackId])
   @@index([status])
+  @@index([isDeleted, createdAt(sort: Desc)])
   @@map("transcriptions")
 }
 
@@ -183,6 +184,8 @@ model User {
   playlistItemsAdded      PlaylistItem[]           @relation("PlaylistItemsAddedByUser")
   listeningHistory        ListeningHistory[]
 
+  @@index([isDeleted, createdAt(sort: Desc)])
+  @@index([isDeleted, status])
   @@map("users")
 }
 
@@ -351,6 +354,7 @@ model Post {
   @@index([authorId, createdAt(sort: Desc)])
   @@index([visibility, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
+  @@index([isDeleted, createdAt(sort: Desc)])
   @@map("posts")
 }
 
@@ -372,6 +376,7 @@ model Comment {
   @@index([postId, createdAt(sort: Desc)])
   @@index([authorId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
+  @@index([isDeleted, createdAt(sort: Desc)])
   @@map("comments")
 }
 
@@ -418,6 +423,7 @@ model Upload {
   @@index([status, createdAt(sort: Desc)])
   @@index([sourceType, createdAt(sort: Desc)])
   @@index([cleanupPending, isDeleted])
+  @@index([isDeleted, createdAt(sort: Desc)])
   @@map("uploads")
 }
 
@@ -468,6 +474,7 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([actorId, createdAt(sort: Desc)])
+  @@index([action, isDeleted, createdAt(sort: Desc)])
   @@map("audit_logs")
 }
 
@@ -555,6 +562,7 @@ model PostReport {
 
   @@index([postId, status])
   @@index([status, createdAt(sort: Desc)])
+  @@index([isDeleted, createdAt(sort: Desc)])
   @@map("post_reports")
 }
 

@@ -254,6 +254,8 @@ models that never expose password hashes, Google identifiers, or token hashes.
 Available foundations:
 
 - `adminBackendStatus`
+- `adminDashboardStatistics` with a configurable 7 to 365-day period,
+  overview totals, daily activity, status distributions, and plays by provider
 - `adminUsers` and `adminUser`
 - `adminPosts`, `adminComments`, and `adminPostReports`
 - `adminUploads`, `adminTranscriptions`, and `adminChordTranscriptions`
