@@ -20,6 +20,7 @@ import { SocialModule } from './social/social.module';
 import { PlaylistsModule } from './playlists/playlists.module';
 import { RequestLoaders } from './common/request-loaders';
 import { ChordTranscriptionsModule } from './chord-transcriptions/chord-transcriptions.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ChordTranscriptionsModule } from './chord-transcriptions/chord-transcri
     SocialModule,
     PlaylistsModule,
     ChordTranscriptionsModule,
+    AdminModule,
     GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
       inject: [ConfigService, PrismaService],

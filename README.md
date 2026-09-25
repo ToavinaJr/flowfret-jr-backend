@@ -244,6 +244,26 @@ The worker log must contain `worker.ready`. The API queue diagnostics must repor
 
 The frontend receives the canonical `https://api.audius.co/v1/tracks/:id/stream` URL. It retries that endpoint when an Audius storage node is temporarily unreachable; signed storage-node URLs are never persisted or returned as the durable player URL.
 
+### Admin GraphQL foundation
+
+Administrative queries are exposed only to authenticated users whose
+`UserRole` is `ADMIN`. They use opaque cursor pagination (`first`, `after`),
+cap pages at 100 rows, support search/filtering, and return dedicated admin
+models that never expose password hashes, Google identifiers, or token hashes.
+
+Available foundations:
+
+- `adminBackendStatus`
+- `adminUsers` and `adminUser`
+- `adminPosts`, `adminComments`, and `adminPostReports`
+- `adminUploads`, `adminTranscriptions`, and `adminChordTranscriptions`
+- `adminPlaylists`, `adminCatalogTracks`, and `adminListeningHistory`
+- `adminAuditLogs`
+
+These queries are read-only. Administrative mutations belong to the next
+security phase so destructive actions can enforce last-admin protection,
+session revocation, mandatory reasons, and transactional audit records.
+
 ### REST endpoints
 
 All endpoints use the existing JWT Bearer authentication.

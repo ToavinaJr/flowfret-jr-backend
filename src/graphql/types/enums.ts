@@ -10,6 +10,7 @@ import {
   PostVisibility,
   ProfileVisibility,
   ReportStatus,
+  TranscriptionStatus,
   UploadSourceType,
   UploadStatus,
   UserStatus,
@@ -29,4 +30,5 @@ registerEnumType(UploadStatus, { name: 'UploadStatus' });
 registerEnumType(UploadSourceType, { name: 'UploadSourceType' });
 registerEnumType(NotificationType, { name: 'NotificationType' });
 registerEnumType(ReportStatus, { name: 'ReportStatus' });
+registerEnumType(TranscriptionStatus, { name: 'TranscriptionStatus' });
 registerEnumType(AttachmentKind, { name: 'AttachmentKind' });
