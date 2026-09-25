@@ -30,4 +30,16 @@ describe('YouTubeAudioService', () => {
       ServiceUnavailableException,
     );
   });
+
+  it('fails clearly when the configured cookies file is not Netscape data', () => {
+    const configured = new YouTubeAudioService({
+      get: jest.fn((key: string) =>
+        key === 'YOUTUBE_COOKIES_FILE' ? 'package.json' : undefined,
+      ),
+    } as unknown as ConfigService);
+
+    expect(() => configured.createStream('x77VucXB4jo')).toThrow(
+      'Configured YouTube cookies file is empty or invalid',
+    );
+  });
 });

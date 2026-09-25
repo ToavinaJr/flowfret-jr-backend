@@ -53,6 +53,7 @@ async function bootstrap() {
       );
     },
     credentials: true,
+    exposedHeaders: ['X-Chord-Diagnostic-Id'],
   });
   app.useGlobalPipes(
     new ValidationPipe({

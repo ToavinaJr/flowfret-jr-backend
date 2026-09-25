@@ -3,11 +3,12 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  OnModuleInit,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { delimiter, isAbsolute, resolve } from 'node:path';
 import { PassThrough, type Readable } from 'node:stream';
 import { YOUTUBE_VIDEO_ID_PATTERN } from './youtube.constants';
@@ -18,13 +19,40 @@ export interface YouTubeAudioStream {
 }
 
 @Injectable()
-export class YouTubeAudioService {
+export class YouTubeAudioService implements OnModuleInit {
   private readonly logger = new Logger(YouTubeAudioService.name);
   private activeExtractions = 0;
 
   constructor(private readonly config: ConfigService) {}
 
-  createStream(videoId: string): YouTubeAudioStream {
+  onModuleInit(): void {
+    try {
+      const cookieFile = this.cookieFile();
+      this.logger.log(
+        JSON.stringify({
+          event: 'youtube.extractor_config',
+          python: this.pythonBinary(),
+          bundledPythonPackagesPresent: existsSync(
+            resolve(process.cwd(), '.python-packages', 'yt_dlp'),
+          ),
+          cookiesConfigured: Boolean(cookieFile),
+          ...(cookieFile ? this.cookieDiagnostics(cookieFile) : {}),
+        }),
+      );
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: 'youtube.extractor_config_invalid',
+          reason:
+            error instanceof Error
+              ? error.message
+              : 'Unknown configuration error',
+        }),
+      );
+    }
+  }
+
+  createStream(videoId: string, diagnosticId?: string): YouTubeAudioStream {
     if (!YOUTUBE_VIDEO_ID_PATTERN.test(videoId)) {
       throw new BadRequestException('Invalid YouTube video id');
     }
@@ -43,10 +71,7 @@ export class YouTubeAudioService {
       this.activeExtractions = Math.max(0, this.activeExtractions - 1);
     };
 
-    const python =
-      this.config.get<string>('YOUTUBE_DL_PYTHON_BIN')?.trim() ||
-      this.config.get<string>('WHISPER_PYTHON_BIN')?.trim() ||
-      'python3';
+    const python = this.pythonBinary();
     const maxBytes = this.number('YOUTUBE_AUDIO_MAX_SIZE_MB', 30) * 1024 * 1024;
     const maxDuration = this.number('YOUTUBE_AUDIO_MAX_DURATION_SECONDS', 600);
     const timeoutMs = this.number('YOUTUBE_AUDIO_DOWNLOAD_TIMEOUT_MS', 120_000);
@@ -82,6 +107,19 @@ export class YouTubeAudioService {
         windowsHide: true,
         env: { ...process.env, PYTHONPATH: pythonPath },
       },
+    );
+    const startedAt = Date.now();
+    this.logger.log(
+      JSON.stringify({
+        event: 'youtube.audio_extraction_started',
+        diagnosticId,
+        videoId,
+        cookiesConfigured: Boolean(cookieFile),
+        activeExtractions: this.activeExtractions,
+        maxBytes,
+        maxDuration,
+        timeoutMs,
+      }),
     );
     const output = new PassThrough();
     let bytes = 0;
@@ -122,8 +160,10 @@ export class YouTubeAudioService {
       this.logger.error(
         JSON.stringify({
           event: 'youtube.audio_process_error',
+          diagnosticId,
           videoId,
           errorName: error.name,
+          errorMessage: error.message,
         }),
       );
       fail('YouTube audio extractor is unavailable');
@@ -134,15 +174,29 @@ export class YouTubeAudioService {
       clearTimeout(timer);
       release();
       if (code === 0 && bytes > 0) {
+        this.logger.log(
+          JSON.stringify({
+            event: 'youtube.audio_extraction_succeeded',
+            diagnosticId,
+            videoId,
+            bytes,
+            durationMs: Date.now() - startedAt,
+          }),
+        );
         output.end();
         return;
       }
+      const detail = this.safeExtractorDetail(stderr);
       this.logger.warn(
         JSON.stringify({
           event: 'youtube.audio_extraction_failed',
+          diagnosticId,
           videoId,
           code,
-          detail: stderr.replace(/https?:\/\/\S+/gi, '[redacted-url]').trim(),
+          category: this.extractorFailureCategory(stderr),
+          durationMs: Date.now() - startedAt,
+          bytes,
+          detail,
         }),
       );
       output.destroy(
@@ -159,6 +213,14 @@ export class YouTubeAudioService {
     return Number.isInteger(value) && value > 0 ? value : fallback;
   }
 
+  private pythonBinary(): string {
+    return (
+      this.config.get<string>('YOUTUBE_DL_PYTHON_BIN')?.trim() ||
+      this.config.get<string>('WHISPER_PYTHON_BIN')?.trim() ||
+      'python3'
+    );
+  }
+
   private cookieFile(): string | undefined {
     const configured = this.config.get<string>('YOUTUBE_COOKIES_FILE')?.trim();
     if (!configured) return undefined;
@@ -170,6 +232,68 @@ export class YouTubeAudioService {
         'Configured YouTube cookies file is unavailable',
       );
     }
+    const diagnostics = this.cookieDiagnostics(path);
+    if (!diagnostics.headerValid || diagnostics.cookieRows === 0) {
+      throw new ServiceUnavailableException(
+        'Configured YouTube cookies file is empty or invalid',
+      );
+    }
     return path;
+  }
+
+  private cookieDiagnostics(path: string): {
+    cookieFileBytes: number;
+    cookieRows: number;
+    headerValid: boolean;
+  } {
+    const content = readFileSync(path, 'utf8');
+    const firstLine = content.split(/\r?\n/, 1)[0]?.trim();
+    const cookieRows = content.split(/\r?\n/).filter((line) => {
+      const candidate = line.trim();
+      return (
+        Boolean(candidate) &&
+        (!candidate.startsWith('#') || candidate.startsWith('#HttpOnly_')) &&
+        candidate.split('\t').length >= 7
+      );
+    }).length;
+    return {
+      cookieFileBytes: statSync(path).size,
+      cookieRows,
+      headerValid:
+        firstLine === '# Netscape HTTP Cookie File' ||
+        firstLine === '# HTTP Cookie File',
+    };
+  }
+
+  private extractorFailureCategory(stderr: string): string {
+    if (/sign in to confirm|not a bot|login required/i.test(stderr)) {
+      return 'youtube_authentication_required';
+    }
+    if (/cookie.*(?:expired|invalid)|invalid.*cookie/i.test(stderr)) {
+      return 'youtube_cookies_invalid';
+    }
+    if (
+      /no module named yt_dlp|module specification for 'yt_dlp'/i.test(stderr)
+    ) {
+      return 'yt_dlp_missing';
+    }
+    if (/no supported javascript runtime|javascript runtime/i.test(stderr)) {
+      return 'javascript_runtime_unavailable';
+    }
+    if (/unable to download|network|timed?\s*out|connection/i.test(stderr)) {
+      return 'youtube_network_failure';
+    }
+    if (/requested format is not available|no video formats/i.test(stderr)) {
+      return 'audio_format_unavailable';
+    }
+    return 'unknown_extractor_failure';
+  }
+
+  private safeExtractorDetail(stderr: string): string {
+    return stderr
+      .replace(/https?:\/\/\S+/gi, '[redacted-url]')
+      .replace(/(cookie|authorization):\s*\S+/gi, '$1: [redacted]')
+      .trim()
+      .slice(-800);
   }
 }
