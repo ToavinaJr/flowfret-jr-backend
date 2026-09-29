@@ -8,11 +8,13 @@ import { AdminUsersResolver } from './admin-users.resolver';
 import { AdminSecurityResolver } from './admin-security.resolver';
 import { AdminSecurityService } from './admin-security.service';
 import { AdminStatisticsService } from './admin-statistics.service';
+import { AdminUserActivityResolver } from './admin-user-activity.resolver';
 
 @Module({
   providers: [
     AdminDashboardResolver,
     AdminUsersResolver,
+    AdminUserActivityResolver,
     AdminContentResolver,
     AdminMediaResolver,
     AdminMusicResolver,
