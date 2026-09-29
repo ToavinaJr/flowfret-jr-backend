@@ -321,6 +321,16 @@ export class AdminUser {
   @Field() isDeleted!: boolean;
   @Field(() => GraphQLISODateTime, { nullable: true }) deletedAt!: Date | null;
   @Field(() => String, { nullable: true }) displayName!: string | null;
+  @Field(() => AdminUserActivity)
+  activity!: AdminUserActivity;
+}
+
+@ObjectType()
+export class AdminUserActivity {
+  @Field(() => Int) posts!: number;
+  @Field(() => Int) comments!: number;
+  @Field(() => Int) playlists!: number;
+  @Field(() => Int) uploads!: number;
 }
 
 @ObjectType()

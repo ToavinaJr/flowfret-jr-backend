@@ -1,11 +1,12 @@
 import { ParseUUIDPipe } from '@nestjs/common';
-import { Args, Query, Resolver } from '@nestjs/graphql';
+import { Args, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { Prisma, UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildAdminPage, decodeAdminPage } from './admin-pagination';
 import {
   AdminSortDirection,
+  AdminUserActivity,
   AdminUser,
   AdminUserConnection,
   AdminUsersInput,
@@ -16,6 +17,25 @@ import {
 @Resolver()
 export class AdminUsersResolver {
   constructor(private readonly prisma: PrismaService) {}
+
+  @ResolveField(() => AdminUserActivity)
+  async activity(user: AdminUser): Promise<AdminUserActivity> {
+    const [posts, comments, playlists, uploads] = await Promise.all([
+      this.prisma.post.count({
+        where: { authorId: user.id, isDeleted: false },
+      }),
+      this.prisma.comment.count({
+        where: { authorId: user.id, isDeleted: false },
+      }),
+      this.prisma.playlist.count({
+        where: { userId: user.id, isDeleted: false },
+      }),
+      this.prisma.upload.count({
+        where: { userId: user.id, isDeleted: false },
+      }),
+    ]);
+    return { posts, comments, playlists, uploads };
+  }
 
   @Query(() => AdminUserConnection, { name: 'adminUsers' })
   async users(
