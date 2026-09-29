@@ -24,6 +24,7 @@ import {
 import { GraphQLJSON } from 'graphql-type-json';
 import {
   IsBoolean,
+  IsDateString,
   IsEnum,
   IsInt,
   IsOptional,
@@ -200,6 +201,16 @@ export class AdminAuditInput extends AdminListInput {
   @IsString()
   @MaxLength(100)
   entityType?: string;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }
 
 @InputType()
