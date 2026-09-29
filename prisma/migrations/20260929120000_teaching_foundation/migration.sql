@@ -34,7 +34,7 @@ CREATE TABLE "teaching_courses" (
   "max_students" INTEGER NOT NULL DEFAULT 1,
   "teaching_mode" "TeachingMode" NOT NULL DEFAULT 'HYBRID',
   "price_amount" INTEGER NOT NULL,
-  "price_currency" VARCHAR(3) NOT NULL DEFAULT 'EUR',
+  "price_currency" VARCHAR(3) NOT NULL,
   "price_unit" "TeachingPriceUnit" NOT NULL DEFAULT 'PER_COURSE',
   "duration_minutes" INTEGER NOT NULL,
   "status" "TeachingCourseStatus" NOT NULL DEFAULT 'DRAFT',

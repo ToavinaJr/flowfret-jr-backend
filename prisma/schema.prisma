@@ -405,7 +405,7 @@ model TeachingCourse {
   maxStudents       Int                  @default(1) @map("max_students")
   teachingMode      TeachingMode         @default(HYBRID) @map("teaching_mode")
   priceAmount       Int                  @map("price_amount")
-  priceCurrency     String               @default("EUR") @map("price_currency") @db.VarChar(3)
+  priceCurrency     String               @map("price_currency") @db.VarChar(3)
   priceUnit         TeachingPriceUnit    @default(PER_COURSE) @map("price_unit")
   durationMinutes   Int                  @map("duration_minutes")
   status            TeachingCourseStatus @default(DRAFT)
