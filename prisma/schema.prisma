@@ -56,6 +56,19 @@ enum TeachingEnrollmentStatus {
   CANCELLED
 }
 
+enum TeachingLessonStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum LessonAttendanceStatus {
+  EXPECTED
+  PRESENT
+  ABSENT
+  EXCUSED
+}
+
 enum ProfileVisibility {
   PUBLIC
   FRIENDS
@@ -117,6 +130,10 @@ enum NotificationType {
   TEACHING_COURSE_INVITATION
   TEACHING_ENROLLMENT_REQUEST
   TEACHING_ENROLLMENT_UPDATED
+  TEACHING_LESSON_SCHEDULED
+  TEACHING_LESSON_RESCHEDULED
+  TEACHING_LESSON_CANCELLED
+  TEACHING_LESSON_COMPLETED
 }
 
 enum ReportStatus {
@@ -207,6 +224,7 @@ model User {
   profile                 Profile?
   instructorProfile       InstructorProfile?
   teachingEnrollments     TeachingEnrollment[]       @relation("TeachingEnrollmentStudent")
+  createdTeachingLessons  TeachingLesson[]           @relation("TeachingLessonCreator")
   authoredPosts           Post[]                   @relation("UserAuthoredPosts")
   comments                Comment[]                @relation("UserComments")
   uploads                 Upload[]
@@ -419,6 +437,7 @@ model TeachingCourse {
 
   instructor InstructorProfile     @relation(fields: [instructorId], references: [id], onDelete: Restrict)
   enrollments TeachingEnrollment[]
+  lessons     TeachingLesson[]
 
   @@index([instructorId, status, isDeleted, updatedAt(sort: Desc)])
   @@index([status, teachingMode, isDeleted, createdAt(sort: Desc)])
@@ -442,11 +461,55 @@ model TeachingEnrollment {
 
   course  TeachingCourse @relation(fields: [courseId], references: [id], onDelete: Restrict)
   student User           @relation("TeachingEnrollmentStudent", fields: [studentId], references: [id], onDelete: Restrict)
+  lessonAttendances LessonAttendance[]
 
   @@unique([courseId, studentId], map: "teaching_enrollments_course_student_unique")
   @@index([studentId, status, isDeleted, updatedAt(sort: Desc)])
   @@index([courseId, status, isDeleted, createdAt])
   @@map("teaching_enrollments")
+}
+
+model TeachingLesson {
+  id               String               @id @default(uuid()) @db.Uuid
+  courseId         String               @map("course_id") @db.Uuid
+  createdById      String               @map("created_by_id") @db.Uuid
+  startsAt         DateTime             @map("starts_at") @db.Timestamptz(6)
+  endsAt           DateTime             @map("ends_at") @db.Timestamptz(6)
+  timeZone         String               @map("time_zone") @db.VarChar(64)
+  teachingMode     TeachingMode         @map("teaching_mode")
+  location         String?              @db.VarChar(500)
+  meetingUrl       String?              @map("meeting_url") @db.Text
+  status           TeachingLessonStatus @default(SCHEDULED)
+  cancellationNote String?              @map("cancellation_note") @db.VarChar(1000)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  course      TeachingCourse     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  createdBy   User               @relation("TeachingLessonCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  attendances LessonAttendance[]
+
+  @@index([courseId, startsAt])
+  @@index([status, startsAt, endsAt])
+  @@index([createdById, startsAt])
+  @@map("teaching_lessons")
+}
+
+model LessonAttendance {
+  id           String                 @id @default(uuid()) @db.Uuid
+  lessonId     String                 @map("lesson_id") @db.Uuid
+  enrollmentId String                 @map("enrollment_id") @db.Uuid
+  status       LessonAttendanceStatus @default(EXPECTED)
+  note         String?                @db.VarChar(1000)
+  markedAt     DateTime?              @map("marked_at") @db.Timestamptz(6)
+  createdAt    DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  lesson     TeachingLesson     @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  enrollment TeachingEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+
+  @@unique([lessonId, enrollmentId], map: "lesson_attendance_lesson_enrollment_unique")
+  @@index([enrollmentId, status])
+  @@map("lesson_attendances")
 }
 
 model Post {

@@ -21,6 +21,8 @@ import {
   TeachingCourseStatus,
   TeachingPriceUnit,
   TeachingEnrollmentStatus,
+  TeachingLessonStatus,
+  LessonAttendanceStatus,
 } from '@prisma/client';
 
 registerEnumType(UserStatus, { name: 'UserStatus' });
@@ -46,3 +48,5 @@ registerEnumType(TeachingPriceUnit, { name: 'TeachingPriceUnit' });
 registerEnumType(TeachingEnrollmentStatus, {
   name: 'TeachingEnrollmentStatus',
 });
+registerEnumType(TeachingLessonStatus, { name: 'TeachingLessonStatus' });
+registerEnumType(LessonAttendanceStatus, { name: 'LessonAttendanceStatus' });

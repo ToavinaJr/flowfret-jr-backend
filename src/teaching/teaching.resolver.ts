@@ -9,6 +9,7 @@ import {
   TeachingCourseFormat,
   TeachingCourseStatus,
   TeachingEnrollmentStatus,
+  TeachingLessonStatus,
   TeachingMode,
   TeachingPriceUnit,
   UserRole,
@@ -630,6 +631,34 @@ export class TeachingResolver {
               : null,
         },
       });
+      if (data.status === TeachingEnrollmentStatus.ACTIVE) {
+        const upcomingLessons = await tx.teachingLesson.findMany({
+          where: {
+            courseId: enrollment.courseId,
+            status: TeachingLessonStatus.SCHEDULED,
+            endsAt: { gt: new Date() },
+          },
+          select: { id: true },
+        });
+        if (upcomingLessons.length) {
+          await tx.lessonAttendance.createMany({
+            data: upcomingLessons.map(({ id: lessonId }) => ({
+              lessonId,
+              enrollmentId: id,
+            })),
+            skipDuplicates: true,
+          });
+          await tx.lessonAttendance.updateMany({
+            where: {
+              enrollmentId: id,
+              lessonId: {
+                in: upcomingLessons.map(({ id: lessonId }) => lessonId),
+              },
+            },
+            data: { status: 'EXPECTED', note: null, markedAt: null },
+          });
+        }
+      }
       await tx.auditLog.create({
         data: {
           actorId: context.req.user.sub,
