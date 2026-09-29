@@ -21,6 +21,7 @@ import { PlaylistsModule } from './playlists/playlists.module';
 import { RequestLoaders } from './common/request-loaders';
 import { ChordTranscriptionsModule } from './chord-transcriptions/chord-transcriptions.module';
 import { AdminModule } from './admin/admin.module';
+import { TeachingModule } from './teaching/teaching.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { AdminModule } from './admin/admin.module';
     PlaylistsModule,
     ChordTranscriptionsModule,
     AdminModule,
+    TeachingModule,
     GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
       inject: [ConfigService, PrismaService],

@@ -15,6 +15,12 @@ import {
   UploadStatus,
   UserStatus,
   UserRole,
+  InstructorStatus,
+  TeachingCourseFormat,
+  TeachingMode,
+  TeachingCourseStatus,
+  TeachingPriceUnit,
+  TeachingEnrollmentStatus,
 } from '@prisma/client';
 
 registerEnumType(UserStatus, { name: 'UserStatus' });
@@ -32,3 +38,9 @@ registerEnumType(NotificationType, { name: 'NotificationType' });
 registerEnumType(ReportStatus, { name: 'ReportStatus' });
 registerEnumType(TranscriptionStatus, { name: 'TranscriptionStatus' });
 registerEnumType(AttachmentKind, { name: 'AttachmentKind' });
+registerEnumType(InstructorStatus, { name: 'InstructorStatus' });
+registerEnumType(TeachingCourseFormat, { name: 'TeachingCourseFormat' });
+registerEnumType(TeachingMode, { name: 'TeachingMode' });
+registerEnumType(TeachingCourseStatus, { name: 'TeachingCourseStatus' });
+registerEnumType(TeachingPriceUnit, { name: 'TeachingPriceUnit' });
+registerEnumType(TeachingEnrollmentStatus, { name: 'TeachingEnrollmentStatus' });
