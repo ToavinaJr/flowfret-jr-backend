@@ -134,6 +134,24 @@ export class AdminContentInput extends AdminListInput {
 }
 
 @InputType()
+export class AdminModerateReportInput {
+  @Field()
+  @IsUUID()
+  reportId!: string;
+
+  @Field(() => ReportStatus)
+  @IsEnum(ReportStatus)
+  status!: ReportStatus;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(3)
+  @MaxLength(500)
+  reason!: string;
+}
+
+@InputType()
 export class AdminMediaInput extends AdminListInput {
   @Field(() => UploadStatus, { nullable: true })
   @IsOptional()
@@ -397,6 +415,11 @@ export class AdminPostReport {
   @Field() postId!: string;
   @Field() reporterId!: string;
   @Field() reporterUsername!: string;
+  @Field(() => String, { nullable: true }) postContent!: string | null;
+  @Field() postAuthorUsername!: string;
+  @Field(() => PostStatus) postStatus!: PostStatus;
+  @Field(() => PostVisibility) postVisibility!: PostVisibility;
+  @Field() postIsDeleted!: boolean;
   @Field() reason!: string;
   @Field(() => ReportStatus) status!: ReportStatus;
   @Field(() => GraphQLISODateTime) createdAt!: Date;

@@ -1,20 +1,28 @@
-import { Args, Query, Resolver } from '@nestjs/graphql';
-import { Prisma, UserRole } from '@prisma/client';
+import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Prisma, ReportStatus, UserRole } from '@prisma/client';
+import { RateLimit } from '../auth/rate-limit.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildAdminPage, decodeAdminPage } from './admin-pagination';
 import {
   AdminCommentConnection,
   AdminContentInput,
+  AdminModerateReportInput,
   AdminPostConnection,
   AdminPostReportConnection,
   AdminSortDirection,
 } from './admin.types';
+import { AdminModerationService } from './admin-moderation.service';
+
+type AdminRequestContext = { req: { user: { sub: string } } };
 
 @Roles(UserRole.ADMIN)
 @Resolver()
 export class AdminContentResolver {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly moderation: AdminModerationService,
+  ) {}
 
   @Query(() => AdminPostConnection, { name: 'adminPosts' })
   async posts(
@@ -134,7 +142,18 @@ export class AdminContentResolver {
         skip: page.skip,
         take: page.take + 1,
         orderBy: [{ createdAt: direction }, { id: direction }],
-        include: { reporter: { select: { username: true } } },
+        include: {
+          reporter: { select: { username: true } },
+          post: {
+            select: {
+              content: true,
+              status: true,
+              visibility: true,
+              isDeleted: true,
+              author: { select: { username: true } },
+            },
+          },
+        },
       }),
       this.prisma.postReport.count({ where }),
     ]);
@@ -142,9 +161,28 @@ export class AdminContentResolver {
       rows.map((row) => ({
         ...row,
         reporterUsername: row.reporter.username,
+        postContent: row.post.content,
+        postAuthorUsername: row.post.author.username,
+        postStatus: row.post.status,
+        postVisibility: row.post.visibility,
+        postIsDeleted: row.post.isDeleted,
       })),
       totalCount,
       page,
+    );
+  }
+
+  @RateLimit(30, 60, true)
+  @Mutation(() => ReportStatus, { name: 'adminModeratePostReport' })
+  moderateReport(
+    @Args('input') input: AdminModerateReportInput,
+    @Context() context: AdminRequestContext,
+  ): Promise<ReportStatus> {
+    return this.moderation.moderateReport(
+      context.req.user.sub,
+      input.reportId,
+      input.status,
+      input.reason,
     );
   }
 
