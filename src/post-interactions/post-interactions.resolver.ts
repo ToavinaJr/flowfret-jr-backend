@@ -92,8 +92,13 @@ export class PostInteractionsResolver {
   updatePostReport(
     @Args('id') id: string,
     @Args('data') data: UpdatePostReportInput,
+    @Context() context: RequestContext,
   ): Promise<PostReportModel> {
-    return this.moderation.updateReport(id, data);
+    return this.moderation.updateReportWithReason(
+      id,
+      data,
+      context.req.user.sub,
+    );
   }
 
   @Mutation(() => PostReportModel)

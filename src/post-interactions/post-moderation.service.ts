@@ -3,7 +3,7 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, ReportStatus } from '@prisma/client';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 import {
   CreatePostAttachmentInput,
@@ -71,6 +71,64 @@ export class PostModerationService {
     return this.prisma.postReport.update({
       where: { id },
       data: { status: data.status, reviewedAt: new Date() },
+    });
+  }
+
+  async updateReportWithReason(
+    id: string,
+    data: UpdatePostReportInput,
+    actorId: string,
+  ): Promise<PostReportModel> {
+    const reason = data.reason?.trim() ?? '';
+    if (!data.status || data.status === ReportStatus.OPEN) {
+      throw new BadRequestException({
+        code: 'ADMIN_MODERATION_STATUS_INVALID',
+        message: 'A valid moderation status is required.',
+      });
+    }
+    if (reason.length < 3 || reason.length > 500) {
+      throw new BadRequestException({
+        code: 'ADMIN_MODERATION_REASON_INVALID',
+        message:
+          'A moderation reason between 3 and 500 characters is required.',
+      });
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const report = await tx.postReport.findUnique({
+        where: { id },
+        select: { id: true, postId: true, status: true, isDeleted: true },
+      });
+      if (!report || report.isDeleted) {
+        throw new BadRequestException({
+          code: 'ADMIN_REPORT_NOT_FOUND',
+          message: 'Report not found.',
+        });
+      }
+      if (report.status === data.status) {
+        throw new ConflictException({
+          code: 'ADMIN_REPORT_STATUS_UNCHANGED',
+          message: 'Report already has this status.',
+        });
+      }
+      const updated = await tx.postReport.update({
+        where: { id },
+        data: { status: data.status, reviewedAt: new Date() },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: AUDIT_ACTION.ADMIN_POST_REPORT_MODERATED,
+          entityType: AUDIT_ENTITY.POST,
+          entityId: report.postId,
+          metadata: {
+            reportId: id,
+            reason,
+            previousStatus: report.status,
+            nextStatus: data.status,
+          },
+        },
+      });
+      return updated;
     });
   }
 

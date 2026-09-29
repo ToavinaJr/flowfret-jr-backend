@@ -33,6 +33,8 @@ export class AuditInterceptor implements NestInterceptor {
     'adminSetUserStatus',
     'adminDeleteUser',
     'adminRevokeUserSessions',
+    'adminModeratePostReport',
+    'updatePostReport',
   ]);
 
   constructor(private readonly prisma: PrismaService) {}

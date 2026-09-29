@@ -74,6 +74,12 @@ export class UpdatePostReportInput {
   @IsOptional()
   @IsEnum(ReportStatus)
   status?: ReportStatus;
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(500)
+  reason?: string;
   @Field(() => GraphQLISODateTime, { nullable: true })
   @IsOptional()
   reviewedAt?: Date | null;

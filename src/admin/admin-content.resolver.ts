@@ -131,6 +131,22 @@ export class AdminContentResolver {
                   username: { contains: search, mode: 'insensitive' },
                 },
               },
+              {
+                post: {
+                  is: {
+                    content: { contains: search, mode: 'insensitive' },
+                  },
+                },
+              },
+              {
+                post: {
+                  is: {
+                    author: {
+                      username: { contains: search, mode: 'insensitive' },
+                    },
+                  },
+                },
+              },
             ],
           }
         : {}),

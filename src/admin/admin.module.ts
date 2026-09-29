@@ -25,5 +25,6 @@ import { AdminModerationService } from './admin-moderation.service';
     AdminStatisticsService,
     AdminModerationService,
   ],
+  exports: [AdminModerationService],
 })
 export class AdminModule {}

@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, ReportStatus } from '@prisma/client';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,7 +22,8 @@ export class AdminModerationService {
     if (reason.length < 3 || reason.length > 500) {
       throw new BadRequestException({
         code: 'ADMIN_MODERATION_REASON_INVALID',
-        message: 'A moderation reason between 3 and 500 characters is required.',
+        message:
+          'A moderation reason between 3 and 500 characters is required.',
       });
     }
     if (status === ReportStatus.OPEN) {
