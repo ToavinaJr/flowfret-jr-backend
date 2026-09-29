@@ -185,6 +185,31 @@ export class TeachingResolver {
     });
   }
 
+  @Query(() => [TeachingEnrollmentModel], { name: 'myTeachingEnrollments' })
+  async myTeachingEnrollments(@Context() context: TeachingContext) {
+    const rows = await this.prisma.teachingEnrollment.findMany({
+      where: {
+        studentId: context.req.user.sub,
+        isDeleted: false,
+        status: { in: activeEnrollmentStatuses },
+      },
+      include: {
+        course: {
+          include: {
+            instructor: { include: { user: { select: { username: true } } } },
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+    });
+    return rows.map((row) => ({
+      ...row,
+      courseTitle: row.course.title,
+      instructorUsername: row.course.instructor.user.username,
+    }));
+  }
+
   @Mutation(() => TeachingCourseModel)
   async createTeachingCourse(
     @Args('data') data: CreateTeachingCourseInput,
@@ -330,11 +355,20 @@ export class TeachingResolver {
     @Context() context: TeachingContext,
   ) {
     await this.requireOwnedCourse(courseId, context.req.user.sub);
-    return this.prisma.teachingEnrollment.findMany({
+    const rows = await this.prisma.teachingEnrollment.findMany({
       where: { courseId, isDeleted: false },
+      include: {
+        student: { select: { username: true } },
+        course: { select: { title: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
+    return rows.map((row) => ({
+      ...row,
+      studentUsername: row.student.username,
+      courseTitle: row.course.title,
+    }));
   }
 
   @Mutation(() => TeachingEnrollmentModel)

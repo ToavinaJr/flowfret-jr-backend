@@ -67,6 +67,9 @@ export class TeachingEnrollmentModel {
   @Field() id!: string;
   @Field() courseId!: string;
   @Field() studentId!: string;
+  @Field(() => String, { nullable: true }) courseTitle?: string;
+  @Field(() => String, { nullable: true }) instructorUsername?: string;
+  @Field(() => String, { nullable: true }) studentUsername?: string;
   @Field(() => TeachingEnrollmentStatus) status!: TeachingEnrollmentStatus;
   @Field(() => GraphQLISODateTime, { nullable: true }) invitedAt!: Date | null;
   @Field(() => GraphQLISODateTime, { nullable: true }) acceptedAt!: Date | null;

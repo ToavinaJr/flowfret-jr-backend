@@ -74,4 +74,7 @@ export const CONFIGURABLE_NOTIFICATION_TYPES = new Set<NotificationType>([
   NotificationType.POST_LIKE,
   NotificationType.POST_COMMENT,
   NotificationType.FOLLOWED_POST_ACTIVITY,
+  NotificationType.TEACHING_COURSE_INVITATION,
+  NotificationType.TEACHING_ENROLLMENT_REQUEST,
+  NotificationType.TEACHING_ENROLLMENT_UPDATED,
 ]);
