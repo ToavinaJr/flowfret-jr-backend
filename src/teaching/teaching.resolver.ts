@@ -424,7 +424,7 @@ export class TeachingResolver {
       courseId,
       context.req.user.sub,
     );
-    const student = await this.assertActiveUser(studentId);
+    await this.assertActiveUser(studentId);
     if (studentId === context.req.user.sub)
       throw new BadRequestException(
         'Vous ne pouvez pas vous inviter vous-même.',
@@ -704,24 +704,6 @@ function normalizeOptionalText(
 function normalizeList(values: string[] | undefined): string[] | undefined {
   if (!values) return values;
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
-}
-
-function courseData(
-  data: CreateTeachingCourseInput | UpdateTeachingCourseInput,
-) {
-  return {
-    title: data.title?.trim(),
-    description: normalizeOptionalText(data.description),
-    level: normalizeOptionalText(data.level),
-    format: data.format,
-    maxStudents:
-      data.maxStudents ?? (data.format === TeachingCourseFormat.GROUP ? 2 : 1),
-    teachingMode: data.teachingMode,
-    priceAmount: data.priceAmount,
-    priceCurrency: data.priceCurrency?.trim().toUpperCase(),
-    priceUnit: data.priceUnit,
-    durationMinutes: data.durationMinutes,
-  };
 }
 
 function validateCourseShape(data: {
