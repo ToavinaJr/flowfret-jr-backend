@@ -43,4 +43,6 @@ registerEnumType(TeachingCourseFormat, { name: 'TeachingCourseFormat' });
 registerEnumType(TeachingMode, { name: 'TeachingMode' });
 registerEnumType(TeachingCourseStatus, { name: 'TeachingCourseStatus' });
 registerEnumType(TeachingPriceUnit, { name: 'TeachingPriceUnit' });
-registerEnumType(TeachingEnrollmentStatus, { name: 'TeachingEnrollmentStatus' });
+registerEnumType(TeachingEnrollmentStatus, {
+  name: 'TeachingEnrollmentStatus',
+});
