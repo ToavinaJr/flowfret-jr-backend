@@ -317,7 +317,14 @@ export class TeachingResolver {
     @Context() context: TeachingContext,
   ) {
     await this.requireOwnedCourse(id, context.req.user.sub);
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const scheduledLessons = await tx.teachingLesson.findMany({
+        where: { courseId: id, status: TeachingLessonStatus.SCHEDULED },
+        include: {
+          attendances: { include: { enrollment: true } },
+          course: { select: { title: true } },
+        },
+      });
       const archived = await tx.teachingCourse.update({
         where: { id },
         data: {
@@ -337,6 +344,13 @@ export class TeachingResolver {
           endedAt: new Date(),
         },
       });
+      await tx.teachingLesson.updateMany({
+        where: { courseId: id, status: TeachingLessonStatus.SCHEDULED },
+        data: {
+          status: TeachingLessonStatus.CANCELLED,
+          cancellationNote: 'Le cours a été archivé.',
+        },
+      });
       await tx.auditLog.create({
         data: {
           actorId: context.req.user.sub,
@@ -346,8 +360,30 @@ export class TeachingResolver {
           metadata: {},
         },
       });
-      return archived;
+      return { archived, scheduledLessons };
     });
+    for (const lesson of result.scheduledLessons) {
+      const recipients = [
+        ...new Set(
+          lesson.attendances
+            .filter(
+              ({ enrollment }) =>
+                enrollment.status === TeachingEnrollmentStatus.ACTIVE &&
+                !enrollment.isDeleted,
+            )
+            .map(({ enrollment }) => enrollment.studentId),
+        ),
+      ];
+      for (const userId of recipients)
+        await this.createNotification(userId, 'TEACHING_LESSON_CANCELLED', {
+          lessonId: lesson.id,
+          courseId: id,
+          courseTitle: lesson.course.title,
+          startsAt: lesson.startsAt.toISOString(),
+          timeZone: lesson.timeZone,
+        });
+    }
+    return result.archived;
   }
 
   @Query(() => [TeachingEnrollmentModel], { name: 'teachingCourseEnrollments' })
@@ -740,7 +776,8 @@ export class TeachingResolver {
     type:
       | 'TEACHING_COURSE_INVITATION'
       | 'TEACHING_ENROLLMENT_REQUEST'
-      | 'TEACHING_ENROLLMENT_UPDATED',
+      | 'TEACHING_ENROLLMENT_UPDATED'
+      | 'TEACHING_LESSON_CANCELLED',
     payload: Prisma.InputJsonObject,
   ) {
     const notificationType =

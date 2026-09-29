@@ -433,7 +433,13 @@ export class TeachingLessonsResolver {
   ) {
     const recipients = [
       ...new Set(
-        lesson.attendances.map(({ enrollment }) => enrollment.studentId),
+        lesson.attendances
+          .filter(
+            ({ enrollment }) =>
+              enrollment.status === participantEnrollmentStatus &&
+              !enrollment.isDeleted,
+          )
+          .map(({ enrollment }) => enrollment.studentId),
       ),
     ];
     if (!recipients.length) return;
