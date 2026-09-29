@@ -1,7 +1,10 @@
 import { ResolveField, Resolver } from '@nestjs/graphql';
+import { UserRole } from '@prisma/client';
+import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminUser, AdminUserActivity } from './admin.types';
 
+@Roles(UserRole.ADMIN)
 @Resolver(() => AdminUser)
 export class AdminUserActivityResolver {
   constructor(private readonly prisma: PrismaService) {}
