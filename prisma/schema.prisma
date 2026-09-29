@@ -18,6 +18,44 @@ enum UserRole {
   ADMIN
 }
 
+enum InstructorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum TeachingCourseFormat {
+  INDIVIDUAL
+  GROUP
+}
+
+enum TeachingMode {
+  IN_PERSON
+  ONLINE
+  HYBRID
+}
+
+enum TeachingCourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TeachingPriceUnit {
+  PER_COURSE
+  PER_LESSON
+}
+
+enum TeachingEnrollmentStatus {
+  REQUESTED
+  INVITED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
 enum ProfileVisibility {
   PUBLIC
   FRIENDS
@@ -164,6 +202,8 @@ model User {
   deletedAt             DateTime?  @map("deleted_at") @db.Timestamptz(6)
 
   profile                 Profile?
+  instructorProfile       InstructorProfile?
+  teachingEnrollments     TeachingEnrollment[]       @relation("TeachingEnrollmentStudent")
   authoredPosts           Post[]                   @relation("UserAuthoredPosts")
   comments                Comment[]                @relation("UserComments")
   uploads                 Upload[]
@@ -327,6 +367,83 @@ model Profile {
 
   @@index([visibility])
   @@map("profiles")
+}
+
+/// A teaching capability attached to a regular FlowFret account. A user may
+/// also be enrolled as a student in other courses.
+model InstructorProfile {
+  id                String           @id @default(uuid()) @db.Uuid
+  userId            String           @unique @map("user_id") @db.Uuid
+  status            InstructorStatus @default(PENDING)
+  headline          String?          @db.VarChar(160)
+  biography         String?          @db.Text
+  experienceYears   Int?             @map("experience_years")
+  specialties       String[]         @default([])
+  languages         String[]         @default([])
+  storageQuotaBytes BigInt           @default(0) @map("storage_quota_bytes") @db.BigInt
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  isDeleted         Boolean          @default(false) @map("is_deleted")
+  deletedAt         DateTime?        @map("deleted_at") @db.Timestamptz(6)
+
+  user    User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  courses TeachingCourse[]
+
+  @@index([status, isDeleted, createdAt(sort: Desc)])
+  @@map("instructor_profiles")
+}
+
+/// A paid guitar course offered by an approved instructor. Capacity is
+/// persisted now so group classes can be enabled without replacing this model.
+model TeachingCourse {
+  id                String               @id @default(uuid()) @db.Uuid
+  instructorId      String               @map("instructor_id") @db.Uuid
+  title             String               @db.VarChar(160)
+  description       String?              @db.Text
+  level             String?              @db.VarChar(50)
+  format            TeachingCourseFormat @default(INDIVIDUAL)
+  maxStudents       Int                  @default(1) @map("max_students")
+  teachingMode      TeachingMode         @default(HYBRID) @map("teaching_mode")
+  priceAmount       Int                  @map("price_amount")
+  priceCurrency     String               @default("EUR") @map("price_currency") @db.VarChar(3)
+  priceUnit         TeachingPriceUnit    @default(PER_COURSE) @map("price_unit")
+  durationMinutes   Int                  @map("duration_minutes")
+  status            TeachingCourseStatus @default(DRAFT)
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  isDeleted         Boolean              @default(false) @map("is_deleted")
+  deletedAt         DateTime?            @map("deleted_at") @db.Timestamptz(6)
+
+  instructor InstructorProfile     @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  enrollments TeachingEnrollment[]
+
+  @@index([instructorId, status, isDeleted, updatedAt(sort: Desc)])
+  @@index([status, teachingMode, isDeleted, createdAt(sort: Desc)])
+  @@map("teaching_courses")
+}
+
+/// Students must be existing FlowFret users. Keeping enrollment separate
+/// supports invitations, requests, pauses and a future multi-student format.
+model TeachingEnrollment {
+  id          String                  @id @default(uuid()) @db.Uuid
+  courseId    String                  @map("course_id") @db.Uuid
+  studentId   String                  @map("student_id") @db.Uuid
+  status      TeachingEnrollmentStatus @default(REQUESTED)
+  invitedAt   DateTime?               @map("invited_at") @db.Timestamptz(6)
+  acceptedAt  DateTime?               @map("accepted_at") @db.Timestamptz(6)
+  endedAt     DateTime?               @map("ended_at") @db.Timestamptz(6)
+  createdAt   DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  isDeleted   Boolean                 @default(false) @map("is_deleted")
+  deletedAt   DateTime?               @map("deleted_at") @db.Timestamptz(6)
+
+  course  TeachingCourse @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  student User           @relation("TeachingEnrollmentStudent", fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([courseId, studentId], map: "teaching_enrollments_course_student_unique")
+  @@index([studentId, status, isDeleted, updatedAt(sort: Desc)])
+  @@index([courseId, status, isDeleted, createdAt])
+  @@map("teaching_enrollments")
 }
 
 model Post {
