@@ -10,6 +10,8 @@ import { AdminSecurityService } from './admin-security.service';
 import { AdminStatisticsService } from './admin-statistics.service';
 import { AdminUserActivityResolver } from './admin-user-activity.resolver';
 import { AdminModerationService } from './admin-moderation.service';
+import { AdminEntityResolver } from './admin-entity.resolver';
+import { AdminEntityService } from './admin-entity.service';
 
 @Module({
   providers: [
@@ -24,6 +26,8 @@ import { AdminModerationService } from './admin-moderation.service';
     AdminSecurityService,
     AdminStatisticsService,
     AdminModerationService,
+    AdminEntityResolver,
+    AdminEntityService,
   ],
   exports: [AdminModerationService],
 })
