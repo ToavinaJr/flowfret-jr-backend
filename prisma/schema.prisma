@@ -145,6 +145,7 @@ enum NotificationType {
   TEACHING_LESSON_RESCHEDULED
   TEACHING_LESSON_CANCELLED
   TEACHING_LESSON_COMPLETED
+  TEACHING_LESSON_REMINDER
 }
 
 enum ReportStatus {
@@ -255,6 +256,7 @@ model User {
   playlists               Playlist[]               @relation("UserPlaylists")
   playlistItemsAdded      PlaylistItem[]           @relation("PlaylistItemsAddedByUser")
   listeningHistory        ListeningHistory[]
+  teachingLessonReminders TeachingLessonReminder[]
 
   @@index([isDeleted, createdAt(sort: Desc)])
   @@index([isDeleted, status])
@@ -500,6 +502,7 @@ model TeachingLesson {
   createdBy   User               @relation("TeachingLessonCreator", fields: [createdById], references: [id], onDelete: Restrict)
   attendances LessonAttendance[]
   materials   TeachingMaterial[]
+  reminders   TeachingLessonReminder[]
 
   @@index([courseId, startsAt])
   @@index([status, startsAt, endsAt])
@@ -542,6 +545,22 @@ model LessonAttendance {
   @@unique([lessonId, enrollmentId], map: "lesson_attendance_lesson_enrollment_unique")
   @@index([enrollmentId, status])
   @@map("lesson_attendances")
+}
+
+model TeachingLessonReminder {
+  id            String   @id @default(uuid()) @db.Uuid
+  lessonId      String   @map("lesson_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  minutesBefore Int      @map("minutes_before")
+  startsAt      DateTime @map("starts_at") @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  lesson TeachingLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, userId, minutesBefore, startsAt], map: "teaching_lesson_reminders_once_unique")
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("teaching_lesson_reminders")
 }
 
 model Post {
@@ -650,6 +669,7 @@ model Notification {
   userId    String           @map("user_id") @db.Uuid
   type      NotificationType
   payload   Json             @db.JsonB
+  dedupeKey String?          @unique(map: "notifications_dedupe_key_unique") @map("dedupe_key") @db.VarChar(255)
   readAt    DateTime?        @map("read_at") @db.Timestamptz(6)
   createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   isDeleted Boolean          @default(false) @map("is_deleted")

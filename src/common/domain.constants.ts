@@ -86,4 +86,5 @@ export const CONFIGURABLE_NOTIFICATION_TYPES = new Set<NotificationType>([
   NotificationType.TEACHING_LESSON_RESCHEDULED,
   NotificationType.TEACHING_LESSON_CANCELLED,
   NotificationType.TEACHING_LESSON_COMPLETED,
+  NotificationType.TEACHING_LESSON_REMINDER,
 ]);
