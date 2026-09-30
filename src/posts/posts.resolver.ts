@@ -40,8 +40,9 @@ export class PostsResolver {
     @Context() context: RequestContext,
     @Args('after', { type: () => String, nullable: true }) after?: string,
     @Args('take', { type: () => Int, defaultValue: 20 }) take = 20,
+    @Args('query', { type: () => String, nullable: true }) query?: string,
   ): Promise<PostModel[]> {
-    return this.queries.list(context.req.user.sub, after, take);
+    return this.queries.list(context.req.user.sub, after, take, query);
   }
 
   @Query(() => PostModel, { name: 'post', nullable: true })

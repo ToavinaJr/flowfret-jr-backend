@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PostModel } from '../graphql/graphql.types';
 import { visiblePostWhere } from '../common/post-access';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,9 +30,40 @@ export class PostsQueryService {
     viewerId: string,
     after?: string,
     take = 20,
+    query?: string,
   ): Promise<PostModel[]> {
+    const search = query?.trim();
+    if (search && search.length > 100) {
+      throw new BadRequestException('Post search query is too long.');
+    }
     const rows = await this.prisma.post.findMany({
-      where: { ...(await visiblePostWhere(this.prisma, viewerId)) },
+      where: {
+        ...(await visiblePostWhere(this.prisma, viewerId)),
+        ...(search
+          ? {
+              AND: [
+                {
+                  OR: [
+                    {
+                      content: {
+                        contains: search,
+                        mode: 'insensitive' as const,
+                      },
+                    },
+                    {
+                      author: {
+                        username: {
+                          contains: search,
+                          mode: 'insensitive' as const,
+                        },
+                      },
+                    },
+                  ],
+                },
+              ],
+            }
+          : {}),
+      },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: Math.min(50, Math.max(1, take)),
       ...(after ? { cursor: { id: after }, skip: 1 } : {}),
