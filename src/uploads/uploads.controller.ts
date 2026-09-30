@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  BadGatewayException,
   Body,
   ForbiddenException,
   NotFoundException,
@@ -348,10 +349,18 @@ export class UploadsController {
       headers: req.headers.range ? { Range: req.headers.range } : {},
       signal: AbortSignal.timeout(30_000),
     });
-    if (!upstream.ok && upstream.status !== 206)
-      throw new BadRequestException(
-        'Le document est temporairement indisponible.',
+    if (!upstream.ok && upstream.status !== 206) {
+      const providerMessage = upstream.headers
+        .get('x-cld-error')
+        ?.replace(/https?:\/\/\S+/gi, '[URL redacted]')
+        .slice(0, 300);
+      this.logger.warn(
+        `Cloudinary rejected teaching material delivery (status=${upstream.status}${providerMessage ? `, reason=${providerMessage}` : ''})`,
       );
+      throw new BadGatewayException(
+        'Le service de stockage ne peut pas fournir ce document pour le moment.',
+      );
+    }
     res.status(upstream.status);
     res.setHeader('Content-Type', material.upload.fileType);
     res.setHeader(

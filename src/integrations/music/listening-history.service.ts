@@ -73,6 +73,56 @@ export class ListeningHistoryService {
     }));
   }
 
+  async trending(take = 10): Promise<MusicTrack[]> {
+    const rankings = await this.prisma.listeningHistory.groupBy({
+      by: ['provider', 'providerTrackId'],
+      _sum: { playCount: true },
+      orderBy: [{ _sum: { playCount: 'desc' } }, { providerTrackId: 'asc' }],
+      take: Math.min(10, Math.max(1, take)),
+    });
+    if (!rankings.length) return [];
+
+    const rows = await this.prisma.listeningHistory.findMany({
+      where: {
+        OR: rankings.map(({ provider, providerTrackId }) => ({
+          provider,
+          providerTrackId,
+        })),
+      },
+      orderBy: { lastPlayedAt: 'desc' },
+    });
+    const snapshots = new Map<string, (typeof rows)[number]>();
+    for (const row of rows) {
+      const key = `${row.provider}:${row.providerTrackId}`;
+      if (!snapshots.has(key)) snapshots.set(key, row);
+    }
+
+    return rankings.flatMap(({ provider, providerTrackId }) => {
+      const row = snapshots.get(`${provider}:${providerTrackId}`);
+      if (!row) return [];
+      return [
+        {
+          provider: row.provider,
+          id: row.providerTrackId,
+          providerTrackId: row.providerTrackId,
+          audiusId: row.providerTrackId,
+          title: row.title,
+          artists: this.readArtists(row.artists),
+          imageUrl: row.imageUrl,
+          audiusUrl: row.externalUrl,
+          externalUrl: row.externalUrl,
+          album: row.album,
+          isrc: row.isrc,
+          streamUrl: row.streamUrl,
+          genre: row.genre,
+          geniusUrl: null,
+          geniusMatchScore: null,
+          durationMs: row.durationMs,
+        },
+      ];
+    });
+  }
+
   private readArtists(
     value: Prisma.JsonValue,
   ): Array<{ id: string; name: string }> {

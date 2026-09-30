@@ -23,6 +23,15 @@ export class MusicResolver {
     return this.musicService.searchMusic(args.query, args.limit, args.cursor);
   }
 
+  @Query(() => [MusicTrack], { name: 'trendingMusic' })
+  @RateLimits(
+    { limit: 30, windowSeconds: 60, failClosed: true },
+    { limit: 500, windowSeconds: 86_400, failClosed: true },
+  )
+  trendingMusic(): Promise<MusicTrack[]> {
+    return this.listeningHistory.trending(10);
+  }
+
   @Query(() => [MusicTrack], { name: 'myListeningHistory' })
   myListeningHistory(
     @Context() context: { req: { user: { sub: string } } },

@@ -197,7 +197,14 @@ export class CloudinaryService {
       throw new Error('Invalid authenticated media path');
     const remainder = url.pathname.split('/authenticated/')[1];
     if (!remainder) throw new Error('Invalid authenticated media path');
-    const signingPath = remainder;
+    let signingPath: string;
+    try {
+      // Cloudinary signs the path components (version and public ID), before
+      // URL encoding. The upload response stores those components encoded.
+      signingPath = decodeURIComponent(remainder);
+    } catch {
+      throw new Error('Invalid authenticated media path');
+    }
     const secret = getRequiredConfig(this.config, 'CLOUDINARY_API_SECRET');
     const signature = createHash('sha1')
       .update(`${signingPath}${secret}`)
