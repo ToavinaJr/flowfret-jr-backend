@@ -7,6 +7,7 @@ import {
   Args,
   Context,
   GraphQLISODateTime,
+  Int,
   Mutation,
   Query,
   Resolver,
@@ -171,6 +172,108 @@ export class TeachingLessonsResolver {
     });
     await this.notifyLesson(lesson, NotificationType.TEACHING_LESSON_SCHEDULED);
     return this.present(lesson);
+  }
+
+  @Mutation(() => [TeachingLessonModel])
+  async scheduleTeachingLessonSeries(
+    @Args('courseId') courseId: string,
+    @Args('data') data: TeachingLessonInput,
+    @Args('occurrences', { type: () => Int }) occurrences: number,
+    @Context() context: LessonContext,
+  ) {
+    if (!Number.isInteger(occurrences) || occurrences < 2 || occurrences > 24)
+      throw new BadRequestException(
+        'Une série doit contenir entre 2 et 24 séances.',
+      );
+    const userId = context.req.user.sub;
+    const course = await this.prisma.teachingCourse.findFirst({
+      where: {
+        id: courseId,
+        isDeleted: false,
+        status: TeachingCourseStatus.PUBLISHED,
+        instructor: {
+          userId,
+          status: InstructorStatus.APPROVED,
+          isDeleted: false,
+          user: { status: UserStatus.ACTIVE, isDeleted: false },
+        },
+      },
+      include: {
+        enrollments: {
+          where: { status: participantEnrollmentStatus, isDeleted: false },
+        },
+      },
+    });
+    if (!course) throw new NotFoundException('Cours publié introuvable.');
+    if (!course.enrollments.length)
+      throw new BadRequestException(
+        'Une série exige au moins un élève inscrit et confirmé.',
+      );
+
+    const students = course.enrollments.map(({ studentId }) => studentId);
+    const schedules = Array.from({ length: occurrences }, (_, index) =>
+      normalizeSchedule(
+        {
+          ...data,
+          startsAt: new Date(
+            new Date(data.startsAt).getTime() + index * 7 * 24 * 60 * 60 * 1000,
+          ),
+        },
+        course.teachingMode,
+        course.durationMinutes,
+      ),
+    );
+    const lessons = await this.withSerializable(async (tx) => {
+      const created: Array<
+        Prisma.TeachingLessonGetPayload<{ include: typeof lessonInclude }>
+      > = [];
+      for (const schedule of schedules) {
+        await this.assertNoConflicts(
+          tx,
+          course.instructorId,
+          students,
+          schedule.startsAt,
+          schedule.endsAt,
+        );
+        created.push(
+          await tx.teachingLesson.create({
+            data: {
+              courseId,
+              createdById: userId,
+              ...schedule,
+              status: TeachingLessonStatus.SCHEDULED,
+              attendances: {
+                create: course.enrollments.map(({ id }) => ({
+                  enrollmentId: id,
+                })),
+              },
+            },
+            include: lessonInclude,
+          }),
+        );
+      }
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'TEACHING_LESSON_SERIES_SCHEDULED',
+          entityType: AUDIT_ENTITY.TEACHING_LESSON,
+          entityId: created[0]?.id,
+          metadata: {
+            courseId,
+            lessonIds: created.map(({ id }) => id),
+            occurrences,
+            startsAt: schedules[0].startsAt.toISOString(),
+          },
+        },
+      });
+      return created;
+    });
+    for (const lesson of lessons)
+      await this.notifyLesson(
+        lesson,
+        NotificationType.TEACHING_LESSON_SCHEDULED,
+      );
+    return lessons.map((lesson) => this.present(lesson));
   }
 
   @Mutation(() => TeachingLessonModel)

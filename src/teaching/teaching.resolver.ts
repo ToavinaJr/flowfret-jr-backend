@@ -505,6 +505,12 @@ export class TeachingResolver {
         'Une inscription est déjà en cours pour ce cours.',
       );
     const enrollment = await this.prisma.$transaction(async (tx) => {
+      await this.assertCapacityInTransaction(
+        tx,
+        course.id,
+        course.maxStudents,
+        course.format,
+      );
       const result = existing
         ? await tx.teachingEnrollment.update({
             where: { id: existing.id },
@@ -575,6 +581,12 @@ export class TeachingResolver {
         'Une inscription ou invitation existe déjà pour cet élève.',
       );
     const enrollment = await this.prisma.$transaction(async (tx) => {
+      await this.assertCapacityInTransaction(
+        tx,
+        course.id,
+        course.maxStudents,
+        course.format,
+      );
       const result = existing
         ? await tx.teachingEnrollment.update({
             where: { id: existing.id },
@@ -644,6 +656,15 @@ export class TeachingResolver {
         enrollment.course.format,
       );
     const result = await this.prisma.$transaction(async (tx) => {
+      if (accept) {
+        await this.assertCapacityInTransaction(
+          tx,
+          enrollment.courseId,
+          enrollment.course.maxStudents,
+          enrollment.course.format,
+          enrollment.id,
+        );
+      }
       const updated = await tx.teachingEnrollment.update({
         where: { id: enrollmentId },
         data: accept
@@ -718,6 +739,15 @@ export class TeachingResolver {
         'Un élève peut uniquement annuler sa demande ou son inscription.',
       );
     const updated = await this.prisma.$transaction(async (tx) => {
+      if (data.status === TeachingEnrollmentStatus.ACTIVE) {
+        await this.assertCapacityInTransaction(
+          tx,
+          enrollment.courseId,
+          enrollment.course.maxStudents,
+          enrollment.course.format,
+          enrollment.id,
+        );
+      }
       const result = await tx.teachingEnrollment.update({
         where: { id },
         data: {
@@ -830,6 +860,36 @@ export class TeachingResolver {
       });
       if (occupied >= maxStudents)
         throw new BadRequestException('Ce cours a atteint sa capacité.');
+    }
+  }
+
+  private async assertCapacityInTransaction(
+    tx: Prisma.TransactionClient,
+    courseId: string,
+    maxStudents: number,
+    format: TeachingCourseFormat,
+    excludeEnrollmentId?: string,
+  ) {
+    // Serialize capacity changes per course so concurrent requests cannot
+    // reserve the same last seat.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${courseId}, 0))`;
+    const occupied = await tx.teachingEnrollment.count({
+      where: {
+        courseId,
+        isDeleted: false,
+        status: { in: activeEnrollmentStatuses },
+        ...(excludeEnrollmentId ? { id: { not: excludeEnrollmentId } } : {}),
+      },
+    });
+    if (
+      (format === TeachingCourseFormat.INDIVIDUAL && occupied > 0) ||
+      (format === TeachingCourseFormat.GROUP && occupied >= maxStudents)
+    ) {
+      throw new BadRequestException(
+        format === TeachingCourseFormat.INDIVIDUAL
+          ? 'Ce cours individuel a déjà une demande ou une place réservée.'
+          : 'Ce cours a atteint sa capacité.',
+      );
     }
   }
 
