@@ -53,8 +53,20 @@ export class GoogleAuthService {
       where: { OR: [{ googleId }, { email }] },
       include: { profile: true },
     });
-    const completed = existing?.googleSignupCompleted === true;
-    if (existing?.googleId === googleId && !completed && !existing.isDeleted) {
+    if (existing?.googleId === googleId && !existing.isDeleted) {
+      if (
+        existing.status === UserStatus.SUSPENDED ||
+        existing.status === UserStatus.DELETED
+      ) {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'google_registration.rejected',
+            reason: 'account_unavailable',
+          }),
+        );
+        throw new ConflictException(GENERIC_GOOGLE_ERROR);
+      }
+
       return this.prisma.user.update({
         where: { id: existing.id },
         data: {

@@ -13,9 +13,10 @@ export interface GoogleUserInfo {
 
 interface GoogleTokenInfo {
   aud?: string;
+  audience?: string;
+  issued_to?: string;
   expires_in?: string;
   sub?: string;
-  /** Legacy access-token responses used this name instead of the OIDC `sub`. */
   user_id?: string;
   scope?: string;
 }
@@ -37,8 +38,13 @@ export class GoogleProfileService {
         throw new UnauthorizedException('Invalid Google access token.');
       const tokenInfo = (await tokenResponse.json()) as GoogleTokenInfo;
       const tokenSubject = tokenInfo.sub ?? tokenInfo.user_id;
+      const tokenClientIds = [
+        tokenInfo.aud,
+        tokenInfo.audience,
+        tokenInfo.issued_to,
+      ];
       if (
-        tokenInfo.aud !== clientId ||
+        !tokenClientIds.includes(clientId) ||
         !tokenSubject ||
         !Number.isFinite(Number(tokenInfo.expires_in)) ||
         Number(tokenInfo.expires_in) <= 0 ||
