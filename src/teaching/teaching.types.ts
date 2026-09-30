@@ -38,6 +38,7 @@ export class InstructorProfileModel {
   @Field(() => Int, { nullable: true }) experienceYears!: number | null;
   @Field(() => [String]) specialties!: string[];
   @Field(() => [String]) languages!: string[];
+  @Field(() => String) storageQuotaBytes!: string;
   @Field(() => GraphQLISODateTime) createdAt!: Date;
   @Field(() => GraphQLISODateTime) updatedAt!: Date;
 }

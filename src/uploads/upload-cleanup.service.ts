@@ -41,7 +41,13 @@ export class UploadCleanupService implements OnModuleInit, OnModuleDestroy {
         isDeleted: true,
         ...(uploadIds ? { id: { in: uploadIds } } : {}),
       },
-      select: { id: true, storagePath: true, storagePublicId: true },
+      select: {
+        id: true,
+        storagePath: true,
+        storagePublicId: true,
+        resourceType: true,
+        accessType: true,
+      },
       take: uploadIds ? undefined : 25,
     });
 
@@ -55,7 +61,14 @@ export class UploadCleanupService implements OnModuleInit, OnModuleDestroy {
         continue;
       }
       try {
-        await this.cloudinary.deleteImage(publicId);
+        if (upload.accessType === 'AUTHENTICATED') {
+          await this.cloudinary.deleteTeachingFile(
+            publicId,
+            upload.resourceType,
+          );
+        } else {
+          await this.cloudinary.deleteImage(publicId);
+        }
         await this.prisma.upload.updateMany({
           where: { id: upload.id, cleanupPending: true },
           data: { cleanupPending: false },

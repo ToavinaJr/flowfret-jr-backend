@@ -13,6 +13,6 @@ import { UploadsResolver } from './uploads.resolver';
     ConcurrentUploadsInterceptor,
     UploadsResolver,
   ],
-  exports: [UploadCleanupService],
+  exports: [UploadCleanupService, CloudinaryService],
 })
 export class UploadsModule {}

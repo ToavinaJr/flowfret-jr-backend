@@ -45,9 +45,18 @@ export class TeachingResolver {
     nullable: true,
   })
   myInstructorProfile(@Context() context: TeachingContext) {
-    return this.prisma.instructorProfile.findFirst({
-      where: { userId: context.req.user.sub, isDeleted: false },
-    });
+    return this.prisma.instructorProfile
+      .findFirst({
+        where: { userId: context.req.user.sub, isDeleted: false },
+      })
+      .then((profile) =>
+        profile
+          ? {
+              ...profile,
+              storageQuotaBytes: profile.storageQuotaBytes.toString(),
+            }
+          : null,
+      );
   }
 
   @Roles(UserRole.ADMIN)
@@ -56,11 +65,57 @@ export class TeachingResolver {
     @Args('status', { type: () => InstructorStatus, nullable: true })
     status?: InstructorStatus,
   ) {
-    return this.prisma.instructorProfile.findMany({
-      where: { isDeleted: false, ...(status ? { status } : {}) },
-      orderBy: { createdAt: 'asc' },
-      take: 200,
+    return this.prisma.instructorProfile
+      .findMany({
+        where: { isDeleted: false, ...(status ? { status } : {}) },
+        orderBy: { createdAt: 'asc' },
+        take: 200,
+      })
+      .then((profiles) =>
+        profiles.map((profile) => ({
+          ...profile,
+          storageQuotaBytes: profile.storageQuotaBytes.toString(),
+        })),
+      );
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Mutation(() => InstructorProfileModel)
+  async setInstructorStorageQuota(
+    @Args('id') id: string,
+    @Args('storageQuotaBytes') value: string,
+    @Context() context: TeachingContext,
+  ) {
+    if (!/^\d+$/.test(value)) throw new BadRequestException('Quota invalide.');
+    const quota = BigInt(value);
+    if (quota < 50n * 1024n * 1024n || quota > 1024n * 1024n * 1024n * 1024n)
+      throw new BadRequestException(
+        'Le quota doit être compris entre 50 Mio et 1 Tio.',
+      );
+    const profile = await this.prisma.instructorProfile.findFirst({
+      where: { id, isDeleted: false },
     });
+    if (!profile) throw new NotFoundException('Profil enseignant introuvable.');
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.instructorProfile.update({
+        where: { id },
+        data: { storageQuotaBytes: quota },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: context.req.user.sub,
+          action: 'TEACHER_STORAGE_QUOTA_UPDATED',
+          entityType: 'instructor_profile',
+          entityId: id,
+          metadata: { storageQuotaBytes: value },
+        },
+      });
+      return row;
+    });
+    return {
+      ...updated,
+      storageQuotaBytes: updated.storageQuotaBytes.toString(),
+    };
   }
 
   @Roles(UserRole.ADMIN)
@@ -81,7 +136,7 @@ export class TeachingResolver {
       where: { id, isDeleted: false },
     });
     if (!profile) throw new NotFoundException('Profil enseignant introuvable.');
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.instructorProfile.update({
         where: { id },
         data: { status },
@@ -97,6 +152,10 @@ export class TeachingResolver {
       });
       return updated;
     });
+    return {
+      ...updated,
+      storageQuotaBytes: updated.storageQuotaBytes.toString(),
+    };
   }
 
   @Mutation(() => InstructorProfileModel)
@@ -135,7 +194,10 @@ export class TeachingResolver {
       });
       return result;
     });
-    return profile;
+    return {
+      ...profile,
+      storageQuotaBytes: profile.storageQuotaBytes.toString(),
+    };
   }
 
   @Query(() => [TeachingCourseModel], { name: 'publishedTeachingCourses' })

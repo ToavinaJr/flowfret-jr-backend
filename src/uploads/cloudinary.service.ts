@@ -10,6 +10,17 @@ import {
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 export const MAX_POST_IMAGES = 12;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+export const MAX_TEACHING_FILE_BYTES = 50 * 1024 * 1024;
+const TEACHING_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+]);
+export type TeachingResourceType = 'IMAGE' | 'VIDEO';
 export interface UploadedImage {
   buffer: Buffer;
   mimetype: string;
@@ -29,6 +40,17 @@ function hasValidSignature(buffer: Buffer, type: string): boolean {
       buffer.subarray(0, 4).toString() === 'RIFF' &&
       buffer.subarray(8, 12).toString() === 'WEBP'
     );
+  return false;
+}
+
+function hasValidTeachingSignature(buffer: Buffer, type: string): boolean {
+  if (type.startsWith('image/')) return hasValidSignature(buffer, type);
+  if (type === 'application/pdf')
+    return buffer.subarray(0, 5).toString() === '%PDF-';
+  if (type === 'video/webm')
+    return buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
+  if (type === 'video/mp4' || type === 'video/quicktime')
+    return buffer.subarray(4, 8).toString() === 'ftyp';
   return false;
 }
 
@@ -99,33 +121,132 @@ export class CloudinaryService {
     return { url: result.secure_url, publicId: result.public_id };
   }
 
+  async uploadTeachingFile(file: UploadedImage): Promise<{
+    url: string;
+    publicId: string;
+    resourceType: TeachingResourceType;
+  }> {
+    if (
+      !file ||
+      !TEACHING_TYPES.has(file.mimetype) ||
+      file.size > MAX_TEACHING_FILE_BYTES ||
+      !hasValidTeachingSignature(file.buffer, file.mimetype)
+    ) {
+      throw new ApplicationException(
+        'UPLOAD_INVALID_FILE',
+        'Unsupported or invalid teaching file.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const resourceType: TeachingResourceType = file.mimetype.startsWith(
+      'video/',
+    )
+      ? 'VIDEO'
+      : 'IMAGE';
+    const endpointType = resourceType.toLowerCase();
+    const cloudName = getRequiredConfig(this.config, 'CLOUDINARY_CLOUD_NAME');
+    const apiKey = getRequiredConfig(this.config, 'CLOUDINARY_API_KEY');
+    const apiSecret = getRequiredConfig(this.config, 'CLOUDINARY_API_SECRET');
+    const folder = `${getRequiredConfig(this.config, 'CLOUDINARY_FOLDER')}/teaching`;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = createHash('sha1')
+      .update(
+        `folder=${folder}&timestamp=${timestamp}&type=authenticated${apiSecret}`,
+      )
+      .digest('hex');
+    const body = new FormData();
+    body.append(
+      'file',
+      new Blob([Uint8Array.from(file.buffer)], { type: file.mimetype }),
+      file.originalname,
+    );
+    body.append('api_key', apiKey);
+    body.append('timestamp', String(timestamp));
+    body.append('folder', folder);
+    body.append('type', 'authenticated');
+    body.append('signature', signature);
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/${endpointType}/upload`,
+      { method: 'POST', body, signal: AbortSignal.timeout(this.timeoutMs()) },
+    );
+    const result = (await response.json()) as {
+      secure_url?: string;
+      public_id?: string;
+    };
+    if (!response.ok || !result.secure_url || !result.public_id)
+      throw new ExternalServiceException(
+        'UPLOAD_FAILED',
+        'Unable to upload the teaching file.',
+      );
+    return { url: result.secure_url, publicId: result.public_id, resourceType };
+  }
+
+  authenticatedDeliveryUrl(
+    storagePath: string,
+    resourceType: TeachingResourceType,
+  ): string {
+    const url = new URL(storagePath);
+    const cloudName = getRequiredConfig(this.config, 'CLOUDINARY_CLOUD_NAME');
+    if (
+      url.protocol !== 'https:' ||
+      url.hostname !== 'res.cloudinary.com' ||
+      !url.pathname.startsWith(
+        `/${cloudName}/${resourceType.toLowerCase()}/authenticated/`,
+      )
+    )
+      throw new Error('Invalid authenticated media path');
+    const remainder = url.pathname.split('/authenticated/')[1];
+    if (!remainder) throw new Error('Invalid authenticated media path');
+    const signingPath = remainder;
+    const secret = getRequiredConfig(this.config, 'CLOUDINARY_API_SECRET');
+    const signature = createHash('sha1')
+      .update(`${signingPath}${secret}`)
+      .digest('base64url')
+      .slice(0, 8);
+    url.pathname = url.pathname.replace(
+      '/authenticated/',
+      `/authenticated/s--${signature}--/`,
+    );
+    return url.toString();
+  }
+
+  async deleteTeachingFile(
+    publicId: string,
+    resourceType: TeachingResourceType,
+  ): Promise<void> {
+    await this.deleteStoredFile(publicId, resourceType, 'authenticated');
+  }
+
   async deleteImage(publicId: string): Promise<void> {
+    await this.deleteStoredFile(publicId, 'IMAGE', 'upload');
+  }
+
+  private async deleteStoredFile(
+    publicId: string,
+    resourceType: TeachingResourceType,
+    type: 'authenticated' | 'upload',
+  ): Promise<void> {
     const cloudName = getRequiredConfig(this.config, 'CLOUDINARY_CLOUD_NAME');
     const apiKey = getRequiredConfig(this.config, 'CLOUDINARY_API_KEY');
     const apiSecret = getRequiredConfig(this.config, 'CLOUDINARY_API_SECRET');
     const timestamp = Math.floor(Date.now() / 1000);
+    const params = `public_id=${publicId}&timestamp=${timestamp}&type=${type}`;
     const signature = createHash('sha1')
-      .update(`public_id=${publicId}&timestamp=${timestamp}${apiSecret}`)
+      .update(`${params}${apiSecret}`)
       .digest('hex');
     const body = new FormData();
     body.append('public_id', publicId);
     body.append('api_key', apiKey);
     body.append('timestamp', String(timestamp));
+    body.append('type', type);
     body.append('signature', signature);
+    const endpointType = resourceType.toLowerCase();
     const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`,
-      {
-        method: 'POST',
-        body,
-        signal: AbortSignal.timeout(this.timeoutMs()),
-      },
+      `https://api.cloudinary.com/v1_1/${cloudName}/${endpointType}/destroy`,
+      { method: 'POST', body, signal: AbortSignal.timeout(this.timeoutMs()) },
     );
-    if (!response.ok) {
-      this.logger.error(
-        `Cloudinary cleanup failed (publicId=${publicId}, status=${response.status})`,
-      );
+    if (!response.ok)
       throw new Error(`Cloudinary cleanup failed for ${publicId}`);
-    }
   }
 
   private timeoutMs(): number {

@@ -113,7 +113,18 @@ enum UploadSourceType {
   POST
   PROFILE
   MESSAGE
+  COURSE_MATERIAL
   OTHER
+}
+
+enum UploadResourceType {
+  IMAGE
+  VIDEO
+}
+
+enum UploadAccessType {
+  PUBLIC
+  AUTHENTICATED
 }
 
 enum NotificationType {
@@ -438,6 +449,7 @@ model TeachingCourse {
   instructor InstructorProfile     @relation(fields: [instructorId], references: [id], onDelete: Restrict)
   enrollments TeachingEnrollment[]
   lessons     TeachingLesson[]
+  materials   TeachingMaterial[]
 
   @@index([instructorId, status, isDeleted, updatedAt(sort: Desc)])
   @@index([status, teachingMode, isDeleted, createdAt(sort: Desc)])
@@ -487,11 +499,31 @@ model TeachingLesson {
   course      TeachingCourse     @relation(fields: [courseId], references: [id], onDelete: Restrict)
   createdBy   User               @relation("TeachingLessonCreator", fields: [createdById], references: [id], onDelete: Restrict)
   attendances LessonAttendance[]
+  materials   TeachingMaterial[]
 
   @@index([courseId, startsAt])
   @@index([status, startsAt, endsAt])
   @@index([createdById, startsAt])
   @@map("teaching_lessons")
+}
+
+model TeachingMaterial {
+  id          String    @id @default(uuid()) @db.Uuid
+  courseId    String    @map("course_id") @db.Uuid
+  lessonId    String?   @map("lesson_id") @db.Uuid
+  uploadId    String    @unique @map("upload_id") @db.Uuid
+  title       String    @db.VarChar(160)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+
+  course  TeachingCourse @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  lesson  TeachingLesson? @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  upload  Upload         @relation(fields: [uploadId], references: [id], onDelete: Restrict)
+
+  @@index([courseId, isDeleted, createdAt(sort: Desc)])
+  @@index([lessonId, isDeleted, createdAt(sort: Desc)])
+  @@map("teaching_materials")
 }
 
 model LessonAttendance {
@@ -594,6 +626,8 @@ model Upload {
   duration        Int?             @db.Integer
   status          UploadStatus     @default(UPLOADED)
   sourceType      UploadSourceType @default(OTHER) @map("source_type")
+  resourceType    UploadResourceType @default(IMAGE) @map("resource_type")
+  accessType      UploadAccessType @default(PUBLIC) @map("access_type")
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt       DateTime?        @map("deleted_at") @db.Timestamptz(6)
@@ -601,6 +635,7 @@ model Upload {
 
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   attachments PostAttachment[]
+  teachingMaterial TeachingMaterial?
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
