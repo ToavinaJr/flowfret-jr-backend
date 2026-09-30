@@ -2,7 +2,7 @@ import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Prisma, UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
-import { buildAdminPage, decodeAdminPage } from './admin-pagination';
+import { adminCreatedAtRange, buildAdminPage, decodeAdminPage } from './admin-pagination';
 import {
   AdminCatalogTrackConnection,
   AdminListeningHistoryConnection,
@@ -23,9 +23,11 @@ export class AdminMusicResolver {
   ): Promise<AdminPlaylistConnection> {
     const page = decodeAdminPage(input);
     const search = input?.search?.trim();
+    const createdAt = adminCreatedAtRange(input?.from, input?.to);
     const where: Prisma.PlaylistWhereInput = {
       ...(input?.includeDeleted ? {} : { isDeleted: false }),
       ...(input?.userId ? { userId: input.userId } : {}),
+      ...(createdAt ? { createdAt } : {}),
       ...(search
         ? {
             OR: [
@@ -72,8 +74,10 @@ export class AdminMusicResolver {
   ): Promise<AdminCatalogTrackConnection> {
     const page = decodeAdminPage(input);
     const search = input?.search?.trim();
+    const createdAt = adminCreatedAtRange(input?.from, input?.to);
     const where: Prisma.CatalogTrackWhereInput = {
       ...(input?.provider ? { provider: input.provider } : {}),
+      ...(createdAt ? { createdAt } : {}),
       ...(search
         ? {
             OR: [
@@ -120,9 +124,11 @@ export class AdminMusicResolver {
   ): Promise<AdminListeningHistoryConnection> {
     const page = decodeAdminPage(input);
     const search = input?.search?.trim();
+    const lastPlayedAt = adminCreatedAtRange(input?.from, input?.to);
     const where: Prisma.ListeningHistoryWhereInput = {
       ...(input?.provider ? { provider: input.provider } : {}),
       ...(input?.userId ? { userId: input.userId } : {}),
+      ...(lastPlayedAt ? { lastPlayedAt } : {}),
       ...(search
         ? {
             OR: [

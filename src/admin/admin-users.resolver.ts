@@ -3,7 +3,7 @@ import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Prisma, UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
-import { buildAdminPage, decodeAdminPage } from './admin-pagination';
+import { adminCreatedAtRange, buildAdminPage, decodeAdminPage } from './admin-pagination';
 import {
   AdminSortDirection,
   AdminUser,
@@ -24,10 +24,12 @@ export class AdminUsersResolver {
   ): Promise<AdminUserConnection> {
     const page = decodeAdminPage(input);
     const search = input?.search?.trim();
+    const createdAt = adminCreatedAtRange(input?.from, input?.to);
     const where: Prisma.UserWhereInput = {
       ...(input?.includeDeleted ? {} : { isDeleted: false }),
       ...(input?.status ? { status: input.status } : {}),
       ...(input?.role ? { role: input.role } : {}),
+      ...(createdAt ? { createdAt } : {}),
       ...(search
         ? {
             OR: [

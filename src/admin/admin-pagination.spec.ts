@@ -1,5 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
-import { buildAdminPage, decodeAdminPage } from './admin-pagination';
+import {
+  adminCreatedAtRange,
+  buildAdminPage,
+  decodeAdminPage,
+} from './admin-pagination';
 
 describe('admin cursor pagination', () => {
   it('uses safe defaults and caps the requested page size', () => {
@@ -26,5 +30,21 @@ describe('admin cursor pagination', () => {
     expect(() => decodeAdminPage({ after: negative })).toThrow(
       BadRequestException,
     );
+  });
+});
+
+describe('admin created-at filters', () => {
+  it('includes the entire UTC day for date-only values', () => {
+    expect(adminCreatedAtRange('2026-09-01', '2026-09-01')).toEqual({
+      gte: new Date('2026-09-01T00:00:00.000Z'),
+      lte: new Date('2026-09-01T23:59:59.999Z'),
+    });
+  });
+
+  it('supports open-ended date ranges', () => {
+    expect(adminCreatedAtRange('2026-09-01')).toEqual({
+      gte: new Date('2026-09-01T00:00:00.000Z'),
+    });
+    expect(adminCreatedAtRange()).toBeUndefined();
   });
 });

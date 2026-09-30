@@ -7,6 +7,7 @@ import {
 } from '@nestjs/graphql';
 import {
   IsBoolean,
+  IsDateString,
   IsEnum,
   IsInt,
   IsOptional,
@@ -66,6 +67,16 @@ export class AdminManagedEntityListInput {
   @IsOptional()
   @IsBoolean()
   includeDeleted = false;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }
 
 @InputType()

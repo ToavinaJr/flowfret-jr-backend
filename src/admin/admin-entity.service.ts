@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { adminCreatedAtRange } from './admin-pagination';
 import { AdminManagedEntity } from './admin-entity.types';
 
 type EntityConfig = {
@@ -253,14 +254,19 @@ export class AdminEntityService {
     first: number,
     skip: number,
     includeDeleted: boolean,
+    from?: string,
+    to?: string,
   ) {
     const config = ENTITY_CONFIG[entity];
     const delegate = this.getDelegate(
       this.prisma as unknown as DynamicClient,
       config,
     );
-    const where =
-      config.softDelete && !includeDeleted ? { isDeleted: false } : {};
+    const createdAt = adminCreatedAtRange(from, to);
+    const where = {
+      ...(config.softDelete && !includeDeleted ? { isDeleted: false } : {}),
+      ...(createdAt ? { createdAt } : {}),
+    };
     const [rows, totalCount] = await Promise.all([
       delegate.findMany({
         where,

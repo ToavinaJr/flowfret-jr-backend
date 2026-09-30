@@ -90,6 +90,16 @@ export class AdminListInput {
   @IsBoolean()
   includeDeleted?: boolean;
 
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsDateString()
+  to?: string;
+
   @Field(() => AdminSortDirection, { defaultValue: AdminSortDirection.DESC })
   @IsOptional()
   @IsEnum(AdminSortDirection)
@@ -202,15 +212,6 @@ export class AdminAuditInput extends AdminListInput {
   @MaxLength(100)
   entityType?: string;
 
-  @Field(() => String, { nullable: true })
-  @IsOptional()
-  @IsDateString()
-  from?: string;
-
-  @Field(() => String, { nullable: true })
-  @IsOptional()
-  @IsDateString()
-  to?: string;
 }
 
 @InputType()

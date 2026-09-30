@@ -3,7 +3,7 @@ import { Prisma, ReportStatus, UserRole } from '@prisma/client';
 import { RateLimit } from '../auth/rate-limit.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
-import { buildAdminPage, decodeAdminPage } from './admin-pagination';
+import { adminCreatedAtRange, buildAdminPage, decodeAdminPage } from './admin-pagination';
 import {
   AdminCommentConnection,
   AdminContentInput,
@@ -31,9 +31,11 @@ export class AdminContentResolver {
   ): Promise<AdminPostConnection> {
     const page = decodeAdminPage(input);
     const search = input?.search?.trim();
+    const createdAt = adminCreatedAtRange(input?.from, input?.to);
     const where: Prisma.PostWhereInput = {
       ...(input?.includeDeleted ? {} : { isDeleted: false }),
       ...(input?.postStatus ? { status: input.postStatus } : {}),
+      ...(createdAt ? { createdAt } : {}),
       ...(search
         ? {
             OR: [
@@ -75,9 +77,11 @@ export class AdminContentResolver {
   ): Promise<AdminCommentConnection> {
     const page = decodeAdminPage(input);
     const search = input?.search?.trim();
+    const createdAt = adminCreatedAtRange(input?.from, input?.to);
     const where: Prisma.CommentWhereInput = {
       ...(input?.includeDeleted ? {} : { isDeleted: false }),
       ...(input?.commentStatus ? { status: input.commentStatus } : {}),
+      ...(createdAt ? { createdAt } : {}),
       ...(search
         ? {
             OR: [
@@ -119,9 +123,11 @@ export class AdminContentResolver {
   ): Promise<AdminPostReportConnection> {
     const page = decodeAdminPage(input);
     const search = input?.search?.trim();
+    const createdAt = adminCreatedAtRange(input?.from, input?.to);
     const where: Prisma.PostReportWhereInput = {
       ...(input?.includeDeleted ? {} : { isDeleted: false }),
       ...(input?.reportStatus ? { status: input.reportStatus } : {}),
+      ...(createdAt ? { createdAt } : {}),
       ...(search
         ? {
             OR: [

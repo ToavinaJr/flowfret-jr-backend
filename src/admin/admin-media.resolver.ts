@@ -2,7 +2,7 @@ import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Prisma, UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
-import { buildAdminPage, decodeAdminPage } from './admin-pagination';
+import { adminCreatedAtRange, buildAdminPage, decodeAdminPage } from './admin-pagination';
 import {
   AdminChordTranscriptionConnection,
   AdminMediaInput,
@@ -23,9 +23,11 @@ export class AdminMediaResolver {
   ): Promise<AdminUploadConnection> {
     const page = decodeAdminPage(input);
     const search = input?.search?.trim();
+    const createdAt = adminCreatedAtRange(input?.from, input?.to);
     const where: Prisma.UploadWhereInput = {
       ...(input?.includeDeleted ? {} : { isDeleted: false }),
       ...(input?.uploadStatus ? { status: input.uploadStatus } : {}),
+      ...(createdAt ? { createdAt } : {}),
       ...(search
         ? {
             OR: [
@@ -69,12 +71,14 @@ export class AdminMediaResolver {
   ): Promise<AdminTranscriptionConnection> {
     const page = decodeAdminPage(input);
     const search = input?.search?.trim();
+    const createdAt = adminCreatedAtRange(input?.from, input?.to);
     const where: Prisma.TranscriptionWhereInput = {
       ...(input?.includeDeleted ? {} : { isDeleted: false }),
       ...(input?.transcriptionStatus
         ? { status: input.transcriptionStatus }
         : {}),
       ...(input?.provider ? { provider: input.provider } : {}),
+      ...(createdAt ? { createdAt } : {}),
       ...(search
         ? {
             OR: [
@@ -107,8 +111,10 @@ export class AdminMediaResolver {
   ): Promise<AdminChordTranscriptionConnection> {
     const page = decodeAdminPage(input);
     const search = input?.search?.trim();
+    const createdAt = adminCreatedAtRange(input?.from, input?.to);
     const where: Prisma.ChordTranscriptionWhereInput = {
       ...(input?.provider ? { provider: input.provider } : {}),
+      ...(createdAt ? { createdAt } : {}),
       ...(search
         ? {
             OR: [

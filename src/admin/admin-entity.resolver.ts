@@ -27,6 +27,8 @@ export class AdminEntityResolver {
       input.first,
       input.skip,
       input.includeDeleted,
+      input.from,
+      input.to,
     );
   }
 
