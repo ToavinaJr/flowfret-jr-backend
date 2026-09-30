@@ -584,7 +584,7 @@ export class TeachingLessonsResolver {
   }
 }
 
-function validateWindow(from: Date, to: Date) {
+export function validateWindow(from: Date, to: Date) {
   const width = to.getTime() - from.getTime();
   if (!Number.isFinite(width) || width <= 0 || width > 93 * 24 * 60 * 60 * 1000)
     throw new BadRequestException(
@@ -592,7 +592,7 @@ function validateWindow(from: Date, to: Date) {
     );
 }
 
-function normalizeSchedule(
+export function normalizeSchedule(
   data: TeachingLessonInput,
   courseMode: TeachingMode,
   durationMinutes: number,
