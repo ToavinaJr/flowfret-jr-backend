@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GENERIC_GOOGLE_ERROR } from './auth.constants';
 
@@ -23,6 +23,8 @@ interface GoogleTokenInfo {
 
 @Injectable()
 export class GoogleProfileService {
+  private readonly logger = new Logger(GoogleProfileService.name);
+
   constructor(private readonly configService: ConfigService) {}
 
   async fetch(accessToken: string): Promise<GoogleUserInfo> {
@@ -34,8 +36,12 @@ export class GoogleProfileService {
         `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`,
         timeout,
       );
-      if (!tokenResponse.ok)
+      if (!tokenResponse.ok) {
+        this.logValidationFailure('tokeninfo_rejected', {
+          statusCode: tokenResponse.status,
+        });
         throw new UnauthorizedException('Invalid Google access token.');
+      }
       const tokenInfo = (await tokenResponse.json()) as GoogleTokenInfo;
       const tokenSubject = tokenInfo.sub ?? tokenInfo.user_id;
       const tokenClientIds = [
@@ -43,14 +49,21 @@ export class GoogleProfileService {
         tokenInfo.audience,
         tokenInfo.issued_to,
       ];
-      if (
-        !tokenClientIds.includes(clientId) ||
-        !tokenSubject ||
-        !Number.isFinite(Number(tokenInfo.expires_in)) ||
-        Number(tokenInfo.expires_in) <= 0 ||
-        !tokenInfo.scope?.split(' ').includes('openid')
-      )
+      const rejectionReason =
+        !tokenClientIds.includes(clientId)
+          ? 'audience_mismatch'
+          : !tokenSubject
+            ? 'subject_missing'
+            : !Number.isFinite(Number(tokenInfo.expires_in)) ||
+                Number(tokenInfo.expires_in) <= 0
+              ? 'token_expired_or_expiry_missing'
+              : !tokenInfo.scope?.split(/\s+/).includes('openid')
+                ? 'openid_scope_missing'
+                : null;
+      if (rejectionReason) {
+        this.logValidationFailure(rejectionReason);
         throw new UnauthorizedException('Invalid Google access token.');
+      }
       const profileResponse = await fetch(
         'https://openidconnect.googleapis.com/v1/userinfo',
         {
@@ -58,16 +71,38 @@ export class GoogleProfileService {
           signal: AbortSignal.timeout(this.timeoutMs()),
         },
       );
-      if (!profileResponse.ok)
+      if (!profileResponse.ok) {
+        this.logValidationFailure('userinfo_rejected', {
+          statusCode: profileResponse.status,
+        });
         throw new UnauthorizedException('Invalid Google access token.');
+      }
       const profile = (await profileResponse.json()) as GoogleUserInfo;
-      if (!profile.sub || profile.sub !== tokenSubject)
+      if (!profile.sub || profile.sub !== tokenSubject) {
+        this.logValidationFailure(
+          profile.sub ? 'userinfo_subject_mismatch' : 'userinfo_subject_missing',
+        );
         throw new UnauthorizedException('Invalid Google profile.');
+      }
       return profile;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
+      this.logValidationFailure('google_request_failed');
       throw new UnauthorizedException('Unable to reach Google.');
     }
+  }
+
+  private logValidationFailure(
+    reason: string,
+    details: { statusCode?: number } = {},
+  ): void {
+    this.logger.warn(
+      JSON.stringify({
+        event: 'google_profile.validation_failed',
+        reason,
+        ...details,
+      }),
+    );
   }
 
   private timeoutMs(): number {
