@@ -94,13 +94,13 @@ export class TranscriptionWorkflowService {
     if (item.status === TranscriptionStatus.FAILED) {
       this.logger.warn(
         JSON.stringify({
-          event: 'transcription.reused_failed',
+          event: 'transcription.reused_failed_retrying',
           transcriptionId: item.id,
           trackId: dto.trackId,
           errorCode: item.errorCode,
         }),
       );
-      return toTranscriptionResponse(item, null, false);
+      return this.retry(item.id, dto.audioUrl, userId);
     }
     if (item.status === TranscriptionStatus.COMPLETED) {
       this.logger.log(

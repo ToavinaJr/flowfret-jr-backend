@@ -41,9 +41,9 @@ export class WhisperWorkerConfigService {
         45,
       ),
       maxAudioSizeMb: this.number('TRANSCRIPTION_MAX_AUDIO_SIZE_MB', 100),
-      maxDurationSeconds: this.number(
-        'TRANSCRIPTION_MAX_DURATION_SECONDS',
-        900,
+      maxDurationSeconds: Math.min(
+        300,
+        this.number('TRANSCRIPTION_MAX_DURATION_SECONDS', 300),
       ),
       maxRedirects: this.number('TRANSCRIPTION_MAX_REDIRECTS', 3),
       downloadTimeoutMs: this.number(

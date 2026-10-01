@@ -5,8 +5,10 @@ import { TranscriptionAudioSourceService } from './transcription-audio-source.se
 
 describe('TranscriptionAudioSourceService', () => {
   const audius = { getFreshStreamUrl: jest.fn() };
+  const youtubeAudio = { createStream: jest.fn() };
   const service = new TranscriptionAudioSourceService(
     audius as unknown as AudiusService,
+    youtubeAudio as never,
   );
 
   beforeEach(() => jest.clearAllMocks());

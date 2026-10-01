@@ -16,6 +16,8 @@ import {
 } from './transcriptions.constants';
 import { buildTranscriptionJobId } from './transcriptions.utils';
 
+const MAX_TRANSCRIPTION_QUEUE_ATTEMPTS = 5;
+
 @Injectable()
 export class TranscriptionQueueService {
   private readonly logger = new Logger(TranscriptionQueueService.name);
@@ -80,7 +82,7 @@ export class TranscriptionQueueService {
           },
           {
             jobId,
-            attempts: this.numberConfig('TRANSCRIPTION_ATTEMPTS', 3),
+            attempts: this.attemptsConfig(),
             backoff: { type: 'exponential', delay: 5_000 },
             removeOnComplete: { age: 3600, count: 100 },
             removeOnFail: { age: 86_400, count: 500 },
@@ -143,7 +145,13 @@ export class TranscriptionQueueService {
         language,
         model: item.model,
       },
-      { jobId, attempts: 1, removeOnComplete: true },
+      {
+        jobId,
+        attempts: this.attemptsConfig(),
+        backoff: { type: 'exponential', delay: 5_000 },
+        removeOnComplete: { age: 3600, count: 100 },
+        removeOnFail: { age: 86_400, count: 500 },
+      },
     );
     return jobId;
   }
@@ -151,6 +159,21 @@ export class TranscriptionQueueService {
   private numberConfig(key: string, fallback: number): number {
     const value = Number(this.config.get(key));
     return Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  private attemptsConfig(): number {
+    const configured = Number(this.config.get('TRANSCRIPTION_ATTEMPTS') ?? 3);
+    const valid = Number.isInteger(configured) && configured > 0 ? configured : 3;
+    const attempts = Math.min(valid, MAX_TRANSCRIPTION_QUEUE_ATTEMPTS);
+    if (attempts < valid)
+      this.logger.warn(
+        JSON.stringify({
+          event: 'transcription.attempts_capped',
+          configuredAttempts: valid,
+          maximumAttempts: MAX_TRANSCRIPTION_QUEUE_ATTEMPTS,
+        }),
+      );
+    return attempts;
   }
 
   private async operation<T>(

@@ -9,6 +9,6 @@ import { YouTubeAudioService } from './youtube-audio.service';
   imports: [HttpModule.register({ timeout: YOUTUBE_HTTP_TIMEOUT_MS })],
   controllers: [YouTubeAudioController],
   providers: [YouTubeService, YouTubeAudioService],
-  exports: [YouTubeService],
+  exports: [YouTubeService, YouTubeAudioService],
 })
 export class YouTubeModule {}

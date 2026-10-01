@@ -73,7 +73,10 @@ export class YouTubeAudioService implements OnModuleInit {
 
     const python = this.pythonBinary();
     const maxBytes = this.number('YOUTUBE_AUDIO_MAX_SIZE_MB', 30) * 1024 * 1024;
-    const maxDuration = this.number('YOUTUBE_AUDIO_MAX_DURATION_SECONDS', 600);
+    const maxDuration = Math.min(
+      300,
+      this.number('YOUTUBE_AUDIO_MAX_DURATION_SECONDS', 300),
+    );
     const timeoutMs = this.number('YOUTUBE_AUDIO_DOWNLOAD_TIMEOUT_MS', 120_000);
     const url = `https://www.youtube.com/watch?v=${videoId}`;
     const bundledPythonPackages = resolve(process.cwd(), '.python-packages');
@@ -134,10 +137,12 @@ export class YouTubeAudioService implements OnModuleInit {
       }
       release();
     };
-    const fail = (message: string) => {
+    const fail = (message: string, code = 'YOUTUBE_AUDIO_EXTRACTION_FAILED') => {
       if (finished) return;
       dispose();
-      output.destroy(new BadGatewayException(message));
+      output.destroy(
+        Object.assign(new BadGatewayException(message), { code }),
+      );
     };
     const timer = setTimeout(
       () => fail('YouTube audio extraction timed out'),
@@ -199,8 +204,21 @@ export class YouTubeAudioService implements OnModuleInit {
           detail,
         }),
       );
+      const category = this.extractorFailureCategory(stderr);
       output.destroy(
-        new BadGatewayException('YouTube audio extraction failed'),
+        Object.assign(
+          new BadGatewayException(
+            category === 'duration_limit_exceeded'
+              ? 'Video exceeds the maximum transcription duration'
+              : 'YouTube audio extraction failed',
+          ),
+          {
+            code:
+              category === 'duration_limit_exceeded'
+                ? 'AUDIO_TOO_LONG'
+                : 'YOUTUBE_AUDIO_EXTRACTION_FAILED',
+          },
+        ),
       );
     });
     output.on('close', dispose);
@@ -266,6 +284,9 @@ export class YouTubeAudioService implements OnModuleInit {
   }
 
   private extractorFailureCategory(stderr: string): string {
+    if (/does not pass filter|duration.{0,30}(?:limit|long)|longer than/i.test(stderr)) {
+      return 'duration_limit_exceeded';
+    }
     if (/sign in to confirm|not a bot|login required/i.test(stderr)) {
       return 'youtube_authentication_required';
     }

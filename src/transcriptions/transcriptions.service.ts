@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateTranscriptionDto } from './dto/create-transcription.dto';
 import type { TranscriptionEvent } from './entities/transcription.types';
 import { TranscriptionAccessService } from './transcription-access.service';
 import type { TranscriptionResponse } from './transcription.presenter';
 import { TranscriptionQueueDiagnosticsService } from './transcription-queue-diagnostics.service';
 import { TranscriptionWorkflowService } from './transcription-workflow.service';
+import { TranscriptionsRepository } from './transcriptions.repository';
 
 export type { TranscriptionResponse } from './transcription.presenter';
 
@@ -14,6 +15,7 @@ export class TranscriptionsService {
     private readonly workflow: TranscriptionWorkflowService,
     private readonly access: TranscriptionAccessService,
     private readonly queueDiagnostics: TranscriptionQueueDiagnosticsService,
+    private readonly repository: TranscriptionsRepository,
   ) {}
 
   createOrGet(
@@ -52,5 +54,21 @@ export class TranscriptionsService {
 
   diagnostics(): Promise<Record<string, unknown>> {
     return this.queueDiagnostics.diagnostics();
+  }
+
+  async getLrcForAdmin(id: string): Promise<{ content: string }> {
+    const transcription = await this.repository.findById(id);
+    if (!transcription) throw new NotFoundException('Transcription not found');
+    return { content: transcription.lrcContent ?? '' };
+  }
+
+  async updateLrcForAdmin(
+    id: string,
+    content: string,
+  ): Promise<{ success: true }> {
+    const transcription = await this.repository.findById(id);
+    if (!transcription) throw new NotFoundException('Transcription not found');
+    await this.repository.update(id, { lrcContent: content });
+    return { success: true };
   }
 }

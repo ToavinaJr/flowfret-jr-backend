@@ -1,6 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { createWriteStream } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import { MusicProvider } from '@prisma/client';
 import { AudiusService } from '../integrations/audius/audius.service';
+import { YouTubeAudioService } from '../integrations/youtube/youtube-audio.service';
+
+export interface ExtractedYouTubeAudio {
+  audioPath: string;
+  cleanup: () => Promise<void>;
+}
 
 const DIRECT_AUDIO_HOSTS = new Set([
   'p.scdn.co',
@@ -10,7 +21,10 @@ const DIRECT_AUDIO_HOSTS = new Set([
 
 @Injectable()
 export class TranscriptionAudioSourceService {
-  constructor(private readonly audius: AudiusService) {}
+  constructor(
+    private readonly audius: AudiusService,
+    private readonly youtubeAudio: YouTubeAudioService,
+  ) {}
 
   async resolve(
     provider: MusicProvider,
@@ -34,6 +48,27 @@ export class TranscriptionAudioSourceService {
       code: 'TRANSCRIPTION_PROVIDER_UNSUPPORTED',
       message: 'This music provider does not expose a transcribable audio URL.',
     });
+  }
+
+  async extractYouTubeAudio(
+    videoId: string,
+    transcriptionId: string,
+  ): Promise<ExtractedYouTubeAudio> {
+    const directory = await mkdtemp(join(tmpdir(), 'flowfret-youtube-'));
+    const audioPath = join(directory, 'source.audio');
+    let extraction: ReturnType<YouTubeAudioService['createStream']> | undefined;
+    try {
+      extraction = this.youtubeAudio.createStream(videoId, transcriptionId);
+      await pipeline(extraction.stream, createWriteStream(audioPath));
+      return {
+        audioPath,
+        cleanup: () => rm(directory, { recursive: true, force: true }),
+      };
+    } catch (error) {
+      extraction?.dispose();
+      await rm(directory, { recursive: true, force: true });
+      throw error;
+    }
   }
 
   private safeUrl(value: string): URL {

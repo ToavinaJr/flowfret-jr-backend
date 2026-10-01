@@ -40,6 +40,7 @@ services:
       REDIS_PRIVATE_URL: ''
       REDIS_HOST: redis
       REDIS_TLS: 'false'
+      YOUTUBE_DL_PYTHON_BIN: python3
     ports: ['127.0.0.1:3000:3000']
     depends_on:
       db: { condition: service_healthy }
@@ -59,6 +60,7 @@ services:
       REDIS_PRIVATE_URL: ''
       REDIS_HOST: redis
       REDIS_TLS: 'false'
+      YOUTUBE_DL_PYTHON_BIN: python3
       HF_HOME: /models
       TRANSCRIPTION_TEMP_DIR: /transcription-tmp
     volumes:

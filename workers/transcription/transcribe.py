@@ -176,7 +176,14 @@ def process_request(request: dict[str, Any]) -> int:
         temp_root = Path(tempfile.mkdtemp(prefix="flowfret-transcription-", dir=options.get("tempDir") or None))
         downloaded = temp_root / "source.audio"
         prepared = temp_root / "prepared.wav"
-        download_audio(str(request["audioUrl"]), downloaded, options)
+        audio_path = request.get("audioPath")
+        if isinstance(audio_path, str) and audio_path:
+            source_path = Path(audio_path)
+            if not source_path.is_file():
+                raise WorkerError("AUDIO_DOWNLOAD_FAILED", "Extracted audio is unavailable")
+            shutil.copyfile(source_path, downloaded)
+        else:
+            download_audio(str(request["audioUrl"]), downloaded, options)
         duration = probe_duration(downloaded)
         max_duration = float(options.get("maxDurationSeconds", 900))
         validate_duration(duration, max_duration)

@@ -13,7 +13,11 @@ import {
 } from './transcriptions.constants';
 import { WhisperWorkerConfigService } from './whisper-worker-config.service';
 
-type WorkerInput = TranscriptionJobData & { title?: string; artist?: string };
+type WorkerInput = TranscriptionJobData & {
+  title?: string;
+  artist?: string;
+  audioPath?: string;
+};
 
 @Injectable()
 export class WhisperBridgeService implements OnModuleDestroy {

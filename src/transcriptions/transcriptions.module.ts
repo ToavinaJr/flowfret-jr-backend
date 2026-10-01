@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getRedisOptions } from '../common/redis-config';
 import { AudiusModule } from '../integrations/audius/audius.module';
+import { YouTubeModule } from '../integrations/youtube/youtube.module';
 import { TRANSCRIPTION_QUEUE } from './transcriptions.constants';
 import { TranscriptionsController } from './transcriptions.controller';
 import { TranscriptionEvents } from './transcriptions.events';
@@ -18,6 +19,7 @@ import { TranscriptionCapacityService } from './transcription-capacity.service';
 @Module({
   imports: [
     AudiusModule,
+    YouTubeModule,
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

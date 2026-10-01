@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   Req,
   Res,
   Sse,
@@ -23,6 +24,7 @@ import { TranscriptionsService } from './transcriptions.service';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { RateLimits } from '../auth/rate-limit.decorator';
+import { UpdateTranscriptionLrcDto } from './dto/update-transcription-lrc.dto';
 
 @Controller('api/transcriptions')
 @UseGuards(AuthGuard('jwt'))
@@ -57,6 +59,21 @@ export class TranscriptionsController {
   @Roles(UserRole.ADMIN)
   diagnostics() {
     return this.service.diagnostics();
+  }
+
+  @Get(':id/lrc/admin')
+  @Roles(UserRole.ADMIN)
+  getLrcForAdmin(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.getLrcForAdmin(id);
+  }
+
+  @Put(':id/lrc/admin')
+  @Roles(UserRole.ADMIN)
+  updateLrcForAdmin(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateTranscriptionLrcDto,
+  ) {
+    return this.service.updateLrcForAdmin(id, dto.content);
   }
 
   @Get(':id')

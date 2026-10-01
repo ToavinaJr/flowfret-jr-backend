@@ -64,20 +64,6 @@ export class TranscriptionsProcessor extends WorkerHost {
       bufferedUntil: 0,
     });
     try {
-      const freshUrl = await this.audioSources.resolve(
-        provider,
-        trackId,
-        job.data.audioUrl,
-      );
-      this.logger.log(
-        JSON.stringify({
-          event: 'transcription.audio_source_resolved',
-          provider,
-          transcriptionId,
-          trackId,
-          streamHost: new URL(freshUrl).hostname,
-        }),
-      );
       const run = (audioUrl: string) =>
         this.whisper.run(
           {
@@ -89,22 +75,70 @@ export class TranscriptionsProcessor extends WorkerHost {
           (message) =>
             this.messages.handle(transcriptionId, message, segments, job),
         );
-      try {
-        await run(freshUrl);
-      } catch (error) {
-        if (!this.isRetryableDownloadError(error)) throw error;
-        this.logger.warn(
+      if (provider === MusicProvider.YOUTUBE) {
+        const extracted = await this.audioSources.extractYouTubeAudio(
+          trackId,
+          transcriptionId,
+        );
+        this.logger.log(
           JSON.stringify({
-            event: 'transcription.audio_download_retry',
+            event: 'transcription.audio_source_resolved',
+            provider,
             transcriptionId,
             trackId,
-            errorCode: this.errorCode(error),
-            errorName: error instanceof Error ? error.name : 'UnknownError',
+            source: 'local_youtube_audio',
           }),
         );
-        await run(
-          await this.audioSources.resolve(provider, trackId, job.data.audioUrl),
+        try {
+          await this.whisper.run(
+            {
+              ...job.data,
+              audioPath: extracted.audioPath,
+              title: transcription?.title ?? undefined,
+              artist: transcription?.artist ?? undefined,
+            },
+            (message) =>
+              this.messages.handle(transcriptionId, message, segments, job),
+          );
+        } finally {
+          await extracted.cleanup();
+        }
+      } else {
+        const freshUrl = await this.audioSources.resolve(
+          provider,
+          trackId,
+          job.data.audioUrl,
         );
+        this.logger.log(
+          JSON.stringify({
+            event: 'transcription.audio_source_resolved',
+            provider,
+            transcriptionId,
+            trackId,
+            streamHost: new URL(freshUrl).hostname,
+          }),
+        );
+        try {
+          await run(freshUrl);
+        } catch (error) {
+          if (!this.isRetryableDownloadError(error)) throw error;
+          this.logger.warn(
+            JSON.stringify({
+              event: 'transcription.audio_download_retry',
+              transcriptionId,
+              trackId,
+              errorCode: this.errorCode(error),
+              errorName: error instanceof Error ? error.name : 'UnknownError',
+            }),
+          );
+          await run(
+            await this.audioSources.resolve(
+              provider,
+              trackId,
+              job.data.audioUrl,
+            ),
+          );
+        }
       }
       this.logger.log(
         JSON.stringify({
