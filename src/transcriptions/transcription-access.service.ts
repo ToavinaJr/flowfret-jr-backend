@@ -96,6 +96,18 @@ export class TranscriptionAccessService {
     return { content: item.lrcContent, filename: `${safe}.lrc` };
   }
 
+  async lrcForAdmin(id: string): Promise<{ content: string }> {
+    const item = await this.repository.findById(id);
+    if (!item) throw new NotFoundException('Transcription not found');
+    return { content: item.lrcContent ?? '' };
+  }
+
+  async updateLrcForAdmin(id: string, content: string): Promise<void> {
+    const item = await this.repository.findById(id);
+    if (!item) throw new NotFoundException('Transcription not found');
+    await this.repository.update(id, { lrcContent: content });
+  }
+
   async requireOne(id: string, userId: string): Promise<Transcription> {
     const item = await this.repository.findById(id);
     if (!item || !(await this.repository.hasAccess(userId, id)))
