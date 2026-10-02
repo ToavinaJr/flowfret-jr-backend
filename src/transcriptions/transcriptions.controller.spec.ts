@@ -1,15 +1,12 @@
 import { Reflector } from '@nestjs/core';
-import {
-  RATE_LIMIT_KEY,
-  type RateLimitOptions,
-} from '../auth/rate-limit.decorator';
+import { RATE_LIMIT_KEY } from '../auth/rate-limit.decorator';
 import { TranscriptionsController } from './transcriptions.controller';
 
 describe('TranscriptionsController', () => {
   const reflector = new Reflector();
 
-  it('rate-limits transcription creation requests per minute and per day', () => {
-    const policies = reflector.getAllAndOverride<RateLimitOptions[]>(
+  it('does not apply request rate limits to transcription creation', () => {
+    const policies = reflector.getAllAndOverride<unknown[]>(
       RATE_LIMIT_KEY,
       [
         // Metadata belongs to the prototype method; the test never invokes it.
@@ -19,14 +16,11 @@ describe('TranscriptionsController', () => {
       ],
     );
 
-    expect(policies).toEqual([
-      { limit: 5, windowSeconds: 60, failClosed: true },
-      { limit: 20, windowSeconds: 86_400, failClosed: true },
-    ]);
+    expect(policies).toBeUndefined();
   });
 
-  it('rate-limits transcription retries per hour and per day', () => {
-    const policies = reflector.getAllAndOverride<RateLimitOptions[]>(
+  it('does not apply request rate limits to transcription retries', () => {
+    const policies = reflector.getAllAndOverride<unknown[]>(
       RATE_LIMIT_KEY,
       [
         // Metadata belongs to the prototype method; the test never invokes it.
@@ -36,9 +30,6 @@ describe('TranscriptionsController', () => {
       ],
     );
 
-    expect(policies).toEqual([
-      { limit: 3, windowSeconds: 3600, failClosed: true },
-      { limit: 5, windowSeconds: 86_400, failClosed: true },
-    ]);
+    expect(policies).toBeUndefined();
   });
 });
