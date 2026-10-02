@@ -37,7 +37,7 @@ const ALLOWED_TRANSCRIPTION_PROVIDERS = ['whisper', 'azure'] as const;
 
 export function validateEnvironment(
   environment: Record<string, unknown>,
-  options: { requireMail?: boolean } = {},
+  options: { requireMail?: boolean; requireWeb?: boolean } = {},
 ): Record<string, unknown> {
   for (const key of POSITIVE_INTEGER_KEYS) {
     const raw = environment[key];
@@ -61,7 +61,10 @@ export function validateEnvironment(
     'LLM_PROVIDER',
     ALLOWED_TRANSCRIPTION_PROVIDERS,
   );
-  if (environment.NODE_ENV === 'production') {
+  if (
+    environment.NODE_ENV === 'production' &&
+    options.requireWeb !== false
+  ) {
     const jwtSecret = environment.JWT_SECRET;
     if (typeof jwtSecret !== 'string' || jwtSecret.length < 32) {
       throw new Error(

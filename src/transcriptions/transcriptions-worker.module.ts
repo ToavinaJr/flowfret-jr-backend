@@ -20,7 +20,10 @@ import { WhisperWorkerConfigService } from './whisper-worker-config.service';
     ConfigModule.forRoot({
       isGlobal: true,
       validate: (environment) =>
-        validateEnvironment(environment, { requireMail: false }),
+        validateEnvironment(environment, {
+          requireMail: false,
+          requireWeb: false,
+        }),
       envFilePath: [
         `.env.${process.env.NODE_ENV ?? 'development'}.local`,
         `.env.${process.env.NODE_ENV ?? 'development'}`,
