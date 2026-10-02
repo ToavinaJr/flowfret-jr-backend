@@ -63,6 +63,7 @@ export class TranscriptionQueueService {
           trackId: dto.trackId,
           jobId,
           jobState,
+          transcriptionStatus: item.status,
         }),
       );
       return jobId;
@@ -95,6 +96,8 @@ export class TranscriptionQueueService {
           transcriptionId: item.id,
           trackId: dto.trackId,
           jobId,
+          queueState: 'waiting',
+          transcriptionStatus: item.status,
         }),
       );
       return jobId;

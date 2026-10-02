@@ -44,6 +44,17 @@ export class TranscriptionMessageHandler {
           duration: message.duration,
           processingPhase: TRANSCRIPTION_PHASE.TRANSCRIBING,
         });
+        this.logger.log(
+          JSON.stringify({
+            event: 'transcription.status_changed',
+            transcriptionId: id,
+            jobId: job.id,
+            previousStatus: TranscriptionStatus.DOWNLOADING,
+            status: TranscriptionStatus.PROCESSING,
+            progress: 0,
+            source: 'whisper_started',
+          }),
+        );
         return;
       case WORKER_MESSAGE.MODEL_LOADING:
       case WORKER_MESSAGE.MODEL_READY: {
@@ -51,7 +62,19 @@ export class TranscriptionMessageHandler {
         const phase = ready
           ? TRANSCRIPTION_PHASE.MODEL_READY
           : TRANSCRIPTION_PHASE.MODEL_LOADING;
-        await this.repository.update(id, { processingPhase: phase });
+        const updated = await this.repository.update(id, {
+          processingPhase: phase,
+        });
+        this.logger.log(
+          JSON.stringify({
+            event: 'transcription.status_observed',
+            transcriptionId: id,
+            jobId: job.id,
+            status: updated.status,
+            processingPhase: phase,
+            progress: updated.progress,
+          }),
+        );
         this.events.emit({
           type: ready
             ? TRANSCRIPTION_EVENT.MODEL_READY
@@ -78,14 +101,30 @@ export class TranscriptionMessageHandler {
             Math.round(job.progress as number) || 0,
           );
         return;
-      case WORKER_MESSAGE.PROGRESS:
+      case WORKER_MESSAGE.PROGRESS: {
+        const previousProgress = Number(job.progress) || 0;
+        const previousMilestone = Math.floor(previousProgress / 10);
+        const currentMilestone = Math.floor(message.progress / 10);
         await job.updateProgress(message.progress);
-        await this.repository.saveSegments(
+        const updated = await this.repository.saveSegments(
           id,
           segments,
           message.bufferedUntil,
           message.progress,
         );
+        if (currentMilestone > previousMilestone) {
+          this.logger.log(
+            JSON.stringify({
+              event: 'transcription.progress',
+              transcriptionId: id,
+              jobId: job.id,
+              status: updated.status,
+              progress: message.progress,
+              bufferedUntil: message.bufferedUntil,
+              segmentCount: segments.length,
+            }),
+          );
+        }
         this.events.emit({
           type: TRANSCRIPTION_EVENT.PROGRESS,
           transcriptionId: id,
@@ -93,7 +132,8 @@ export class TranscriptionMessageHandler {
           bufferedUntil: message.bufferedUntil,
         });
         return;
-      case WORKER_MESSAGE.READY_TO_PLAY:
+      }
+      case WORKER_MESSAGE.READY_TO_PLAY: {
         this.logger.log(
           JSON.stringify({
             event: 'transcription.ready_to_play',
@@ -103,12 +143,23 @@ export class TranscriptionMessageHandler {
             segmentCount: segments.length,
           }),
         );
-        await this.repository.update(id, {
+        const updated = await this.repository.update(id, {
           status: TranscriptionStatus.READY_TO_PLAY,
           readyToPlay: true,
           bufferedUntil: message.bufferedUntil,
           segments: segments as never,
         });
+        this.logger.log(
+          JSON.stringify({
+            event: 'transcription.status_changed',
+            transcriptionId: id,
+            jobId: job.id,
+            status: updated.status,
+            progress: updated.progress,
+            bufferedUntil: message.bufferedUntil,
+            source: 'initial_audio_buffer_ready',
+          }),
+        );
         this.events.emit({
           type: TRANSCRIPTION_EVENT.READY_TO_PLAY,
           transcriptionId: id,
@@ -116,7 +167,8 @@ export class TranscriptionMessageHandler {
           bufferedUntil: message.bufferedUntil,
         });
         return;
-      case WORKER_MESSAGE.COMPLETED:
+      }
+      case WORKER_MESSAGE.COMPLETED: {
         this.logger.log(
           JSON.stringify({
             event: 'transcription.whisper_completed',
@@ -127,7 +179,7 @@ export class TranscriptionMessageHandler {
             segmentCount: segments.length,
           }),
         );
-        await this.repository.update(id, {
+        const updated = await this.repository.update(id, {
           status: TranscriptionStatus.COMPLETED,
           processingPhase: TRANSCRIPTION_PHASE.COMPLETED,
           progress: 100,
@@ -141,6 +193,18 @@ export class TranscriptionMessageHandler {
           errorCode: null,
           errorMessage: null,
         });
+        this.logger.log(
+          JSON.stringify({
+            event: 'transcription.status_changed',
+            transcriptionId: id,
+            jobId: job.id,
+            status: updated.status,
+            progress: updated.progress,
+            bufferedUntil: message.duration,
+            segmentCount: segments.length,
+            source: 'whisper_completed',
+          }),
+        );
         this.events.emit({
           type: TRANSCRIPTION_EVENT.COMPLETED,
           transcriptionId: id,
@@ -149,6 +213,7 @@ export class TranscriptionMessageHandler {
           readyToPlay: true,
         });
         return;
+      }
       case WORKER_MESSAGE.FAILED:
         throw Object.assign(new Error(message.message), {
           code: message.errorCode,

@@ -90,6 +90,17 @@ export class TranscriptionWorkflowService {
         if (!item) throw error;
       }
     }
+    if (created) {
+      this.logger.log(
+        JSON.stringify({
+          event: 'transcription.status_changed',
+          transcriptionId: item.id,
+          trackId: item.trackId,
+          status: item.status,
+          source: 'request_created',
+        }),
+      );
+    }
     await this.repository.grantAccess(userId, item.id);
     if (item.status === TranscriptionStatus.FAILED) {
       this.logger.warn(
@@ -156,6 +167,18 @@ export class TranscriptionWorkflowService {
         event: 'transcription.retry_enqueued',
         transcriptionId: id,
         trackId: item.trackId,
+        jobId,
+        queueState: 'waiting',
+      }),
+    );
+    this.logger.log(
+      JSON.stringify({
+        event: 'transcription.status_changed',
+        transcriptionId: id,
+        trackId: item.trackId,
+        previousStatus: TranscriptionStatus.FAILED,
+        status: reset.status,
+        source: 'manual_retry',
         jobId,
       }),
     );

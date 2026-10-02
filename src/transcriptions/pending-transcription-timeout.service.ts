@@ -58,6 +58,16 @@ export class PendingTranscriptionTimeoutService
         );
         if (!failed) continue;
         failedIds.push(item.id);
+        this.logger.warn(
+          JSON.stringify({
+            event: 'transcription.status_changed',
+            transcriptionId: item.id,
+            previousStatus: 'PENDING',
+            status: 'FAILED',
+            errorCode: TRANSCRIPTION_ERROR_CODE.PENDING_TIMEOUT,
+            source: 'pending_timeout',
+          }),
+        );
         this.events.emit({
           type: TRANSCRIPTION_EVENT.FAILED,
           transcriptionId: item.id,

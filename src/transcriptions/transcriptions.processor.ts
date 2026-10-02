@@ -62,6 +62,17 @@ export class TranscriptionsProcessor extends WorkerHost {
       );
       return;
     }
+    this.logger.log(
+      JSON.stringify({
+        event: 'transcription.status_changed',
+        transcriptionId,
+        trackId,
+        jobId: job.id,
+        previousStatus: TranscriptionStatus.PENDING,
+        status: TranscriptionStatus.DOWNLOADING,
+        source: 'worker_claimed_job',
+      }),
+    );
     this.events.emit({
       type: TRANSCRIPTION_EVENT.PROCESSING,
       transcriptionId,
@@ -147,6 +158,7 @@ export class TranscriptionsProcessor extends WorkerHost {
       }
       this.logger.log(
         JSON.stringify({
+          event: 'transcription.job_completed',
           transcriptionId,
           jobId: job.id,
           trackId,
@@ -167,6 +179,7 @@ export class TranscriptionsProcessor extends WorkerHost {
   ): Promise<never> {
     const { transcriptionId, trackId } = job.data;
     const finalAttempt = job.attemptsMade + 1 >= Number(job.opts.attempts ?? 1);
+    const current = await this.repository.findById(transcriptionId);
     if (!finalAttempt) {
       this.logger.warn(
         JSON.stringify({
@@ -179,13 +192,26 @@ export class TranscriptionsProcessor extends WorkerHost {
           nextAttempt: job.attemptsMade + 2,
         }),
       );
-      await this.repository.update(transcriptionId, {
+      const reset = await this.repository.update(transcriptionId, {
         status: TranscriptionStatus.PENDING,
         errorCode: null,
         errorMessage: null,
       });
+      this.logger.warn(
+        JSON.stringify({
+          event: 'transcription.status_changed',
+          transcriptionId,
+          trackId,
+          jobId: job.id,
+          previousStatus: current?.status,
+          status: reset.status,
+          source: 'automatic_retry',
+          nextAttempt: job.attemptsMade + 2,
+          errorCode: this.errorCode(error),
+        }),
+      );
     } else {
-      await this.repository.markFailed(
+      const failed = await this.repository.markFailed(
         transcriptionId,
         this.errorCode(error),
         'Transcription failed',
@@ -198,10 +224,13 @@ export class TranscriptionsProcessor extends WorkerHost {
       });
       this.logger.error(
         JSON.stringify({
+          event: 'transcription.status_changed',
           transcriptionId,
           jobId: job.id,
           trackId,
-          status: TranscriptionStatus.FAILED,
+          previousStatus: current?.status,
+          status: failed.status,
+          source: 'worker_final_attempt_failed',
           errorCode: this.errorCode(error),
           errorName: error instanceof Error ? error.name : 'UnknownError',
           elapsedMs: Date.now() - startedAt,
