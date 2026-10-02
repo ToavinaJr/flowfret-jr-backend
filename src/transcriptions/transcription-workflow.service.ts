@@ -62,7 +62,7 @@ export class TranscriptionWorkflowService {
     );
     let created = false;
     if (!item) {
-      await this.capacity.ensure(userId);
+      await this.capacity.ensure();
       try {
         item = await this.repository.create({
           provider,

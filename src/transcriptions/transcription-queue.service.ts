@@ -156,6 +156,28 @@ export class TranscriptionQueueService {
     return jobId;
   }
 
+  async removeJobsForTranscriptions(
+    transcriptionIds: readonly string[],
+  ): Promise<number> {
+    if (transcriptionIds.length === 0) return 0;
+    const targetIds = new Set(transcriptionIds);
+    const jobs = await this.operation(
+      'findPendingJobsToExpire',
+      this.queue.getJobs(['waiting', 'delayed', 'paused'], 0, -1),
+    );
+    let removed = 0;
+    for (const job of jobs) {
+      if (!targetIds.has(job.data.transcriptionId)) continue;
+      try {
+        await job.remove();
+        removed += 1;
+      } catch (error) {
+        if ((await job.getState()) !== 'active') throw error;
+      }
+    }
+    return removed;
+  }
+
   private numberConfig(key: string, fallback: number): number {
     const value = Number(this.config.get(key));
     return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -163,7 +185,8 @@ export class TranscriptionQueueService {
 
   private attemptsConfig(): number {
     const configured = Number(this.config.get('TRANSCRIPTION_ATTEMPTS') ?? 3);
-    const valid = Number.isInteger(configured) && configured > 0 ? configured : 3;
+    const valid =
+      Number.isInteger(configured) && configured > 0 ? configured : 3;
     const attempts = Math.min(valid, MAX_TRANSCRIPTION_QUEUE_ATTEMPTS);
     if (attempts < valid)
       this.logger.warn(

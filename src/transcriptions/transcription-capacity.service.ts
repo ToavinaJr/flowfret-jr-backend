@@ -1,38 +1,23 @@
-import {
-  HttpException,
-  Injectable,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+﻿import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TranscriptionsRepository } from './transcriptions.repository';
 import { TranscriptionQueueService } from './transcription-queue.service';
 import { TRANSCRIPTION_ERROR_CODE } from './transcriptions.constants';
 
 @Injectable()
 export class TranscriptionCapacityService {
   constructor(
-    private readonly repository: TranscriptionsRepository,
     private readonly config: ConfigService,
     private readonly queue: TranscriptionQueueService,
   ) {}
 
-  async ensure(userId: string): Promise<void> {
-    const active = await this.repository.countActiveForUser(userId);
-    if (active >= this.numberConfig('TRANSCRIPTION_MAX_ACTIVE_PER_USER', 2))
-      throw new HttpException(
-        {
-          code: TRANSCRIPTION_ERROR_CODE.USER_QUOTA_REACHED,
-          message: 'Trop de transcriptions sont déjà en cours.',
-        },
-        429,
-      );
+  async ensure(): Promise<void> {
     const counts = await this.queue.jobCounts('waiting', 'active', 'delayed');
     const queued =
       (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0);
     if (queued >= this.numberConfig('TRANSCRIPTION_MAX_QUEUE_DEPTH', 50))
       throw new ServiceUnavailableException({
         code: TRANSCRIPTION_ERROR_CODE.QUEUE_SATURATED,
-        message: 'La file de transcription est temporairement saturée.',
+        message: 'La file de transcription est temporairement saturÃ©e.',
       });
   }
 

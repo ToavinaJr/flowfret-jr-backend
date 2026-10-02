@@ -56,14 +56,13 @@ describe('TranscriptionWorkflowService', () => {
     expect(queue.add).not.toHaveBeenCalled();
   });
 
-  it('rejects work when the user active-job quota is full', async () => {
-    const { workflow, repository, queue } = createTranscriptionFixture();
-    repository.countActiveForUser.mockResolvedValue(2);
+  it('allows users to enqueue work while other transcriptions are active', async () => {
+    const { workflow, queue } = createTranscriptionFixture();
 
     await expect(
       workflow.createOrGet({ ...request, trackId: 'other' }, 'user-id'),
-    ).rejects.toMatchObject({ status: 429 });
-    expect(queue.add).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({ cached: false });
+    expect(queue.add).toHaveBeenCalledTimes(1);
   });
 
   it('rejects work when the global queue is saturated', async () => {

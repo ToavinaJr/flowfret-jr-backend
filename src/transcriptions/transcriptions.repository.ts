@@ -12,7 +12,10 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { TranscriptionSegment } from './entities/transcription.types';
-import { TRANSCRIPTION_ERROR_CODE } from './transcriptions.constants';
+import {
+  TRANSCRIPTION_ERROR_CODE,
+  TRANSCRIPTION_PHASE,
+} from './transcriptions.constants';
 
 @Injectable()
 export class TranscriptionsRepository {
@@ -85,25 +88,46 @@ export class TranscriptionsRepository {
       ),
     );
   }
-  countActiveForUser(userId: string): Promise<number> {
-    return this.execute('countActiveForUser', () =>
-      this.prisma.transcriptionAccess.count({
+  findStalePendingBefore(before: Date): Promise<Array<{ id: string }>> {
+    return this.execute('findStalePendingBefore', () =>
+      this.prisma.transcription.findMany({
         where: {
-          userId,
-          transcription: {
-            isDeleted: false,
-            status: {
-              in: [
-                TranscriptionStatus.PENDING,
-                TranscriptionStatus.DOWNLOADING,
-                TranscriptionStatus.PROCESSING,
-                TranscriptionStatus.READY_TO_PLAY,
-              ],
-            },
-          },
+          status: TranscriptionStatus.PENDING,
+          updatedAt: { lte: before },
         },
+        select: { id: true },
       }),
     );
+  }
+  failPendingIfStale(id: string, before: Date): Promise<boolean> {
+    return this.execute('failPendingIfStale', async () => {
+      const result = await this.prisma.transcription.updateMany({
+        where: {
+          id,
+          status: TranscriptionStatus.PENDING,
+          updatedAt: { lte: before },
+        },
+        data: {
+          status: TranscriptionStatus.FAILED,
+          errorCode: TRANSCRIPTION_ERROR_CODE.PENDING_TIMEOUT,
+          errorMessage: 'No worker started the transcription within 5 minutes.',
+        },
+      });
+      return result.count > 0;
+    });
+  }
+  claimPending(id: string): Promise<boolean> {
+    return this.execute('claimPending', async () => {
+      const result = await this.prisma.transcription.updateMany({
+        where: { id, status: TranscriptionStatus.PENDING },
+        data: {
+          status: TranscriptionStatus.DOWNLOADING,
+          processingPhase: TRANSCRIPTION_PHASE.AUDIO_PREPARING,
+          attempts: { increment: 1 },
+        },
+      });
+      return result.count > 0;
+    });
   }
   create(data: {
     provider: MusicProvider;

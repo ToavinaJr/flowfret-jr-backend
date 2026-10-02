@@ -12,7 +12,6 @@ import { TranscriptionsRepository } from './transcriptions.repository';
 import {
   TRANSCRIPTION_ERROR_CODE,
   TRANSCRIPTION_EVENT,
-  TRANSCRIPTION_PHASE,
   TRANSCRIPTION_QUEUE,
   RETRYABLE_TRANSCRIPTION_ERROR_CODES,
 } from './transcriptions.constants';
@@ -52,11 +51,17 @@ export class TranscriptionsProcessor extends WorkerHost {
       }),
     );
     const transcription = await this.repository.findById(transcriptionId);
-    await this.repository.update(transcriptionId, {
-      status: TranscriptionStatus.DOWNLOADING,
-      processingPhase: TRANSCRIPTION_PHASE.AUDIO_PREPARING,
-      attempts: { increment: 1 },
-    });
+    const claimed = await this.repository.claimPending(transcriptionId);
+    if (!transcription || !claimed) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'transcription.job_skipped_not_pending',
+          transcriptionId,
+          jobId: job.id,
+        }),
+      );
+      return;
+    }
     this.events.emit({
       type: TRANSCRIPTION_EVENT.PROCESSING,
       transcriptionId,

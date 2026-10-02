@@ -53,7 +53,6 @@ export function createTranscriptionFixture(
     update: jest.fn(),
     grantAccess: jest.fn().mockResolvedValue(undefined),
     hasAccess: jest.fn().mockResolvedValue(true),
-    countActiveForUser: jest.fn().mockResolvedValue(0),
     saveSegments: jest.fn(),
     markFailed: jest.fn(),
   };
@@ -80,11 +79,7 @@ export function createTranscriptionFixture(
     config,
     bullQueue,
   );
-  const capacity = new TranscriptionCapacityService(
-    repositoryService,
-    config,
-    queueService,
-  );
+  const capacity = new TranscriptionCapacityService(config, queueService);
   const workflow = new TranscriptionWorkflowService(
     repositoryService,
     events as unknown as TranscriptionEvents,

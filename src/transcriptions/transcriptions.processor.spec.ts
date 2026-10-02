@@ -25,6 +25,7 @@ function setup() {
   const events: Array<Record<string, unknown>> = [];
   const repository = {
     findById: jest.fn().mockResolvedValue({ title: 'Title', artist: 'Artist' }),
+    claimPending: jest.fn().mockResolvedValue(true),
     update: jest
       .fn()
       .mockImplementation((_id: string, data: Record<string, unknown>) => {

@@ -15,6 +15,7 @@ import { TranscriptionQueueService } from './transcription-queue.service';
 import { TranscriptionWorkflowService } from './transcription-workflow.service';
 import { TranscriptionQueueDiagnosticsService } from './transcription-queue-diagnostics.service';
 import { TranscriptionCapacityService } from './transcription-capacity.service';
+import { PendingTranscriptionTimeoutService } from './pending-transcription-timeout.service';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { TranscriptionCapacityService } from './transcription-capacity.service';
     TranscriptionQueueService,
     TranscriptionQueueDiagnosticsService,
     TranscriptionCapacityService,
+    PendingTranscriptionTimeoutService,
     TranscriptionWorkflowService,
     TranscriptionsRepository,
     TranscriptionEvents,
