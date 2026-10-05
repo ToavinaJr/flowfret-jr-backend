@@ -62,10 +62,7 @@ export function validateEnvironment(
     'LLM_PROVIDER',
     ALLOWED_TRANSCRIPTION_PROVIDERS,
   );
-  if (
-    environment.NODE_ENV === 'production' &&
-    options.requireWeb !== false
-  ) {
+  if (environment.NODE_ENV === 'production' && options.requireWeb !== false) {
     const jwtSecret = environment.JWT_SECRET;
     if (typeof jwtSecret !== 'string' || jwtSecret.length < 32) {
       throw new Error(

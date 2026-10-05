@@ -51,11 +51,12 @@ The API sends verification and password-reset emails through Gmail SMTP using
 Nodemailer (`smtp.gmail.com`). In production, `SMTP_USER` and `SMTP_PASSWORD`
 are mandatory; `SMTP_PASSWORD` must be a Google App Password, not the account
 password. Enable 2-Step Verification on the Google account before creating an
-App Password. `SMTP_FROM_EMAIL` is optional and defaults to `SMTP_USER`; only
-use a sender address or alias permitted by that account. `SMTP_PORT` defaults
-to `465` (implicit TLS); use `587` for STARTTLS. Configure these values as
-deployment secrets and never commit real credentials. OTP codes and password
-reset links are not written to application logs.
+[App Password](https://myaccount.google.com/apppasswords).
+`SMTP_FROM_EMAIL` is optional and defaults to `SMTP_USER`; only use a sender
+address or alias permitted by that account. `SMTP_PORT` defaults to `465`
+(implicit TLS); use `587` for STARTTLS. Configure these values as deployment
+secrets and never commit real credentials. OTP codes and password reset links
+are not written to application logs.
 
 ## Music search
 

@@ -40,7 +40,8 @@ export class MailService {
   constructor(private readonly configService: ConfigService) {
     const user = this.configService.get<string>('SMTP_USER')?.trim() ?? '';
     const password = this.configService.get<string>('SMTP_PASSWORD') ?? '';
-    const port = Number(this.configService.get<string>('SMTP_PORT') ?? 465);
+    const configuredPort = this.configService.get<string>('SMTP_PORT')?.trim();
+    const port = configuredPort ? Number(configuredPort) : 465;
     this.fromEmail =
       this.configService.get<string>('SMTP_FROM_EMAIL')?.trim() || user;
     this.transporter =
