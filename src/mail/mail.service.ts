@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import sgMail from '@sendgrid/mail';
+import nodemailer, { type Transporter } from 'nodemailer';
 
 interface OtpEmailPayload {
   to: string;
@@ -35,20 +35,27 @@ function escapeHtml(value: string): string {
 export class MailService {
   private readonly logger = new Logger(MailService.name);
   private readonly fromEmail: string;
-  private readonly isConfigured: boolean;
+  private readonly transporter: Transporter | null;
 
   constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>('SENDGRID_API_KEY') ?? '';
+    const user = this.configService.get<string>('SMTP_USER')?.trim() ?? '';
+    const password = this.configService.get<string>('SMTP_PASSWORD') ?? '';
+    const port = Number(this.configService.get<string>('SMTP_PORT') ?? 465);
     this.fromEmail =
-      this.configService.get<string>('SENDGRID_FROM_EMAIL') ??
-      'noreply@flowfret.app';
-    this.isConfigured = apiKey.length > 0;
+      this.configService.get<string>('SMTP_FROM_EMAIL')?.trim() || user;
+    this.transporter =
+      user && password
+        ? nodemailer.createTransport({
+            host: 'smtp.gmail.com',
+            port,
+            secure: port === 465,
+            auth: { user, pass: password },
+          })
+        : null;
 
-    if (this.isConfigured) {
-      sgMail.setApiKey(apiKey);
-    } else {
+    if (!this.transporter) {
       this.logger.warn(
-        'Email delivery is disabled because SENDGRID_API_KEY is missing.',
+        'Email delivery is disabled because SMTP_USER or SMTP_PASSWORD is missing.',
       );
     }
   }
@@ -92,14 +99,14 @@ export class MailService {
       </div>
     `;
 
-    if (!this.isConfigured) {
+    if (!this.transporter) {
       this.logger.warn('OTP email suppressed because delivery is disabled.');
       return;
     }
 
-    await sgMail.send({
+    await this.transporter.sendMail({
       to: payload.to,
-      from: { email: this.fromEmail, name: 'FlowFret' },
+      from: { address: this.fromEmail, name: 'FlowFret' },
       subject,
       text,
       html,
@@ -131,16 +138,16 @@ export class MailService {
         <p style="color:#666;font-size:13px;">Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.</p>
       </div>`;
 
-    if (!this.isConfigured) {
+    if (!this.transporter) {
       this.logger.warn(
         'Password reset email suppressed because delivery is disabled.',
       );
       return;
     }
 
-    await sgMail.send({
+    await this.transporter.sendMail({
       to: payload.to,
-      from: { email: this.fromEmail, name: 'FlowFret' },
+      from: { address: this.fromEmail, name: 'FlowFret' },
       subject,
       text,
       html,

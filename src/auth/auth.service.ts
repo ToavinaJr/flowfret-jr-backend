@@ -38,7 +38,7 @@ export class AuthService {
     private readonly googleAuth: GoogleAuthService,
   ) {}
 
-  async register(input: RegisterInput): Promise<AuthSessionPayload> {
+  async register(input: RegisterInput): Promise<RegisterPendingPayload> {
     const email = normalizeEmail(input.email);
     const existing = await this.prisma.user.findFirst({
       where: {
@@ -64,7 +64,7 @@ export class AuthService {
           email,
           username: input.username,
           passwordHash: await bcrypt.hash(input.password, 10),
-          status: UserStatus.ACTIVE,
+          status: UserStatus.PENDING,
         },
       });
     } catch (error) {
@@ -72,7 +72,14 @@ export class AuthService {
         throw new ConflictException(GENERIC_REGISTRATION_ERROR);
       throw error;
     }
-    return this.sessions.create(user);
+    const result = await this.verification.createAndSend(user);
+    return {
+      email: user.email,
+      verificationToken: result.token,
+      expiresAt: result.expiresAt,
+      message:
+        'Un code OTP à 4 chiffres a été envoyé par e-mail. Validez votre compte pour vous connecter.',
+    };
   }
 
   async login(input: LoginInput): Promise<AuthSessionPayload> {
@@ -83,10 +90,7 @@ export class AuthService {
       throw new UnauthorizedException(GENERIC_CREDENTIALS_ERROR);
     if (!(await bcrypt.compare(input.password, user.passwordHash)))
       throw new UnauthorizedException(GENERIC_CREDENTIALS_ERROR);
-    if (
-      user.status !== UserStatus.ACTIVE &&
-      user.status !== UserStatus.PENDING
-    ) {
+    if (user.status !== UserStatus.ACTIVE) {
       this.logger.warn(
         JSON.stringify({
           event: 'login.rejected',
@@ -95,16 +99,11 @@ export class AuthService {
       );
       throw new UnauthorizedException(GENERIC_CREDENTIALS_ERROR);
     }
-    const authenticatedUser = await this.prisma.user.update({
+    await this.prisma.user.update({
       where: { id: user.id },
-      data: {
-        lastLoginAt: new Date(),
-        ...(user.status === UserStatus.PENDING
-          ? { status: UserStatus.ACTIVE }
-          : {}),
-      },
+      data: { lastLoginAt: new Date() },
     });
-    return this.sessions.create(authenticatedUser);
+    return this.sessions.create(user);
   }
 
   async loginWithGoogle(input: GoogleAuthInput): Promise<AuthSessionPayload> {

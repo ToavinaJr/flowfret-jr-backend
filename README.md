@@ -47,11 +47,15 @@ The inactive Spotify provider is also retained and accepts:
 
 Never commit real secrets.
 
-In production, `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` are mandatory. The
-HTTP API refuses to start without them and never writes OTP codes or password
-reset links to logs. Deployments that ran an older version without SendGrid
-must purge retained application logs according to the hosting provider's
-retention controls before going live with this version.
+The API sends verification and password-reset emails through Gmail SMTP using
+Nodemailer (`smtp.gmail.com`). In production, `SMTP_USER` and `SMTP_PASSWORD`
+are mandatory; `SMTP_PASSWORD` must be a Google App Password, not the account
+password. Enable 2-Step Verification on the Google account before creating an
+App Password. `SMTP_FROM_EMAIL` is optional and defaults to `SMTP_USER`; only
+use a sender address or alias permitted by that account. `SMTP_PORT` defaults
+to `465` (implicit TLS); use `587` for STARTTLS. Configure these values as
+deployment secrets and never commit real credentials. OTP codes and password
+reset links are not written to application logs.
 
 ## Music search
 

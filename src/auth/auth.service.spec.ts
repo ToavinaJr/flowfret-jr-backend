@@ -114,14 +114,17 @@ describe('AuthService security contracts', () => {
     expect(mail.sendOtpVerificationEmail).not.toHaveBeenCalled();
   });
 
-  it('activates new accounts and creates a session without sending an OTP', async () => {
-    const { service, prisma, mail, jwt } = setup();
+  it('creates pending accounts and sends an OTP verification email', async () => {
+    const { service, prisma, mail } = setup();
     prisma.user.findFirst.mockResolvedValue(null);
     let createdStatus: UserStatus | undefined;
     prisma.user.create.mockImplementation(
       (args: { data: { status: UserStatus } }) => {
         createdStatus = args.data.status;
-        return Promise.resolve(activeUser);
+        return Promise.resolve({
+          ...activeUser,
+          status: UserStatus.PENDING,
+        });
       },
     );
 
@@ -131,13 +134,16 @@ describe('AuthService security contracts', () => {
       password: 'password-123',
     });
 
-    expect(createdStatus).toBe(UserStatus.ACTIVE);
-    expect(mail.sendOtpVerificationEmail).not.toHaveBeenCalled();
-    expect(prisma.emailVerificationToken.create).not.toHaveBeenCalled();
-    expect(jwt.sign).toHaveBeenCalledWith(
-      expect.objectContaining({ sub: activeUser.id }),
+    expect(createdStatus).toBe(UserStatus.PENDING);
+    expect(prisma.emailVerificationToken.create).toHaveBeenCalled();
+    expect(mail.sendOtpVerificationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: activeUser.email,
+        username: activeUser.username,
+      }),
     );
-    expect(result.user.id).toBe(activeUser.id);
+    expect(result.email).toBe(activeUser.email);
+    expect(result.verificationToken).toBeDefined();
   });
 
   it('creates a session only for an active password account', async () => {
@@ -161,7 +167,7 @@ describe('AuthService security contracts', () => {
     expect(result.user.id).toBe(activeUser.id);
   });
 
-  it('activates a pending account when its owner logs in successfully', async () => {
+  it('rejects login while email verification is pending', async () => {
     const { service, prisma } = setup();
     const passwordHash = await bcrypt.hash('password-123', 4);
     prisma.user.findUnique.mockResolvedValue({
@@ -169,20 +175,14 @@ describe('AuthService security contracts', () => {
       passwordHash,
       status: UserStatus.PENDING,
     });
-    let activatedStatus: UserStatus | undefined;
-    prisma.user.update.mockImplementation(
-      (args: { data: { status?: UserStatus } }) => {
-        activatedStatus = args.data.status;
-        return Promise.resolve(activeUser);
-      },
-    );
+    await expect(
+      service.login({
+        email: 'alice@example.com',
+        password: 'password-123',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
 
-    await service.login({
-      email: 'alice@example.com',
-      password: 'password-123',
-    });
-
-    expect(activatedStatus).toBe(UserStatus.ACTIVE);
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
   it('keeps password-reset requests opaque for unknown accounts', async () => {
