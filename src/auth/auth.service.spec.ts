@@ -114,6 +114,32 @@ describe('AuthService security contracts', () => {
     expect(mail.sendOtpVerificationEmail).not.toHaveBeenCalled();
   });
 
+  it('activates new accounts and creates a session without sending an OTP', async () => {
+    const { service, prisma, mail, jwt } = setup();
+    prisma.user.findFirst.mockResolvedValue(null);
+    let createdStatus: UserStatus | undefined;
+    prisma.user.create.mockImplementation(
+      (args: { data: { status: UserStatus } }) => {
+        createdStatus = args.data.status;
+        return Promise.resolve(activeUser);
+      },
+    );
+
+    const result = await service.register({
+      email: 'Alice@Example.com',
+      username: 'alice',
+      password: 'password-123',
+    });
+
+    expect(createdStatus).toBe(UserStatus.ACTIVE);
+    expect(mail.sendOtpVerificationEmail).not.toHaveBeenCalled();
+    expect(prisma.emailVerificationToken.create).not.toHaveBeenCalled();
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: activeUser.id }),
+    );
+    expect(result.user.id).toBe(activeUser.id);
+  });
+
   it('creates a session only for an active password account', async () => {
     const { service, prisma, jwt } = setup();
     const passwordHash = await bcrypt.hash('password-123', 4);
@@ -133,6 +159,30 @@ describe('AuthService security contracts', () => {
     );
     expect(result.accessToken).toBe('access-token');
     expect(result.user.id).toBe(activeUser.id);
+  });
+
+  it('activates a pending account when its owner logs in successfully', async () => {
+    const { service, prisma } = setup();
+    const passwordHash = await bcrypt.hash('password-123', 4);
+    prisma.user.findUnique.mockResolvedValue({
+      ...activeUser,
+      passwordHash,
+      status: UserStatus.PENDING,
+    });
+    let activatedStatus: UserStatus | undefined;
+    prisma.user.update.mockImplementation(
+      (args: { data: { status?: UserStatus } }) => {
+        activatedStatus = args.data.status;
+        return Promise.resolve(activeUser);
+      },
+    );
+
+    await service.login({
+      email: 'alice@example.com',
+      password: 'password-123',
+    });
+
+    expect(activatedStatus).toBe(UserStatus.ACTIVE);
   });
 
   it('keeps password-reset requests opaque for unknown accounts', async () => {
