@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -144,6 +145,47 @@ describe('AuthService security contracts', () => {
     );
     expect(result.email).toBe(activeUser.email);
     expect(result.verificationToken).toBeDefined();
+  });
+
+  it('allows the same pending user to retry registration and resend the OTP', async () => {
+    const { service, prisma, mail } = setup();
+    const passwordHash = await bcrypt.hash('password-123', 4);
+    prisma.user.findFirst.mockResolvedValue({
+      ...activeUser,
+      passwordHash,
+      status: UserStatus.PENDING,
+    });
+    prisma.emailVerificationToken.create.mockResolvedValue({});
+
+    const result = await service.register({
+      email: ' Alice@Example.com ',
+      username: 'alice',
+      password: 'password-123',
+    });
+
+    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(mail.sendOtpVerificationEmail).toHaveBeenCalledTimes(1);
+    expect(result.email).toBe(activeUser.email);
+  });
+
+  it('does not report registration success when SMTP delivery fails', async () => {
+    const { service, prisma, mail } = setup();
+    prisma.user.findFirst.mockResolvedValue(null);
+    prisma.user.create.mockResolvedValue({
+      ...activeUser,
+      status: UserStatus.PENDING,
+    });
+    mail.sendOtpVerificationEmail.mockRejectedValue(
+      new Error('connect ENETUNREACH'),
+    );
+
+    await expect(
+      service.register({
+        email: 'alice@example.com',
+        username: 'alice',
+        password: 'password-123',
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
   it('creates a session only for an active password account', async () => {

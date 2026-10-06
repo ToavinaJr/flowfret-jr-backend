@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { User, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -56,6 +61,9 @@ export class EmailVerificationService {
       this.logger.error(
         `Unable to send verification email for user ${user.id}`,
         errorDetails(error),
+      );
+      throw new ServiceUnavailableException(
+        'Unable to send verification email. Please try again later.',
       );
     }
     return { token, expiresAt };

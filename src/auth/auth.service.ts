@@ -26,6 +26,19 @@ import { isUniqueConstraintError, normalizeEmail } from './auth.utils';
 
 export type { AuthSessionPayload } from './auth-session.service';
 
+function pendingRegistrationPayload(
+  user: Pick<User, 'email'>,
+  verification: { token: string; expiresAt: Date },
+): RegisterPendingPayload {
+  return {
+    email: user.email,
+    verificationToken: verification.token,
+    expiresAt: verification.expiresAt,
+    message:
+      'Un code OTP à 4 chiffres a été envoyé par e-mail. Validez votre compte pour vous connecter.',
+  };
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -49,6 +62,18 @@ export class AuthService {
       },
     });
     if (existing) {
+      if (
+        existing.status === UserStatus.PENDING &&
+        existing.email.toLowerCase() === email &&
+        existing.username === input.username &&
+        existing.passwordHash &&
+        (await bcrypt.compare(input.password, existing.passwordHash))
+      ) {
+        return pendingRegistrationPayload(
+          existing,
+          await this.verification.createAndSend(existing),
+        );
+      }
       this.logger.warn(
         JSON.stringify({
           event: 'registration.rejected',
@@ -73,13 +98,7 @@ export class AuthService {
       throw error;
     }
     const result = await this.verification.createAndSend(user);
-    return {
-      email: user.email,
-      verificationToken: result.token,
-      expiresAt: result.expiresAt,
-      message:
-        'Un code OTP à 4 chiffres a été envoyé par e-mail. Validez votre compte pour vous connecter.',
-    };
+    return pendingRegistrationPayload(user, result);
   }
 
   async login(input: LoginInput): Promise<AuthSessionPayload> {

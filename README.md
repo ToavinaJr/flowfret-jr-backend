@@ -56,7 +56,9 @@ password. Enable 2-Step Verification on the Google account before creating an
 address or alias permitted by that account. `SMTP_PORT` defaults to `465`
 (implicit TLS); use `587` for STARTTLS. Configure these values as deployment
 secrets and never commit real credentials. OTP codes and password reset links
-are not written to application logs.
+are not written to application logs. Render Free web services block outbound
+SMTP ports 25, 465, and 587; Gmail SMTP therefore requires a paid Render
+instance or a mail provider/API that supports HTTPS delivery.
 
 ## Music search
 
