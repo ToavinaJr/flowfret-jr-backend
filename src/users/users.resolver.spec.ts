@@ -46,11 +46,17 @@ describe('UsersResolver privacy contracts', () => {
     const loginInfo = {
       path: { prev: { prev: { key: 'login' } } },
     } as unknown as GraphQLResolveInfo;
+    const registerInfo = {
+      path: { prev: { prev: { key: 'register' } } },
+    } as unknown as GraphQLResolveInfo;
     const arbitraryInfo = {
       path: { prev: { prev: { key: 'user' } } },
     } as unknown as GraphQLResolveInfo;
 
     expect(resolver.email(user('actor-id'), {}, loginInfo)).toBe(
+      'alice@example.com',
+    );
+    expect(resolver.email(user('actor-id'), {}, registerInfo)).toBe(
       'alice@example.com',
     );
     expect(() => resolver.email(user('actor-id'), {}, arbitraryInfo)).toThrow(

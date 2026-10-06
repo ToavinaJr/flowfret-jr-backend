@@ -22,6 +22,7 @@ type RequestContext = { req: { user: { sub: string } } };
 const AUTH_PAYLOAD_FIELDS = new Set([
   'login',
   'loginWithGoogle',
+  'register',
   'registerWithGoogle',
   'verifyEmail',
   'refreshSession',
