@@ -26,19 +26,6 @@ import { isUniqueConstraintError, normalizeEmail } from './auth.utils';
 
 export type { AuthSessionPayload } from './auth-session.service';
 
-function pendingRegistrationPayload(
-  user: Pick<User, 'email'>,
-  verification: { token: string; expiresAt: Date },
-): RegisterPendingPayload {
-  return {
-    email: user.email,
-    verificationToken: verification.token,
-    expiresAt: verification.expiresAt,
-    message:
-      'Un code OTP à 4 chiffres a été envoyé par e-mail. Validez votre compte pour vous connecter.',
-  };
-}
-
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -51,7 +38,7 @@ export class AuthService {
     private readonly googleAuth: GoogleAuthService,
   ) {}
 
-  async register(input: RegisterInput): Promise<RegisterPendingPayload> {
+  async register(input: RegisterInput): Promise<AuthSessionPayload> {
     const email = normalizeEmail(input.email);
     const existing = await this.prisma.user.findFirst({
       where: {
@@ -69,10 +56,11 @@ export class AuthService {
         existing.passwordHash &&
         (await bcrypt.compare(input.password, existing.passwordHash))
       ) {
-        return pendingRegistrationPayload(
-          existing,
-          await this.verification.createAndSend(existing),
-        );
+        const activatedUser = await this.prisma.user.update({
+          where: { id: existing.id },
+          data: { status: UserStatus.ACTIVE },
+        });
+        return this.sessions.create(activatedUser);
       }
       this.logger.warn(
         JSON.stringify({
@@ -89,7 +77,7 @@ export class AuthService {
           email,
           username: input.username,
           passwordHash: await bcrypt.hash(input.password, 10),
-          status: UserStatus.PENDING,
+          status: UserStatus.ACTIVE,
         },
       });
     } catch (error) {
@@ -97,8 +85,7 @@ export class AuthService {
         throw new ConflictException(GENERIC_REGISTRATION_ERROR);
       throw error;
     }
-    const result = await this.verification.createAndSend(user);
-    return pendingRegistrationPayload(user, result);
+    return this.sessions.create(user);
   }
 
   async login(input: LoginInput): Promise<AuthSessionPayload> {

@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -115,17 +114,14 @@ describe('AuthService security contracts', () => {
     expect(mail.sendOtpVerificationEmail).not.toHaveBeenCalled();
   });
 
-  it('creates pending accounts and sends an OTP verification email', async () => {
-    const { service, prisma, mail } = setup();
+  it('activates new accounts and creates a session without sending an OTP', async () => {
+    const { service, prisma, mail, jwt } = setup();
     prisma.user.findFirst.mockResolvedValue(null);
     let createdStatus: UserStatus | undefined;
     prisma.user.create.mockImplementation(
       (args: { data: { status: UserStatus } }) => {
         createdStatus = args.data.status;
-        return Promise.resolve({
-          ...activeUser,
-          status: UserStatus.PENDING,
-        });
+        return Promise.resolve(activeUser);
       },
     );
 
@@ -135,19 +131,16 @@ describe('AuthService security contracts', () => {
       password: 'password-123',
     });
 
-    expect(createdStatus).toBe(UserStatus.PENDING);
-    expect(prisma.emailVerificationToken.create).toHaveBeenCalled();
-    expect(mail.sendOtpVerificationEmail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: activeUser.email,
-        username: activeUser.username,
-      }),
+    expect(createdStatus).toBe(UserStatus.ACTIVE);
+    expect(prisma.emailVerificationToken.create).not.toHaveBeenCalled();
+    expect(mail.sendOtpVerificationEmail).not.toHaveBeenCalled();
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: activeUser.id }),
     );
-    expect(result.email).toBe(activeUser.email);
-    expect(result.verificationToken).toBeDefined();
+    expect(result.user.id).toBe(activeUser.id);
   });
 
-  it('allows the same pending user to retry registration and resend the OTP', async () => {
+  it('activates an existing pending account when its owner retries registration', async () => {
     const { service, prisma, mail } = setup();
     const passwordHash = await bcrypt.hash('password-123', 4);
     prisma.user.findFirst.mockResolvedValue({
@@ -156,6 +149,7 @@ describe('AuthService security contracts', () => {
       status: UserStatus.PENDING,
     });
     prisma.emailVerificationToken.create.mockResolvedValue({});
+    prisma.user.update.mockResolvedValue(activeUser);
 
     const result = await service.register({
       email: ' Alice@Example.com ',
@@ -164,28 +158,12 @@ describe('AuthService security contracts', () => {
     });
 
     expect(prisma.user.create).not.toHaveBeenCalled();
-    expect(mail.sendOtpVerificationEmail).toHaveBeenCalledTimes(1);
-    expect(result.email).toBe(activeUser.email);
-  });
-
-  it('does not report registration success when SMTP delivery fails', async () => {
-    const { service, prisma, mail } = setup();
-    prisma.user.findFirst.mockResolvedValue(null);
-    prisma.user.create.mockResolvedValue({
-      ...activeUser,
-      status: UserStatus.PENDING,
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: activeUser.id },
+      data: { status: UserStatus.ACTIVE },
     });
-    mail.sendOtpVerificationEmail.mockRejectedValue(
-      new Error('connect ENETUNREACH'),
-    );
-
-    await expect(
-      service.register({
-        email: 'alice@example.com',
-        username: 'alice',
-        password: 'password-123',
-      }),
-    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(mail.sendOtpVerificationEmail).not.toHaveBeenCalled();
+    expect(result.user.id).toBe(activeUser.id);
   });
 
   it('creates a session only for an active password account', async () => {

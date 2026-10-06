@@ -47,11 +47,13 @@ The inactive Spotify provider is also retained and accepts:
 
 Never commit real secrets.
 
-The API sends verification and password-reset emails through SendGrid. In
-production, `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` are mandatory. The
-sender address must be verified in SendGrid. Configure the API key as a
-deployment secret and never commit it. OTP codes and password reset links are
-not written to application logs.
+The API sends password-reset emails through SendGrid. New accounts are active
+immediately after registration, so signup does not send an OTP or require
+email verification. In production, `SENDGRID_API_KEY` and
+`SENDGRID_FROM_EMAIL` are mandatory for password-reset emails. The sender
+address must be verified in SendGrid. Configure the API key as a deployment
+secret and never commit it. OTP codes and password reset links are not written
+to application logs.
 
 ## Music search
 
