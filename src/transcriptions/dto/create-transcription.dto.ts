@@ -21,10 +21,10 @@ export class CreateTranscriptionDto {
 
   @IsString()
   @Length(1, 255)
-  trackId: string;
+  trackId!: string;
 
   @IsUrl({ protocols: ['https'], require_protocol: true })
-  audioUrl: string;
+  audioUrl!: string;
 
   @IsOptional()
   @IsString()

@@ -19,4 +19,9 @@ describe('CreateTranscriptionDto', () => {
     });
     expect((await validate(dto)).length).toBeGreaterThan(0);
   });
+
+  it('rejects requests missing required track or audio fields', async () => {
+    const dto = plainToInstance(CreateTranscriptionDto, {});
+    expect((await validate(dto)).length).toBeGreaterThan(0);
+  });
 });
