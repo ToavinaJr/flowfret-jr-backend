@@ -47,18 +47,11 @@ The inactive Spotify provider is also retained and accepts:
 
 Never commit real secrets.
 
-The API sends verification and password-reset emails through Gmail SMTP using
-Nodemailer (`smtp.gmail.com`). In production, `SMTP_USER` and `SMTP_PASSWORD`
-are mandatory; `SMTP_PASSWORD` must be a Google App Password, not the account
-password. Enable 2-Step Verification on the Google account before creating an
-[App Password](https://myaccount.google.com/apppasswords).
-`SMTP_FROM_EMAIL` is optional and defaults to `SMTP_USER`; only use a sender
-address or alias permitted by that account. `SMTP_PORT` defaults to `465`
-(implicit TLS); use `587` for STARTTLS. Configure these values as deployment
-secrets and never commit real credentials. OTP codes and password reset links
-are not written to application logs. Render Free web services block outbound
-SMTP ports 25, 465, and 587; Gmail SMTP therefore requires a paid Render
-instance or a mail provider/API that supports HTTPS delivery.
+The API sends verification and password-reset emails through SendGrid. In
+production, `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` are mandatory. The
+sender address must be verified in SendGrid. Configure the API key as a
+deployment secret and never commit it. OTP codes and password reset links are
+not written to application logs.
 
 ## Music search
 

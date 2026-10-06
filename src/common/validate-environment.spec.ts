@@ -16,53 +16,31 @@ describe('validateEnvironment', () => {
       JWT_SECRET: 'a-secure-secret-containing-32-chars',
       APP_URL: 'https://flowfret.app',
       CORS_ORIGINS: 'https://www.flowfret.app',
-      SMTP_USER: 'mailer@gmail.com',
-      SMTP_PASSWORD: 'google-app-password',
-      SMTP_FROM_EMAIL: 'mailer@gmail.com',
-      SMTP_PORT: '465',
+      SENDGRID_API_KEY: 'sendgrid-test-key',
+      SENDGRID_FROM_EMAIL: 'noreply@flowfret.app',
     };
 
     expect(validateEnvironment(environment)).toBe(environment);
   });
 
-  it('requires Gmail SMTP credentials in production', () => {
+  it('requires SendGrid credentials in production', () => {
     expect(() =>
       validateEnvironment({
         NODE_ENV: 'production',
         JWT_SECRET: 'a-secure-secret-containing-32-chars',
         APP_URL: 'https://flowfret.app',
       }),
-    ).toThrow('SMTP_USER must be configured in production');
+    ).toThrow('SENDGRID_API_KEY must be configured in production');
 
     expect(() =>
       validateEnvironment({
         NODE_ENV: 'production',
         JWT_SECRET: 'a-secure-secret-containing-32-chars',
         APP_URL: 'https://flowfret.app',
-        SMTP_USER: 'mailer@gmail.com',
+        SENDGRID_API_KEY: 'sendgrid-test-key',
+        SENDGRID_FROM_EMAIL: 'invalid',
       }),
-    ).toThrow('SMTP_PASSWORD must be configured in production');
-  });
-
-  it('validates SMTP credentials and supported TLS ports', () => {
-    expect(() =>
-      validateEnvironment({
-        SMTP_USER: 'mailer@gmail.com',
-        SMTP_PASSWORD: 'app-password',
-        SMTP_PORT: '2525',
-      }),
-    ).toThrow('SMTP_PORT must be 465 or 587');
-    expect(() =>
-      validateEnvironment({
-        SMTP_USER: 'invalid',
-        SMTP_PASSWORD: 'app-password',
-      }),
-    ).toThrow('SMTP_USER must contain a valid email address');
-    expect(() =>
-      validateEnvironment({
-        SMTP_USER: 'mailer@gmail.com',
-      }),
-    ).toThrow('SMTP_USER and SMTP_PASSWORD must be configured together');
+    ).toThrow('SENDGRID_FROM_EMAIL must contain a valid email address');
   });
 
   it('rejects HTTP application URLs in production', () => {

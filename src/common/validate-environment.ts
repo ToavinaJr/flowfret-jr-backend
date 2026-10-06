@@ -1,6 +1,5 @@
 const POSITIVE_INTEGER_KEYS = [
   'PORT',
-  'SMTP_PORT',
   'DATABASE_POOL_MAX',
   'TRANSCRIPTION_DATABASE_TIMEOUT_MS',
   'REDIS_PORT',
@@ -87,34 +86,9 @@ export function validateEnvironment(
       );
     }
     if (options.requireMail !== false) {
-      requireEmail(environment.SMTP_USER, 'SMTP_USER');
-      requireNonEmpty(environment.SMTP_PASSWORD, 'SMTP_PASSWORD');
+      requireNonEmpty(environment.SENDGRID_API_KEY, 'SENDGRID_API_KEY');
+      requireEmail(environment.SENDGRID_FROM_EMAIL, 'SENDGRID_FROM_EMAIL');
     }
-  }
-  const smtpPort = environment.SMTP_PORT;
-  if (smtpPort !== undefined && smtpPort !== '') {
-    const port = Number(smtpPort);
-    if (port !== 465 && port !== 587) {
-      throw new Error('SMTP_PORT must be 465 or 587');
-    }
-  }
-  const smtpUser = environment.SMTP_USER;
-  const smtpPassword = environment.SMTP_PASSWORD;
-  if (smtpUser !== undefined && smtpUser !== '') {
-    requireEmail(smtpUser, 'SMTP_USER');
-  }
-  if (smtpPassword !== undefined && smtpPassword !== '') {
-    requireNonEmpty(smtpPassword, 'SMTP_PASSWORD');
-  }
-  if (
-    (smtpUser === undefined || smtpUser === '') !==
-    (smtpPassword === undefined || smtpPassword === '')
-  ) {
-    throw new Error('SMTP_USER and SMTP_PASSWORD must be configured together');
-  }
-  const smtpFromEmail = environment.SMTP_FROM_EMAIL;
-  if (smtpFromEmail !== undefined && smtpFromEmail !== '') {
-    requireEmail(smtpFromEmail, 'SMTP_FROM_EMAIL');
   }
   return environment;
 }
