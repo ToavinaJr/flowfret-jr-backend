@@ -8,8 +8,16 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { delimiter, isAbsolute, resolve } from 'node:path';
+import {
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { delimiter, isAbsolute, join, resolve } from 'node:path';
 import { PassThrough, type Readable } from 'node:stream';
 import { YOUTUBE_VIDEO_ID_PATTERN } from './youtube.constants';
 
@@ -70,6 +78,9 @@ export class YouTubeAudioService implements OnModuleInit {
       released = true;
       this.activeExtractions = Math.max(0, this.activeExtractions - 1);
     };
+    const writableCookieFile = cookieFile
+      ? this.writableCookieCopy(cookieFile)
+      : undefined;
 
     const python = this.pythonBinary();
     const maxBytes = this.number('YOUTUBE_AUDIO_MAX_SIZE_MB', 30) * 1024 * 1024;
@@ -94,7 +105,7 @@ export class YouTubeAudioService implements OnModuleInit {
         '--no-progress',
         '--js-runtimes',
         'node',
-        ...(cookieFile ? ['--cookies', cookieFile] : []),
+        ...(writableCookieFile ? ['--cookies', writableCookieFile.path] : []),
         '--format',
         'ba[ext=m4a]/ba[ext=webm]/ba/b',
         '--match-filter',
@@ -135,6 +146,7 @@ export class YouTubeAudioService implements OnModuleInit {
         clearTimeout(timer);
         if (!child.killed) child.kill('SIGKILL');
       }
+      writableCookieFile?.cleanup();
       release();
     };
     const fail = (message: string, code = 'YOUTUBE_AUDIO_EXTRACTION_FAILED') => {
@@ -237,6 +249,21 @@ export class YouTubeAudioService implements OnModuleInit {
       this.config.get<string>('WHISPER_PYTHON_BIN')?.trim() ||
       'python3'
     );
+  }
+
+  private writableCookieCopy(sourcePath: string): {
+    path: string;
+    cleanup: () => void;
+  } {
+    const baseTempDir =
+      this.config.get<string>('TRANSCRIPTION_TEMP_DIR')?.trim() || tmpdir();
+    const directory = mkdtempSync(join(baseTempDir, 'yt-cookies-'));
+    const path = join(directory, 'cookies.txt');
+    copyFileSync(sourcePath, path);
+    return {
+      path,
+      cleanup: () => rmSync(directory, { recursive: true, force: true }),
+    };
   }
 
   private cookieFile(): string | undefined {
