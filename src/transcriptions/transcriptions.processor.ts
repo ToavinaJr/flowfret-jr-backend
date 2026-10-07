@@ -179,6 +179,7 @@ export class TranscriptionsProcessor extends WorkerHost {
     startedAt: number,
   ): Promise<never> {
     const { transcriptionId, trackId } = job.data;
+    const provider = job.data.provider ?? MusicProvider.AUDIUS;
     const finalAttempt = job.attemptsMade + 1 >= Number(job.opts.attempts ?? 1);
     const current = await this.repository.findById(transcriptionId);
     if (!finalAttempt) {

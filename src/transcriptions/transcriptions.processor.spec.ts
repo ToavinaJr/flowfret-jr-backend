@@ -33,7 +33,9 @@ function setup() {
         return data;
       }),
     saveSegments: jest.fn(),
-    markFailed: jest.fn(),
+    markFailed: jest
+      .fn()
+      .mockResolvedValue({ status: TranscriptionStatus.FAILED }),
   };
   const eventBus = {
     emit: jest.fn().mockImplementation((event: Record<string, unknown>) => {
@@ -107,12 +109,9 @@ describe('TranscriptionsProcessor deterministic flow', () => {
     await processor.process(job);
 
     expect(repository.findById).toHaveBeenCalledWith(transcriptionId);
+    expect(repository.claimPending).toHaveBeenCalledWith(transcriptionId);
     expect(updates).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({
-          status: TranscriptionStatus.DOWNLOADING,
-          processingPhase: 'AUDIO_PREPARING',
-        }),
         expect.objectContaining({ processingPhase: 'MODEL_LOADING' }),
         expect.objectContaining({ processingPhase: 'MODEL_READY' }),
         expect.objectContaining({
