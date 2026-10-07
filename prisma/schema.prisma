@@ -218,6 +218,45 @@ model Transcription {
   @@map("transcriptions")
 }
 
+enum AudioStemStatus {
+  PENDING
+  DOWNLOADING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model AudioStem {
+  id                   String          @id @default(uuid()) @db.Uuid
+  provider             MusicProvider   @default(AUDIUS)
+  trackId              String          @map("track_id") @db.VarChar(255)
+  title                String?         @db.VarChar(500)
+  artist               String?         @db.VarChar(500)
+  engineVersion        String          @map("engine_version") @db.VarChar(32)
+  status               AudioStemStatus @default(PENDING)
+  progress             Int             @default(0)
+  duration             Float?
+  vocalsUrl            String?         @map("vocals_url") @db.Text
+  vocalsPublicId       String?         @map("vocals_public_id") @db.Text
+  vocalsFileSize       BigInt?         @map("vocals_file_size") @db.BigInt
+  instrumentalUrl      String?         @map("instrumental_url") @db.Text
+  instrumentalPublicId String?         @map("instrumental_public_id") @db.Text
+  instrumentalFileSize BigInt?         @map("instrumental_file_size") @db.BigInt
+  errorCode            String?         @map("error_code") @db.VarChar(64)
+  errorMessage         String?         @map("error_message") @db.Text
+  attempts             Int             @default(0)
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt          DateTime?       @map("completed_at") @db.Timestamptz(6)
+  isDeleted            Boolean         @default(false) @map("is_deleted")
+  deletedAt            DateTime?       @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([provider, trackId, engineVersion], map: "audio_stems_cache_key_unique")
+  @@index([provider, trackId])
+  @@index([status])
+  @@map("audio_stems")
+}
+
 model User {
   id                    String     @id @default(uuid()) @db.Uuid
   email                 String     @unique @db.VarChar(255)

@@ -11,6 +11,7 @@ import { AuthModule } from './auth/auth.module';
 import { formatGraphQLError } from './common/format-graphql-error';
 import { MusicModule } from './integrations/music/music.module';
 import { TranscriptionsModule } from './transcriptions/transcriptions.module';
+import { StemsModule } from './stems/stems.module';
 import { validateEnvironment } from './common/validate-environment';
 import { UploadsModule } from './uploads/uploads.module';
 import { LyricsModule } from './integrations/lyrics/lyrics.module';
@@ -39,6 +40,7 @@ import { TeachingModule } from './teaching/teaching.module';
     AuthModule,
     MusicModule,
     TranscriptionsModule,
+    StemsModule,
     LyricsModule,
     UploadsModule,
     SocialModule,

@@ -11,6 +11,7 @@ export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 export const MAX_POST_IMAGES = 12;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 export const MAX_TEACHING_FILE_BYTES = 50 * 1024 * 1024;
+export const MAX_STEM_FILE_BYTES = 30 * 1024 * 1024;
 const TEACHING_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -179,6 +180,64 @@ export class CloudinaryService {
         'Unable to upload the teaching file.',
       );
     return { url: result.secure_url, publicId: result.public_id, resourceType };
+  }
+
+  async uploadAudioStem(file: {
+    buffer: Buffer;
+    filename: string;
+  }): Promise<{ url: string; publicId: string; fileSize: number }> {
+    if (!file.buffer.length || file.buffer.length > MAX_STEM_FILE_BYTES) {
+      throw new ApplicationException(
+        'UPLOAD_INVALID_FILE',
+        'The generated audio stem is invalid.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const cloudName = getRequiredConfig(this.config, 'CLOUDINARY_CLOUD_NAME');
+    const apiKey = getRequiredConfig(this.config, 'CLOUDINARY_API_KEY');
+    const apiSecret = getRequiredConfig(this.config, 'CLOUDINARY_API_SECRET');
+    const folder = `${getRequiredConfig(this.config, 'CLOUDINARY_FOLDER')}/stems`;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = createHash('sha1')
+      .update(`folder=${folder}&timestamp=${timestamp}${apiSecret}`)
+      .digest('hex');
+    const body = new FormData();
+    body.append(
+      'file',
+      new Blob([Uint8Array.from(file.buffer)], { type: 'audio/mpeg' }),
+      file.filename,
+    );
+    body.append('api_key', apiKey);
+    body.append('timestamp', String(timestamp));
+    body.append('folder', folder);
+    body.append('signature', signature);
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`,
+      { method: 'POST', body, signal: AbortSignal.timeout(this.timeoutMs()) },
+    );
+    const result = (await response.json()) as {
+      secure_url?: string;
+      public_id?: string;
+      bytes?: number;
+    };
+    if (!response.ok || !result.secure_url || !result.public_id) {
+      this.logger.error(
+        `Cloudinary rejected audio stem upload (status=${response.status})`,
+      );
+      throw new ExternalServiceException(
+        'UPLOAD_FAILED',
+        'Unable to upload the generated audio stem.',
+      );
+    }
+    return {
+      url: result.secure_url,
+      publicId: result.public_id,
+      fileSize: result.bytes ?? file.buffer.length,
+    };
+  }
+
+  async deleteAudioStem(publicId: string): Promise<void> {
+    await this.deleteStoredFile(publicId, 'VIDEO', 'upload');
   }
 
   authenticatedDeliveryUrl(

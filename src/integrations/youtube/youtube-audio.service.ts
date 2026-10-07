@@ -8,14 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { spawn } from 'node:child_process';
-import {
-  copyFileSync,
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  statSync,
-} from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, isAbsolute, join, resolve } from 'node:path';
 import { PassThrough, type Readable } from 'node:stream';
@@ -78,8 +71,8 @@ export class YouTubeAudioService implements OnModuleInit {
       released = true;
       this.activeExtractions = Math.max(0, this.activeExtractions - 1);
     };
-    const writableCookieFile = cookieFile
-      ? this.writableCookieCopy(cookieFile)
+    const liveCookiePath = cookieFile
+      ? this.liveCookieFile(cookieFile)
       : undefined;
 
     const python = this.pythonBinary();
@@ -105,7 +98,7 @@ export class YouTubeAudioService implements OnModuleInit {
         '--no-progress',
         '--js-runtimes',
         'node',
-        ...(writableCookieFile ? ['--cookies', writableCookieFile.path] : []),
+        ...(liveCookiePath ? ['--cookies', liveCookiePath] : []),
         '--format',
         'ba[ext=m4a]/ba[ext=webm]/ba/b',
         '--match-filter',
@@ -146,7 +139,11 @@ export class YouTubeAudioService implements OnModuleInit {
         clearTimeout(timer);
         if (!child.killed) child.kill('SIGKILL');
       }
-      writableCookieFile?.cleanup();
+      // The live cookie file is intentionally left in place: yt-dlp rotates
+      // session tokens into it on each use, and the next extraction must see
+      // that rotation (deleting it here previously made every cookie-backed
+      // session usable exactly once, since YouTube rejects the replayed
+      // pre-rotation value on the following request).
       release();
     };
     const fail = (message: string, code = 'YOUTUBE_AUDIO_EXTRACTION_FAILED') => {
@@ -251,19 +248,22 @@ export class YouTubeAudioService implements OnModuleInit {
     );
   }
 
-  private writableCookieCopy(sourcePath: string): {
-    path: string;
-    cleanup: () => void;
-  } {
+  /**
+   * Returns a writable cookie file yt-dlp can both read and rewrite (the
+   * configured source is typically a read-only secrets mount). Unlike a
+   * fresh copy per call, this path is stable across calls so that session
+   * token rotations yt-dlp writes back actually survive to the next
+   * extraction. It's re-seeded from the source file only when that source
+   * is newer (an operator replaced it with freshly exported cookies).
+   */
+  private liveCookieFile(sourcePath: string): string {
     const baseTempDir =
       this.config.get<string>('TRANSCRIPTION_TEMP_DIR')?.trim() || tmpdir();
-    const directory = mkdtempSync(join(baseTempDir, 'yt-cookies-'));
-    const path = join(directory, 'cookies.txt');
-    copyFileSync(sourcePath, path);
-    return {
-      path,
-      cleanup: () => rmSync(directory, { recursive: true, force: true }),
-    };
+    const path = join(baseTempDir, 'youtube-cookies-live.txt');
+    const sourceModifiedAt = statSync(sourcePath).mtimeMs;
+    const liveModifiedAt = existsSync(path) ? statSync(path).mtimeMs : -1;
+    if (liveModifiedAt < sourceModifiedAt) copyFileSync(sourcePath, path);
+    return path;
   }
 
   private cookieFile(): string | undefined {
