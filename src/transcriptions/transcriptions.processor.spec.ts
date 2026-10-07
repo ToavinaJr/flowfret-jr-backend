@@ -42,6 +42,10 @@ function setup() {
   };
   const audioSources = {
     resolve: jest.fn().mockResolvedValue('https://audio.audius.co/fresh.mp3'),
+    extractYouTubeAudio: jest.fn().mockResolvedValue({
+      audioPath: '/tmp/source.audio',
+      cleanup: jest.fn().mockResolvedValue(undefined),
+    }),
   };
   const whisper = {
     run: jest
@@ -93,7 +97,7 @@ function setup() {
     progress: 33,
     updateProgress: jest.fn(),
   } as unknown as Job<TranscriptionJobData>;
-  return { processor, repository, updates, events, job };
+  return { processor, repository, audioSources, whisper, updates, events, job };
 }
 
 describe('TranscriptionsProcessor deterministic flow', () => {
@@ -153,6 +157,28 @@ describe('TranscriptionsProcessor deterministic flow', () => {
       expect.objectContaining({ status: TranscriptionStatus.PENDING }),
     );
     expect(repository.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('uses the YouTube audio source when the job provider is YOUTUBE', async () => {
+    const { processor, audioSources, whisper, job } = setup();
+    job.data = {
+      ...jobData,
+      provider: MusicProvider.YOUTUBE,
+      trackId: 'video-id',
+      audioUrl: 'https://www.youtube.com/watch?v=video-id',
+    };
+
+    await processor.process(job);
+
+    expect(audioSources.extractYouTubeAudio).toHaveBeenCalledWith(
+      'video-id',
+      transcriptionId,
+    );
+    expect(audioSources.resolve).not.toHaveBeenCalled();
+    expect(whisper.run).toHaveBeenCalledWith(
+      expect.objectContaining({ audioPath: '/tmp/source.audio' }),
+      expect.any(Function),
+    );
   });
 
   it('marks a final worker failure and emits a safe failure event', async () => {
