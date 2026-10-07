@@ -244,6 +244,16 @@ docker compose logs -f transcription-worker
 
 The worker log must contain `worker.ready`. The API queue diagnostics must report `workerCount: 1` or higher. Do not expose ports `3000`, `5434`, or `6379` publicly. Install Caddy or Nginx on the host, configure the public API domain to proxy to `127.0.0.1:3000`, and set `APP_URL` and every `CORS_ORIGINS` entry to HTTPS URLs. `deploy/Caddyfile.example` is a minimal Caddy configuration; Caddy provisions and renews the TLS certificate automatically once DNS points to the VPS.
 
+For a VPS using a hosted PostgreSQL database, Nginx on `127.0.0.1:3100`, and a host-mounted YouTube cookies secret at `/etc/secrets/youtube-cookies.txt`, use the VPS Compose override. Set `DATABASE_URL` in the VPS `.env` to the hosted database URL; `DIRECT_DATABASE_URL` may be set to its direct URL or omitted to use `DATABASE_URL`. The cookie file stays on the VPS and must never be committed. The override mounts it read-only into the worker and sets `YOUTUBE_COOKIES_FILE` to its container path:
+
+```bash
+POSTGRES_PASSWORD=compose-validation-only docker compose -f docker-compose.yml -f docker-compose.vps.yml config --quiet
+POSTGRES_PASSWORD=compose-validation-only docker compose -f docker-compose.yml -f docker-compose.vps.yml run --rm --no-deps backend npx prisma migrate deploy
+POSTGRES_PASSWORD=compose-validation-only docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --no-deps --build backend transcription-worker
+```
+
+The temporary `POSTGRES_PASSWORD` assignment only satisfies interpolation of the unused local `db` service in the base Compose file; it is not the hosted database password and must not be added to `.env`. `--no-deps` leaves the existing local database and Redis containers untouched. Verify that the VPS cookie file exists before starting the worker.
+
 The frontend receives the canonical `https://api.audius.co/v1/tracks/:id/stream` URL. It retries that endpoint when an Audius storage node is temporarily unreachable; signed storage-node URLs are never persisted or returned as the durable player URL.
 
 ### Admin GraphQL foundation
