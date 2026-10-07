@@ -18,7 +18,7 @@ export class RequestLoaders {
   readonly commentMentions: BatchLoader<string, UserModel[]>;
 
   constructor(prisma: PrismaService) {
-    this.userById = new BatchLoader(
+    this.userById = new BatchLoader<string, UserModel | null>(
       async (ids) => {
         const users = await prisma.user.findMany({
           where: { id: { in: [...ids] } },
@@ -27,7 +27,7 @@ export class RequestLoaders {
       },
       () => null,
     );
-    this.postById = new BatchLoader(
+    this.postById = new BatchLoader<string, PostModel | null>(
       async (ids) => {
         const posts = await prisma.post.findMany({
           where: { id: { in: [...ids] } },
@@ -36,7 +36,7 @@ export class RequestLoaders {
       },
       () => null,
     );
-    this.commentsByPostId = new BatchLoader(
+    this.commentsByPostId = new BatchLoader<string, CommentModel[]>(
       async (postIds) => {
         const comments = await prisma.comment.findMany({
           where: { postId: { in: [...postIds] }, isDeleted: false },
@@ -46,7 +46,7 @@ export class RequestLoaders {
       },
       () => [],
     );
-    this.likesByPostId = new BatchLoader(
+    this.likesByPostId = new BatchLoader<string, PostLikeModel[]>(
       async (postIds) => {
         const likes = await prisma.postLike.findMany({
           where: { postId: { in: [...postIds] }, isDeleted: false },
@@ -56,7 +56,7 @@ export class RequestLoaders {
       },
       () => [],
     );
-    this.attachmentsByPostId = new BatchLoader(
+    this.attachmentsByPostId = new BatchLoader<string, PostAttachmentModel[]>(
       async (postIds) => {
         const attachments = await prisma.postAttachment.findMany({
           where: { postId: { in: [...postIds] }, isDeleted: false },
@@ -66,7 +66,7 @@ export class RequestLoaders {
       },
       () => [],
     );
-    this.postMentions = new BatchLoader(
+    this.postMentions = new BatchLoader<string, UserModel[]>(
       async (postIds) => {
         const mentions = await prisma.postMention.findMany({
           where: { postId: { in: [...postIds] }, isDeleted: false },
@@ -81,7 +81,7 @@ export class RequestLoaders {
       },
       () => [],
     );
-    this.commentMentions = new BatchLoader(
+    this.commentMentions = new BatchLoader<string, UserModel[]>(
       async (commentIds) => {
         const mentions = await prisma.commentMention.findMany({
           where: { commentId: { in: [...commentIds] }, isDeleted: false },
