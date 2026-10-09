@@ -19,6 +19,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CommentsCommandService } from './comments-command.service';
 import { CommentsQueryService } from './comments-query.service';
 import { GraphqlRequestContext } from '../common/request-loaders';
+import { RateLimits } from '../auth/rate-limit.decorator';
 
 type RequestContext = GraphqlRequestContext;
 
@@ -31,11 +32,13 @@ export class CommentsResolver {
   ) {}
 
   @Query(() => [CommentModel], { name: 'comments' })
+  @RateLimits({ limit: 120, windowSeconds: 60, failClosed: true })
   comments(@Context() context: RequestContext): Promise<CommentModel[]> {
     return this.queries.list(context.req.user.sub);
   }
 
   @Query(() => CommentModel, { name: 'comment', nullable: true })
+  @RateLimits({ limit: 240, windowSeconds: 60, failClosed: true })
   comment(
     @Args('id') id: string,
     @Context() context: RequestContext,
@@ -44,6 +47,7 @@ export class CommentsResolver {
   }
 
   @Query(() => [CommentModel], { name: 'commentsByPost' })
+  @RateLimits({ limit: 120, windowSeconds: 60, failClosed: true })
   commentsByPost(
     @Args('postId') postId: string,
     @Args('skip', { type: () => Int, defaultValue: 0 }) skip: number,

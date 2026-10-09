@@ -4,6 +4,7 @@ import { CommentsResolver } from './comments.resolver';
 import { CommentsCommandService } from './comments-command.service';
 import { CommentsQueryService } from './comments-query.service';
 import { PolicyViolationError } from '../policies/policy-violation.error';
+import { RATE_LIMIT_KEY } from '../auth/rate-limit.decorator';
 
 const context = { req: { user: { sub: 'actor-id', username: 'alice' } } };
 
@@ -25,6 +26,16 @@ function setup(prisma: Record<string, unknown>) {
 }
 
 describe('CommentsResolver contracts', () => {
+  it('rate-limits comment reads', () => {
+    const commentsByPost = Object.getOwnPropertyDescriptor(
+      CommentsResolver.prototype,
+      'commentsByPost',
+    )?.value as object;
+    expect(Reflect.getMetadata(RATE_LIMIT_KEY, commentsByPost)).toEqual([
+      { limit: 120, windowSeconds: 60, failClosed: true },
+    ]);
+  });
+
   it('creates a comment, increments the counter and notifies the author', async () => {
     const comment = {
       id: 'comment-id',

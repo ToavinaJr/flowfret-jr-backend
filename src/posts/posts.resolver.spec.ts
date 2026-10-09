@@ -4,6 +4,7 @@ import { UploadCleanupService } from '../uploads/upload-cleanup.service';
 import { PostsResolver } from './posts.resolver';
 import { PostsCommandService } from './posts-command.service';
 import { PostsQueryService } from './posts-query.service';
+import { RATE_LIMIT_KEY } from '../auth/rate-limit.decorator';
 
 const context = { req: { user: { sub: 'actor-id', username: 'alice' } } };
 
@@ -28,6 +29,24 @@ function resolverWith(prisma: Record<string, unknown>) {
 }
 
 describe('PostsResolver contracts', () => {
+  it('rate-limits feed and post reads', () => {
+    const posts = Object.getOwnPropertyDescriptor(
+      PostsResolver.prototype,
+      'posts',
+    )?.value as object;
+    const post = Object.getOwnPropertyDescriptor(
+      PostsResolver.prototype,
+      'post',
+    )?.value as object;
+    expect(Reflect.getMetadata(RATE_LIMIT_KEY, posts)).toEqual([
+      { limit: 120, windowSeconds: 60, failClosed: true },
+      { limit: 1200, windowSeconds: 3600, failClosed: true },
+    ]);
+    expect(Reflect.getMetadata(RATE_LIMIT_KEY, post)).toEqual([
+      { limit: 240, windowSeconds: 60, failClosed: true },
+    ]);
+  });
+
   it('maps preloaded feed relations into the public post shape', async () => {
     const prisma = {
       friendship: { findMany: jest.fn().mockResolvedValue([]) },

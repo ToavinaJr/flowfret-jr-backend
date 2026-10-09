@@ -20,6 +20,7 @@ import {
   UserModel,
 } from '../graphql/graphql.types';
 import { Roles } from '../auth/roles.decorator';
+import { RateLimits } from '../auth/rate-limit.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { PostsCommandService } from './posts-command.service';
 import { PostsQueryService } from './posts-query.service';
@@ -36,6 +37,10 @@ export class PostsResolver {
   ) {}
 
   @Query(() => [PostModel], { name: 'posts' })
+  @RateLimits(
+    { limit: 120, windowSeconds: 60, failClosed: true },
+    { limit: 1200, windowSeconds: 3600, failClosed: true },
+  )
   posts(
     @Context() context: RequestContext,
     @Args('after', { type: () => String, nullable: true }) after?: string,
@@ -46,6 +51,7 @@ export class PostsResolver {
   }
 
   @Query(() => PostModel, { name: 'post', nullable: true })
+  @RateLimits({ limit: 240, windowSeconds: 60, failClosed: true })
   post(
     @Args('id') id: string,
     @Context() context: RequestContext,
