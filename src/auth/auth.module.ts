@@ -27,7 +27,7 @@ import { AccountResolver } from './account.resolver';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService): JwtModuleOptions => ({
-        secret: configService.get<string>('JWT_SECRET') ?? 'dev-jwt-secret',
+        secret: requiredJwtSecret(configService),
         signOptions: {
           expiresIn: (configService.get<string>('JWT_ACCESS_EXPIRES_IN') ??
             '15m') as NonNullable<JwtModuleOptions['signOptions']>['expiresIn'],
@@ -62,3 +62,13 @@ import { AccountResolver } from './account.resolver';
   exports: [AuthService],
 })
 export class AuthModule {}
+
+function requiredJwtSecret(configService: ConfigService): string {
+  const secret = configService.get<string>('JWT_SECRET')?.trim();
+  if (!secret) {
+    throw new Error(
+      'JWT_SECRET must be configured before starting the authentication module.',
+    );
+  }
+  return secret;
+}

@@ -18,5 +18,7 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/package*.json ./
+RUN chown -R node:node /app
+USER node
 CMD ["node", "dist/main.js"]
 

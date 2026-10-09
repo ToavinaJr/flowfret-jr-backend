@@ -20,7 +20,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET') ?? 'dev-jwt-secret',
+      secretOrKey: requiredJwtSecret(configService),
     });
   }
 
@@ -47,4 +47,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: user.role,
     };
   }
+}
+
+function requiredJwtSecret(configService: ConfigService): string {
+  const secret = configService.get<string>('JWT_SECRET')?.trim();
+  if (!secret) {
+    throw new Error(
+      'JWT_SECRET must be configured before starting the JWT strategy.',
+    );
+  }
+  return secret;
 }

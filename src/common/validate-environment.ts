@@ -70,7 +70,7 @@ export function validateEnvironment(
   );
   if (environment.NODE_ENV === 'production' && options.requireWeb !== false) {
     const jwtSecret = environment.JWT_SECRET;
-    if (typeof jwtSecret !== 'string' || jwtSecret.length < 32) {
+    if (typeof jwtSecret !== 'string' || jwtSecret.trim().length < 32) {
       throw new Error(
         'JWT_SECRET must contain at least 32 characters in production',
       );

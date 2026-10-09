@@ -21,5 +21,7 @@ COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/package*.json ./
 COPY workers ./workers
+RUN mkdir -p /models /transcription-tmp && chown -R node:node /app /models /transcription-tmp
+USER node
 CMD ["node", "dist/worker.js"]
 
