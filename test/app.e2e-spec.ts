@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './../src/app.module';
 import { GraphQLSchemaHost } from '@nestjs/graphql';
 import { PrismaService } from './../src/prisma/prisma.service';
@@ -84,7 +83,7 @@ function cookieHeader(headers: Record<string, unknown>): string {
 }
 
 describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+  let app: NestExpressApplication;
   let prisma: PrismaService;
 
   beforeAll(async () => {
@@ -92,7 +91,8 @@ describe('AppController (e2e)', () => {
       imports: [AppModule],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
+    app = moduleFixture.createNestApplication<NestExpressApplication>();
+    app.useBodyParser('json', { limit: '64kb' });
     await app.init();
     prisma = app.get(PrismaService);
   });
@@ -337,6 +337,15 @@ describe('AppController (e2e)', () => {
 
     const body = response.body as { message?: string };
     expect(body.message).toBe('Unauthorized');
+  });
+
+  it('rejects GraphQL JSON payloads above the configured body limit', async () => {
+    const oversizedQuery = `{ dbHealth ${'x '.repeat(40_000)} }`;
+
+    await request(app.getHttpServer())
+      .post('/graphql')
+      .send({ query: oversizedQuery })
+      .expect(413);
   });
 
   afterAll(async () => {
