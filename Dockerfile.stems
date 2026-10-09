@@ -13,7 +13,9 @@ ENV NODE_ENV=production
 COPY workers/stems/requirements.txt /tmp/stems-requirements.txt
 COPY requirements.youtube.txt /tmp/youtube-requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages \
-    torch torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    torch torchaudio \
+    --index-url https://download.pytorch.org/whl/cpu \
+    --extra-index-url https://pypi.org/simple && \
     pip3 install --no-cache-dir --break-system-packages \
     -r /tmp/stems-requirements.txt \
     -r /tmp/youtube-requirements.txt
