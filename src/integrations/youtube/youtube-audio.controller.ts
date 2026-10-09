@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Header,
+  HttpException,
+  HttpStatus,
   Logger,
   Param,
   Res,
@@ -35,9 +37,23 @@ export class YouTubeAudioController {
     );
     const extraction = this.audio.createStream(videoId, diagnosticId);
     response.once('close', extraction.dispose);
-    return new StreamableFile(extraction.stream, {
+    const file = new StreamableFile(extraction.stream, {
       type: 'application/octet-stream',
       disposition: `inline; filename="youtube-${videoId}.audio"`,
     });
+    file.setErrorHandler((error, res) => {
+      if (res.destroyed) return;
+      if (res.headersSent) {
+        res.end();
+        return;
+      }
+      const status =
+        error instanceof HttpException
+          ? error.getStatus()
+          : HttpStatus.BAD_GATEWAY;
+      res.statusCode = status;
+      res.send(JSON.stringify({ statusCode: status, message: error.message }));
+    });
+    return file;
   }
 }
