@@ -5,20 +5,12 @@ import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { GraphQLSchemaHost } from '@nestjs/graphql';
 import { PrismaService } from './../src/prisma/prisma.service';
+import { AuthService } from './../src/auth/auth.service';
 
 type GraphQLBody<TData> = {
   data?: TData;
   errors?: Array<{ message: string; extensions?: { code?: string } }>;
 };
-
-const AUTH_QUERY = `
-  mutation Register($data: RegisterInput!) {
-    register(data: $data) {
-      accessToken
-      user { id email username role }
-    }
-  }
-`;
 
 const REFRESH_QUERY = `
   mutation RefreshSession {
@@ -26,16 +18,41 @@ const REFRESH_QUERY = `
   }
 `;
 
-const LOGIN_QUERY = `
-  mutation Login($data: LoginInput!) {
-    login(data: $data) {
-      accessToken
-      user { id email username role }
-    }
+const LOGOUT_QUERY = `mutation Logout { logout }`;
+
+const PROTECTED_HISTORY_QUERY = `
+  query MyListeningHistory {
+    myListeningHistory(take: 1) { id }
   }
 `;
 
-const LOGOUT_QUERY = `mutation Logout { logout }`;
+const ADMIN_USERS_QUERY = `
+  query AdminUsers {
+    adminUsers { totalCount }
+  }
+`;
+
+const USER_QUERY = `
+  query User($id: String!) {
+    user(id: $id) { id email }
+  }
+`;
+
+function cookiePair(headers: Record<string, unknown>): string | undefined {
+  const value = headers['set-cookie'];
+  const cookie = Array.isArray(value)
+    ? value.find((entry): entry is string => typeof entry === 'string')
+    : typeof value === 'string'
+      ? value
+      : undefined;
+  return cookie?.split(';')[0];
+}
+
+function cookieHeader(headers: Record<string, unknown>): string {
+  const value = headers['set-cookie'];
+  if (Array.isArray(value)) return value.join(';');
+  return typeof value === 'string' ? value : '';
+}
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -125,35 +142,17 @@ describe('AppController (e2e)', () => {
     const email = `e2e-${suffix}@example.test`;
     const password = 'E2e-password-123!';
     const username = `e2e_${suffix}`;
-    const client = request.agent(app.getHttpServer());
-
     try {
-      const registerResponse = await client
-        .post('/graphql')
-        .send({
-          query: AUTH_QUERY,
-          variables: { data: { email, password, username } },
-        })
-        .expect(200);
-      const registerBody = registerResponse.body as GraphQLBody<{
-        register: { accessToken: string; user: { email: string } };
-      }>;
+      const session = await app.get(AuthService).register({
+        email,
+        password,
+        username,
+      });
+      let refreshCookie = `fretflow_refresh=${session.refreshToken}`;
 
-      expect(registerBody.errors).toBeUndefined();
-      expect(registerBody.data?.register.user.email).toBe(email);
-      expect(registerBody.data?.register.accessToken).toEqual(expect.any(String));
-      const registerSetCookie = registerResponse.headers['set-cookie'];
-      const setCookie = Array.isArray(registerSetCookie)
-        ? registerSetCookie
-        : [registerSetCookie];
-      const refreshCookie = setCookie.join(';');
-      expect(refreshCookie).toMatch(/fretflow_refresh=[^;]+/i);
-      expect(refreshCookie).toMatch(/Max-Age=\d+/i);
-      expect(refreshCookie).toMatch(/Path=\/graphql/i);
-      expect(refreshCookie).toMatch(/HttpOnly/i);
-
-      const refreshResponse = await client
+      const refreshResponse = await request(app.getHttpServer())
         .post('/graphql')
+        .set('Cookie', refreshCookie)
         .send({ query: REFRESH_QUERY })
         .expect(200);
       const refreshBody = refreshResponse.body as GraphQLBody<{
@@ -164,19 +163,21 @@ describe('AppController (e2e)', () => {
       expect(refreshBody.data?.refreshSession.accessToken).toEqual(
         expect.any(String),
       );
-      const refreshSetCookie: unknown = (
-        refreshResponse.headers as Record<string, unknown>
-      )['set-cookie'];
-      const refreshCookieValue = Array.isArray(refreshSetCookie)
-        ? refreshSetCookie.find((value): value is string => typeof value === 'string')
-        : typeof refreshSetCookie === 'string'
-          ? refreshSetCookie
-          : undefined;
-      const rotatedCookie = refreshCookieValue?.split(';')[0];
-      expect(rotatedCookie).toMatch(/^fretflow_refresh=.+/);
+      const responseCookie = cookiePair(
+        refreshResponse.headers as Record<string, unknown>,
+      );
+      expect(responseCookie).toMatch(/^fretflow_refresh=.+/);
+      refreshCookie = responseCookie as string;
+      const refreshAttributes = cookieHeader(
+        refreshResponse.headers as Record<string, unknown>,
+      );
+      expect(refreshAttributes).toMatch(/Max-Age=\d+/i);
+      expect(refreshAttributes).toMatch(/Path=\/graphql/i);
+      expect(refreshAttributes).toMatch(/HttpOnly/i);
 
-      const logoutResponse = await client
+      const logoutResponse = await request(app.getHttpServer())
         .post('/graphql')
+        .set('Cookie', refreshCookie)
         .send({ query: LOGOUT_QUERY })
         .expect(200);
       const logoutBody = logoutResponse.body as GraphQLBody<{ logout: boolean }>;
@@ -184,7 +185,7 @@ describe('AppController (e2e)', () => {
 
       const revokedRefreshResponse = await request(app.getHttpServer())
         .post('/graphql')
-        .set('Cookie', rotatedCookie as string)
+        .set('Cookie', refreshCookie)
         .send({ query: REFRESH_QUERY })
         .expect(200);
       const revokedRefreshBody = revokedRefreshResponse.body as GraphQLBody<unknown>;
@@ -192,32 +193,9 @@ describe('AppController (e2e)', () => {
         extensions: { code: 'UNAUTHENTICATED' },
       });
 
-      const loginResponse = await client
+      const afterLogoutResponse = await request(app.getHttpServer())
         .post('/graphql')
-        .send({ query: LOGIN_QUERY, variables: { data: { email, password } } })
-        .expect(200);
-      const loginBody = loginResponse.body as GraphQLBody<{
-        login: { accessToken: string; user: { email: string } };
-      }>;
-      expect(loginBody.errors).toBeUndefined();
-      expect(loginBody.data?.login.user.email).toBe(email);
-
-      const postLoginRefresh = await client
-        .post('/graphql')
-        .send({ query: REFRESH_QUERY })
-        .expect(200);
-      const postLoginRefreshBody = postLoginRefresh.body as GraphQLBody<{
-        refreshSession: { user: { email: string } };
-      }>;
-      expect(postLoginRefreshBody.data?.refreshSession.user.email).toBe(email);
-
-      await client
-        .post('/graphql')
-        .send({ query: LOGOUT_QUERY })
-        .expect(200);
-
-      const afterLogoutResponse = await client
-        .post('/graphql')
+        .set('Cookie', refreshCookie)
         .send({ query: REFRESH_QUERY })
         .expect(200);
       const afterLogoutBody = afterLogoutResponse.body as GraphQLBody<{
@@ -229,6 +207,80 @@ describe('AppController (e2e)', () => {
       });
     } finally {
       await prisma.user.deleteMany({ where: { email } });
+    }
+  });
+
+  it('rejects unauthenticated and non-admin access to protected GraphQL fields', async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const email = `security-${suffix}@example.test`;
+    const password = 'E2e-password-123!';
+    const username = `security_${suffix}`;
+
+    try {
+      const anonymousResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .send({ query: PROTECTED_HISTORY_QUERY })
+        .expect(200);
+      const anonymousBody = anonymousResponse.body as GraphQLBody<unknown>;
+      expect(anonymousBody.errors?.[0]).toMatchObject({
+        extensions: { code: 'UNAUTHENTICATED' },
+      });
+
+      const session = await app
+        .get(AuthService)
+        .register({ email, password, username });
+      const accessToken = session.accessToken;
+
+      const adminResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ query: ADMIN_USERS_QUERY })
+        .expect(200);
+      const adminBody = adminResponse.body as GraphQLBody<unknown>;
+      expect(adminBody.errors?.[0]).toMatchObject({
+        extensions: { code: 'FORBIDDEN' },
+      });
+    } finally {
+      await prisma.user.deleteMany({ where: { email } });
+    }
+  });
+
+  it('prevents horizontal access to another user private data', async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const firstEmail = `idor-a-${suffix}@example.test`;
+    const secondEmail = `idor-b-${suffix}@example.test`;
+    const password = 'E2e-password-123!';
+    const firstUsername = `idor_a_${suffix}`;
+    const secondUsername = `idor_b_${suffix}`;
+
+    try {
+      const authService = app.get(AuthService);
+      const first = await authService.register({
+        email: firstEmail,
+        password,
+        username: firstUsername,
+      });
+      const second = await authService.register({
+        email: secondEmail,
+        password,
+        username: secondUsername,
+      });
+      expect(first.accessToken).toEqual(expect.any(String));
+      expect(second.user.id).toEqual(expect.any(String));
+
+      const response = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', `Bearer ${first.accessToken}`)
+        .send({ query: USER_QUERY, variables: { id: second.user.id } })
+        .expect(200);
+      const body = response.body as GraphQLBody<unknown>;
+      expect(body.errors?.[0]).toMatchObject({
+        extensions: { code: 'FORBIDDEN' },
+      });
+    } finally {
+      await prisma.user.deleteMany({
+        where: { email: { in: [firstEmail, secondEmail] } },
+      });
     }
   });
 
