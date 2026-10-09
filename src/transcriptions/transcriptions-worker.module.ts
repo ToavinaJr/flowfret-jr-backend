@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AudiusModule } from '../integrations/audius/audius.module';
+import { LyricsModule } from '../integrations/lyrics/lyrics.module';
 import { YouTubeModule } from '../integrations/youtube/youtube.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { TRANSCRIPTION_QUEUE } from './transcriptions.constants';
@@ -33,6 +34,7 @@ import { WhisperWorkerConfigService } from './whisper-worker-config.service';
     }),
     PrismaModule,
     AudiusModule,
+    LyricsModule,
     YouTubeModule,
     BullModule.forRootAsync({
       inject: [ConfigService],

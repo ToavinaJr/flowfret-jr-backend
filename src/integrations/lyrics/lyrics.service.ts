@@ -1,13 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { createHash } from 'node:crypto';
 import {
   LYRICS_CACHE_TTL_SECONDS,
   LYRICS_NOT_FOUND_TTL_SECONDS,
 } from './lyrics.constants';
 import { LyricsCacheService } from './lyrics-cache.service';
+import { buildLyricsCacheKey } from './lyrics-cache-key.util';
 import type { Lyrics, TrackMetadata } from './interfaces/lyrics.interface';
 import type { LyricsProvider } from './interfaces/lyrics-provider.interface';
 import { LrclibProvider } from './providers/lrclib.provider';
+import { GeniusLyricsProvider } from './providers/genius-lyrics.provider';
 
 @Injectable()
 export class LyricsService {
@@ -16,13 +17,14 @@ export class LyricsService {
 
   constructor(
     lrclib: LrclibProvider,
+    geniusLyrics: GeniusLyricsProvider,
     private readonly cache: LyricsCacheService,
   ) {
-    this.providers = [lrclib];
+    this.providers = [lrclib, geniusLyrics];
   }
 
   async findLyrics(track: TrackMetadata): Promise<Lyrics | null> {
-    const key = this.cacheKey(track);
+    const key = buildLyricsCacheKey(track);
     const cached = await this.cache.get(key);
     if (cached !== undefined) {
       this.logger.log(`Lyrics cache hit (${key})`);
@@ -44,25 +46,5 @@ export class LyricsService {
     }
     await this.cache.set(key, null, LYRICS_NOT_FOUND_TTL_SECONDS);
     return null;
-  }
-
-  private cacheKey(track: TrackMetadata): string {
-    const identity = [
-      track.provider,
-      track.id,
-      track.artist,
-      track.title,
-      track.duration,
-    ]
-      .filter((value) => value !== undefined && value !== '')
-      .map((value) =>
-        String(value)
-          .normalize('NFKD')
-          .toLowerCase()
-          .replace(/[^\p{L}\p{N}]+/gu, ' ')
-          .trim(),
-      )
-      .join('|');
-    return `lyrics:${createHash('sha256').update(identity).digest('hex')}`;
   }
 }

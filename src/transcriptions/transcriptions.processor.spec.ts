@@ -10,6 +10,7 @@ import type { TranscriptionEvents } from './transcriptions.events';
 import type { TranscriptionsRepository } from './transcriptions.repository';
 import type { WhisperBridgeService } from './whisper-bridge.service';
 import { TranscriptionMessageHandler } from './transcription-message-handler.service';
+import type { LyricsAlignmentService } from '../integrations/lyrics/lyrics-alignment.service';
 
 const transcriptionId = '11111111-1111-4111-8111-111111111111';
 const jobData: TranscriptionJobData = {
@@ -81,6 +82,9 @@ function setup() {
         },
       ),
   };
+  const lyricsAlignment = {
+    upgradeAfterTranscription: jest.fn().mockResolvedValue(undefined),
+  };
   const processor = new TranscriptionsProcessor(
     repository as unknown as TranscriptionsRepository,
     eventBus as unknown as TranscriptionEvents,
@@ -89,6 +93,7 @@ function setup() {
     new TranscriptionMessageHandler(
       repository as unknown as TranscriptionsRepository,
       eventBus as unknown as TranscriptionEvents,
+      lyricsAlignment as unknown as LyricsAlignmentService,
     ),
   );
   const job = {
