@@ -4,6 +4,7 @@ import { FriendshipsResolver } from './friendships.resolver';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { FriendshipsCommandService } from './friendships-command.service';
 import { FriendshipsQueryService } from './friendships-query.service';
+import { RATE_LIMIT_KEY } from '../auth/rate-limit.decorator';
 
 function resolverWith(
   prisma: Record<string, unknown>,
@@ -19,6 +20,17 @@ function resolverWith(
 }
 
 describe('FriendshipsResolver notifications', () => {
+  it('rate-limits user discovery at the GraphQL boundary', () => {
+    const method = Object.getOwnPropertyDescriptor(
+      FriendshipsResolver.prototype,
+      'searchUsers',
+    )?.value as object;
+    expect(Reflect.getMetadata(RATE_LIMIT_KEY, method)).toEqual([
+      { limit: 30, windowSeconds: 60, failClosed: true },
+      { limit: 300, windowSeconds: 3600, failClosed: true },
+    ]);
+  });
+
   it('emits a notification after persisting a friend request', async () => {
     const friendship = {
       id: 'friendship-id',

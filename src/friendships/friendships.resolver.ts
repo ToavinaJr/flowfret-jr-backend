@@ -12,6 +12,7 @@ import { FriendshipModel, UserModel } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { FriendshipsCommandService } from './friendships-command.service';
 import { FriendshipsQueryService } from './friendships-query.service';
+import { RateLimits } from '../auth/rate-limit.decorator';
 
 type RequestContext = { req: { user: { sub: string; username?: string } } };
 
@@ -24,6 +25,10 @@ export class FriendshipsResolver {
   ) {}
 
   @Query(() => [UserModel], { name: 'searchUsers' })
+  @RateLimits(
+    { limit: 30, windowSeconds: 60, failClosed: true },
+    { limit: 300, windowSeconds: 3600, failClosed: true },
+  )
   searchUsers(
     @Args('query') query: string,
     @Args('take', { type: () => Int, defaultValue: 20 }) take: number,
