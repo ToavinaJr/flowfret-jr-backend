@@ -647,6 +647,7 @@ model Comment {
   mentions CommentMention[]
 
   @@index([postId, createdAt(sort: Desc)])
+  @@index([postId, isDeleted, createdAt(sort: Desc)])
   @@index([authorId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
   @@index([isDeleted, createdAt(sort: Desc)])
@@ -696,6 +697,7 @@ model Upload {
   teachingMaterial TeachingMaterial?
 
   @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, isDeleted])
   @@index([status, createdAt(sort: Desc)])
   @@index([sourceType, createdAt(sort: Desc)])
   @@index([cleanupPending, isDeleted])
@@ -717,6 +719,7 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt, createdAt(sort: Desc)])
+  @@index([userId, isDeleted, createdAt(sort: Desc)])
   @@index([type, createdAt(sort: Desc)])
   @@map("notifications")
 }
@@ -819,6 +822,7 @@ model PostLike {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId], map: "post_likes_post_id_user_id_unique")
+  @@index([postId, isDeleted, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@map("post_likes")
 }
@@ -838,6 +842,7 @@ model PostReport {
   reporter User @relation("PostReportsByReporter", fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@index([postId, status])
+  @@index([postId, isDeleted, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
   @@index([isDeleted, createdAt(sort: Desc)])
   @@map("post_reports")
