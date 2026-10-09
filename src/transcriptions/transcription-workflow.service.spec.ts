@@ -48,12 +48,17 @@ describe('TranscriptionWorkflowService', () => {
       status: TranscriptionStatus.FAILED,
       errorCode: 'AUDIO_DOWNLOAD_FAILED',
     };
-    const { workflow, queue } = createTranscriptionFixture(failed);
+    const { workflow, queue, repository } = createTranscriptionFixture(failed);
+    repository.update.mockResolvedValue({
+      ...failed,
+      status: TranscriptionStatus.PENDING,
+      manualRetryCount: 1,
+    });
 
     await expect(
       workflow.createOrGet(request, 'user-id'),
-    ).resolves.toMatchObject({ cached: false, jobId: null, status: 'FAILED' });
-    expect(queue.add).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({ cached: false, status: 'PENDING' });
+    expect(queue.add).toHaveBeenCalledTimes(1);
   });
 
   it('allows users to enqueue work while other transcriptions are active', async () => {
