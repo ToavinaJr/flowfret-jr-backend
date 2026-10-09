@@ -46,10 +46,12 @@ services:
       REDIS_HOST: redis
       REDIS_TLS: 'false'
       YOUTUBE_DL_PYTHON_BIN: python3
+      YOUTUBE_POT_PROVIDER_URL: http://pot-provider:4416
     ports: ['127.0.0.1:3000:3000']
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
+      pot-provider: { condition: service_started }
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
@@ -60,8 +62,8 @@ services:
   # Generates YouTube proof-of-origin tokens so yt-dlp extractions succeed
   # without depending on a human-exported, periodically-expiring cookie
   # session. Lightweight (plain JS runtime, no headless browser). Not
-  # published to the host: only transcription-worker/stems-worker reach it,
-  # over the compose network, by service name.
+  # published to the host: only backend/transcription-worker/stems-worker
+  # reach it, over the compose network, by service name.
   pot-provider:
     image: brainicism/bgutil-ytdlp-pot-provider
     restart: unless-stopped
