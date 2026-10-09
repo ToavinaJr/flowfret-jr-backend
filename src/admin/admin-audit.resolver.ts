@@ -1,6 +1,7 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Prisma, UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
+import { RateLimit } from '../auth/rate-limit.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildAdminPage, decodeAdminPage } from './admin-pagination';
 import {
@@ -9,6 +10,7 @@ import {
   AdminSortDirection,
 } from './admin.types';
 
+@RateLimit(120, 60, true)
 @Roles(UserRole.ADMIN)
 @Resolver()
 export class AdminAuditResolver {

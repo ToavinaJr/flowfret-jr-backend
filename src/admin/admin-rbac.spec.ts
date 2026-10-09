@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { UserRole } from '@prisma/client';
 import { ROLES_KEY } from '../auth/roles.decorator';
+import { RATE_LIMIT_KEY } from '../auth/rate-limit.decorator';
 import { AdminAuditResolver } from './admin-audit.resolver';
 import { AdminContentResolver } from './admin-content.resolver';
 import { AdminDashboardResolver } from './admin-dashboard.resolver';
@@ -24,5 +25,8 @@ describe('admin resolver authorization metadata', () => {
     AdminEntityResolver,
   ])('requires ADMIN for %p', (resolver) => {
     expect(Reflect.getMetadata(ROLES_KEY, resolver)).toEqual([UserRole.ADMIN]);
+    expect(Reflect.getMetadata(RATE_LIMIT_KEY, resolver)).toEqual([
+      { limit: 120, windowSeconds: 60, failClosed: true },
+    ]);
   });
 });

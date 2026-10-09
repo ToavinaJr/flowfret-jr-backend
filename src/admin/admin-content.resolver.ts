@@ -20,6 +20,7 @@ import { AdminModerationService } from './admin-moderation.service';
 
 type AdminRequestContext = { req: { user: { sub: string } } };
 
+@RateLimit(120, 60, true)
 @Roles(UserRole.ADMIN)
 @Resolver()
 export class AdminContentResolver {

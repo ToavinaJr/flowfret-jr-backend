@@ -1,6 +1,7 @@
 import { ParseUUIDPipe } from '@nestjs/common';
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Prisma, UserRole } from '@prisma/client';
+import { RateLimit } from '../auth/rate-limit.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -16,6 +17,7 @@ import {
   AdminUserSortField,
 } from './admin.types';
 
+@RateLimit(120, 60, true)
 @Roles(UserRole.ADMIN)
 @Resolver()
 export class AdminUsersResolver {

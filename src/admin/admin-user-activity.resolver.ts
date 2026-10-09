@@ -1,9 +1,11 @@
 import { ResolveField, Resolver } from '@nestjs/graphql';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
+import { RateLimit } from '../auth/rate-limit.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminUser, AdminUserActivity } from './admin.types';
 
+@RateLimit(120, 60, true)
 @Roles(UserRole.ADMIN)
 @Resolver(() => AdminUser)
 export class AdminUserActivityResolver {

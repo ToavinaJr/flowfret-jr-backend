@@ -10,6 +10,7 @@ import {
   AdminStatisticsInput,
 } from './admin.types';
 
+@RateLimit(120, 60, true)
 @Roles(UserRole.ADMIN)
 @Resolver()
 export class AdminDashboardResolver {

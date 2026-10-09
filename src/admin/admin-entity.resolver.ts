@@ -13,6 +13,7 @@ import {
 
 type AdminRequestContext = { req: { user: { sub: string } } };
 
+@RateLimit(120, 60, true)
 @Roles(UserRole.ADMIN)
 @Resolver()
 export class AdminEntityResolver {
