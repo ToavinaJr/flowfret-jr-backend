@@ -81,6 +81,18 @@ function looksLikeInternalMessage(message: string): boolean {
   );
 }
 
+function isExpectedAnonymousRefreshFailure(
+  formattedError: GraphQLFormattedError,
+  original: unknown,
+): boolean {
+  return (
+    isHttpException(original) &&
+    original.getStatus() === 401 &&
+    (formattedError.path?.includes('refreshSession') ?? false) &&
+    original.message === 'Refresh session cookie is missing.'
+  );
+}
+
 /**
  * Strips internal / Prisma details from GraphQL responses.
  * Nest HttpException messages that are intentional stay (auth, conflict).
@@ -101,7 +113,7 @@ export function formatGraphQLError(
     };
   }
 
-  if (isDebugEnabled()) {
+  if (isDebugEnabled() && !isExpectedAnonymousRefreshFailure(formattedError, original)) {
     const event = JSON.stringify({
       event: 'graphql.request_failed',
       message: formattedError.message,

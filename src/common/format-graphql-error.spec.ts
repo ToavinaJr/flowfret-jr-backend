@@ -35,4 +35,19 @@ describe('formatGraphQLError', () => {
       extensions: { code: 'TOO_MANY_REQUESTS', statusCode: 429 },
     });
   });
+
+  it('keeps an anonymous refresh attempt out of warning logs', () => {
+    const error = wrapped(
+      new HttpException('Refresh session cookie is missing.', 401),
+    );
+    const formatted = new GraphQLError(error.message, {
+      path: ['refreshSession'],
+      originalError: error,
+    });
+
+    expect(formatGraphQLError(formatted.toJSON(), formatted)).toEqual({
+      message: 'Refresh session cookie is missing.',
+      extensions: { code: 'UNAUTHENTICATED', statusCode: 401 },
+    });
+  });
 });
