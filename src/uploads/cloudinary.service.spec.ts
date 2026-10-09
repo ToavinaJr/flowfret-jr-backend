@@ -38,6 +38,62 @@ describe('CloudinaryService', () => {
     });
   });
 
+  it('rejects an unsupported MIME type before contacting Cloudinary', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch');
+    const service = new CloudinaryService(config);
+
+    const error = await service
+      .uploadImage({
+        ...jpeg,
+        mimetype: 'image/svg+xml',
+        originalname: 'image.svg',
+      })
+      .catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ApplicationException);
+    expect((error as ApplicationException).getResponse()).toEqual({
+      code: 'UPLOAD_INVALID_FILE',
+      message: 'The image file is invalid.',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an oversized image before contacting Cloudinary', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch');
+    const service = new CloudinaryService(config);
+
+    const error = await service
+      .uploadImage({ ...jpeg, size: 8 * 1024 * 1024 + 1 })
+      .catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ApplicationException);
+    expect((error as ApplicationException).getResponse()).toEqual({
+      code: 'UPLOAD_INVALID_FILE',
+      message: 'The image file is invalid.',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a teaching document with a forged PDF signature', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch');
+    const service = new CloudinaryService(config);
+
+    const error = await service
+      .uploadTeachingFile({
+        ...jpeg,
+        mimetype: 'application/pdf',
+        originalname: 'document.pdf',
+      })
+      .catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ApplicationException);
+    expect((error as ApplicationException).getResponse()).toEqual({
+      code: 'UPLOAD_INVALID_FILE',
+      message: 'Unsupported or invalid teaching file.',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('logs provider detail but returns only a stable application error', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: false,

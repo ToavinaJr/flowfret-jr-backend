@@ -329,6 +329,16 @@ describe('AppController (e2e)', () => {
     expect(depthBody.errors?.[0]?.message).toContain('query depth');
   });
 
+  it('rejects anonymous multipart uploads before reading application data', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/uploads/images')
+      .attach('images', Buffer.from('not-an-image'), 'payload.jpg')
+      .expect(401);
+
+    const body = response.body as { message?: string };
+    expect(body.message).toBe('Unauthorized');
+  });
+
   afterAll(async () => {
     await app.close();
   });
