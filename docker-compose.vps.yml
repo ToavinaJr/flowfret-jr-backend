@@ -3,8 +3,16 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set in .env}
       DIRECT_DATABASE_URL: ${DIRECT_DATABASE_URL:-${DATABASE_URL:?DATABASE_URL must be set in .env}}
+      YOUTUBE_COOKIES_FILE: /etc/secrets/youtube-cookies.txt
     ports: !override
       - '127.0.0.1:3100:3000'
+    volumes:
+      - type: bind
+        source: /etc/secrets/youtube-cookies.txt
+        target: /etc/secrets/youtube-cookies.txt
+        read_only: true
+        bind:
+          create_host_path: false
 
   transcription-worker:
     environment:
