@@ -87,6 +87,9 @@ export class YouTubeAudioService implements OnModuleInit {
     const pythonPath = [bundledPythonPackages, process.env.PYTHONPATH]
       .filter(Boolean)
       .join(delimiter);
+    const potProviderUrl = this.config
+      .get<string>('YOUTUBE_POT_PROVIDER_URL')
+      ?.trim();
     const child = spawn(
       python,
       [
@@ -99,6 +102,12 @@ export class YouTubeAudioService implements OnModuleInit {
         '--js-runtimes',
         'node',
         ...(liveCookiePath ? ['--cookies', liveCookiePath] : []),
+        ...(potProviderUrl
+          ? [
+              '--extractor-args',
+              `youtubepot-bgutilhttp:base_url=${potProviderUrl}`,
+            ]
+          : []),
         '--format',
         'ba[ext=m4a]/ba[ext=webm]/ba/b',
         '--match-filter',
@@ -122,6 +131,7 @@ export class YouTubeAudioService implements OnModuleInit {
         diagnosticId,
         videoId,
         cookiesConfigured: Boolean(cookieFile),
+        potProviderConfigured: Boolean(potProviderUrl),
         activeExtractions: this.activeExtractions,
         maxBytes,
         maxDuration,

@@ -46,6 +46,15 @@ services:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
 
+  # Generates YouTube proof-of-origin tokens so yt-dlp extractions succeed
+  # without depending on a human-exported, periodically-expiring cookie
+  # session. Lightweight (plain JS runtime, no headless browser). Not
+  # published to the host: only transcription-worker/stems-worker reach it,
+  # over the compose network, by service name.
+  pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider
+    restart: unless-stopped
+
   transcription-worker:
     build:
       context: .
@@ -63,12 +72,14 @@ services:
       YOUTUBE_DL_PYTHON_BIN: python3
       HF_HOME: /models
       TRANSCRIPTION_TEMP_DIR: /transcription-tmp
+      YOUTUBE_POT_PROVIDER_URL: http://pot-provider:4416
     volumes:
       - whisper_models:/models
       - transcription_tmp:/transcription-tmp
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
+      pot-provider: { condition: service_started }
 
   stems-worker:
     build:
@@ -86,6 +97,7 @@ services:
       REDIS_TLS: 'false'
       AUDIO_STEMS_TEMP_DIR: /stems-tmp
       TORCH_HOME: /models
+      YOUTUBE_POT_PROVIDER_URL: http://pot-provider:4416
     # Placeholder safety net, not a tuned value: no Demucs benchmark has been
     # run on target hardware yet. Re-set these once Etape 0 of the karaoke
     # plan (manual CPU/RAM benchmark) has real numbers.
@@ -97,6 +109,7 @@ services:
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
+      pot-provider: { condition: service_started }
 
 volumes:
   guitare_pg_data:
