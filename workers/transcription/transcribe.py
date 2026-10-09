@@ -247,13 +247,32 @@ def process_request(request: dict[str, Any]) -> int:
             shutil.rmtree(temp_root, ignore_errors=True)
 
 
+def decode_request(raw: str) -> dict[str, Any]:
+    try:
+        request = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise WorkerError("INVALID_REQUEST", "Worker request is not valid JSON") from error
+    if not isinstance(request, dict):
+        raise WorkerError("INVALID_REQUEST", "Worker request must be a JSON object")
+    return request
+
+
+def process_line(raw: str) -> int:
+    try:
+        return process_request(decode_request(raw))
+    except WorkerError as error:
+        fail(error.code, str(error))
+        print(f"worker error: {error.code}", file=sys.stderr)
+        return 1
+
+
 def main() -> int:
     if "--server" in sys.argv:
         for line in sys.stdin:
             if line.strip():
-                process_request(json.loads(line))
+                process_line(line)
         return 0
-    return process_request(json.loads(sys.stdin.read()))
+    return process_line(sys.stdin.read())
 
 
 if __name__ == "__main__":

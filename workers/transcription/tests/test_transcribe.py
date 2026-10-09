@@ -42,6 +42,21 @@ class TranscribeUtilitiesTest(unittest.TestCase):
                 transcribe.azure_transcribe(Path(__file__), {"language": "auto"})
         self.assertEqual(raised.exception.code, "AZURE_CONFIG_MISSING")
 
+    def test_decode_request_rejects_malformed_json(self):
+        with self.assertRaises(transcribe.WorkerError) as raised:
+            transcribe.decode_request("{not-json")
+        self.assertEqual(raised.exception.code, "INVALID_REQUEST")
+
+    def test_decode_request_rejects_non_object_payloads(self):
+        with self.assertRaises(transcribe.WorkerError) as raised:
+            transcribe.decode_request("[1, 2, 3]")
+        self.assertEqual(raised.exception.code, "INVALID_REQUEST")
+
+    @patch.object(transcribe, "process_request", return_value=0)
+    def test_process_line_decodes_one_request(self, process_request):
+        self.assertEqual(transcribe.process_line('{"trackId":"track"}'), 0)
+        process_request.assert_called_once_with({"trackId": "track"})
+
 
 if __name__ == "__main__":
     unittest.main()
