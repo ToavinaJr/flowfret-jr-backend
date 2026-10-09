@@ -38,6 +38,35 @@ const USER_QUERY = `
   }
 `;
 
+const ALIAS_ABUSE_QUERY = `{ ${Array.from(
+  { length: 31 },
+  (_, index) => `alias${index}: dbHealth`,
+).join(' ')} }`;
+
+const DEPTH_ABUSE_QUERY = `
+  {
+    user(id: "00000000-0000-4000-8000-000000000000") {
+      authoredPosts {
+        author {
+          authoredPosts {
+            author {
+              authoredPosts {
+                author {
+                  authoredPosts {
+                    author {
+                      authoredPosts { author { authoredPosts { author { id } } } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 function cookiePair(headers: Record<string, unknown>): string | undefined {
   const value = headers['set-cookie'];
   const cookie = Array.isArray(value)
@@ -282,6 +311,22 @@ describe('AppController (e2e)', () => {
         where: { email: { in: [firstEmail, secondEmail] } },
       });
     }
+  });
+
+  it('rejects GraphQL alias and depth abuse before resolver execution', async () => {
+    const aliasResponse = await request(app.getHttpServer())
+      .post('/graphql')
+      .send({ query: ALIAS_ABUSE_QUERY })
+      .expect(400);
+    const aliasBody = aliasResponse.body as GraphQLBody<unknown>;
+    expect(aliasBody.errors?.[0]?.message).toContain('alias count');
+
+    const depthResponse = await request(app.getHttpServer())
+      .post('/graphql')
+      .send({ query: DEPTH_ABUSE_QUERY })
+      .expect(400);
+    const depthBody = depthResponse.body as GraphQLBody<unknown>;
+    expect(depthBody.errors?.[0]?.message).toContain('query depth');
   });
 
   afterAll(async () => {
