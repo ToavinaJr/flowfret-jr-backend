@@ -156,12 +156,13 @@ export class YouTubeAudioService implements OnModuleInit {
       // pre-rotation value on the following request).
       release();
     };
-    const fail = (message: string, code = 'YOUTUBE_AUDIO_EXTRACTION_FAILED') => {
+    const fail = (
+      message: string,
+      code = 'YOUTUBE_AUDIO_EXTRACTION_FAILED',
+    ) => {
       if (finished) return;
       dispose();
-      output.destroy(
-        Object.assign(new BadGatewayException(message), { code }),
-      );
+      output.destroy(Object.assign(new BadGatewayException(message), { code }));
     };
     const timer = setTimeout(
       () => fail('YouTube audio extraction timed out'),
@@ -321,7 +322,11 @@ export class YouTubeAudioService implements OnModuleInit {
   }
 
   private extractorFailureCategory(stderr: string): string {
-    if (/does not pass filter|duration.{0,30}(?:limit|long)|longer than/i.test(stderr)) {
+    if (
+      /does not pass filter|duration.{0,30}(?:limit|long)|longer than/i.test(
+        stderr,
+      )
+    ) {
       return 'duration_limit_exceeded';
     }
     if (/sign in to confirm|not a bot|login required/i.test(stderr)) {

@@ -49,17 +49,16 @@ export class GoogleProfileService {
         tokenInfo.audience,
         tokenInfo.issued_to,
       ];
-      const rejectionReason =
-        !tokenClientIds.includes(clientId)
-          ? 'audience_mismatch'
-          : !tokenSubject
-            ? 'subject_missing'
-            : !Number.isFinite(Number(tokenInfo.expires_in)) ||
-                Number(tokenInfo.expires_in) <= 0
-              ? 'token_expired_or_expiry_missing'
-              : !tokenInfo.scope?.split(/\s+/).includes('openid')
-                ? 'openid_scope_missing'
-                : null;
+      const rejectionReason = !tokenClientIds.includes(clientId)
+        ? 'audience_mismatch'
+        : !tokenSubject
+          ? 'subject_missing'
+          : !Number.isFinite(Number(tokenInfo.expires_in)) ||
+              Number(tokenInfo.expires_in) <= 0
+            ? 'token_expired_or_expiry_missing'
+            : !tokenInfo.scope?.split(/\s+/).includes('openid')
+              ? 'openid_scope_missing'
+              : null;
       if (rejectionReason) {
         this.logValidationFailure(rejectionReason);
         throw new UnauthorizedException('Invalid Google access token.');
@@ -80,7 +79,9 @@ export class GoogleProfileService {
       const profile = (await profileResponse.json()) as GoogleUserInfo;
       if (!profile.sub || profile.sub !== tokenSubject) {
         this.logValidationFailure(
-          profile.sub ? 'userinfo_subject_mismatch' : 'userinfo_subject_missing',
+          profile.sub
+            ? 'userinfo_subject_mismatch'
+            : 'userinfo_subject_missing',
         );
         throw new UnauthorizedException('Invalid Google profile.');
       }

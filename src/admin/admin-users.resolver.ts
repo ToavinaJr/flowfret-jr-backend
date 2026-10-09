@@ -3,7 +3,11 @@ import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Prisma, UserRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
-import { adminCreatedAtRange, buildAdminPage, decodeAdminPage } from './admin-pagination';
+import {
+  adminCreatedAtRange,
+  buildAdminPage,
+  decodeAdminPage,
+} from './admin-pagination';
 import {
   AdminSortDirection,
   AdminUser,

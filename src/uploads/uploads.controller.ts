@@ -42,6 +42,21 @@ import { ApplicationException } from '../common/application-exception';
 import { HttpStatus } from '@nestjs/common';
 import type { Response } from 'express';
 import { pipeline } from 'node:stream/promises';
+import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+
+export class UploadTeachingMaterialBody {
+  @IsUUID('4')
+  courseId!: string;
+
+  @IsOptional()
+  @IsUUID('4')
+  lessonId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  title?: string;
+}
 
 @Controller('uploads')
 @UseGuards(AuthGuard('jwt'))
@@ -167,7 +182,7 @@ export class UploadsController {
   )
   async uploadTeachingMaterial(
     @UploadedFile() file: UploadedImage | undefined,
-    @Body() body: { courseId?: string; lessonId?: string; title?: string },
+    @Body() body: UploadTeachingMaterialBody,
     @Req() req: { user: { sub: string } },
   ) {
     if (!file) throw new BadRequestException('Un document est requis.');

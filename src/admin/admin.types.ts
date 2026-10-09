@@ -211,7 +211,6 @@ export class AdminAuditInput extends AdminListInput {
   @IsString()
   @MaxLength(100)
   entityType?: string;
-
 }
 
 @InputType()
