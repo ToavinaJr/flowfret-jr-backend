@@ -23,8 +23,14 @@ export class UsersService {
     });
   }
 
-  find(id: string): Promise<UserModel | null> {
-    return this.prisma.user.findFirst({ where: { id, isDeleted: false } });
+  find(id: string, viewerId: string): Promise<UserModel | null> {
+    return this.prisma.user.findFirst({
+      where: {
+        id,
+        isDeleted: false,
+        OR: [{ id: viewerId }, { status: 'ACTIVE' }],
+      },
+    });
   }
 
   updateMe(data: UpdateMeInput, actorId: string): Promise<UserModel> {

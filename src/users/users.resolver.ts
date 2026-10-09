@@ -54,8 +54,11 @@ export class UsersResolver {
   }
 
   @Query(() => UserModel, { name: 'user', nullable: true })
-  user(@Args('id') id: string): Promise<UserModel | null> {
-    return this.usersService.find(id);
+  user(
+    @Args('id') id: string,
+    @Context() context: RequestContext,
+  ): Promise<UserModel | null> {
+    return this.usersService.find(id, context.req.user.sub);
   }
 
   @Mutation(() => UserModel)
