@@ -43,7 +43,30 @@ describe('LyricsReportsService', () => {
       prisma.lyricsReport.create.mockResolvedValue({ id: 'report-1' });
       await service.createReport(target, 'user-1', '  Wrong lines  ');
       expect(prisma.lyricsReport.create).toHaveBeenCalledWith({
-        data: { ...target, reporterId: 'user-1', reason: 'Wrong lines' },
+        data: {
+          ...target,
+          reporterId: 'user-1',
+          reason: 'Wrong lines',
+          proposedLyrics: null,
+        },
+      });
+    });
+
+    it('trims and stores an optional proposed lyrics suggestion', async () => {
+      prisma.lyricsReport.create.mockResolvedValue({ id: 'report-1' });
+      await service.createReport(
+        target,
+        'user-1',
+        'Wrong lines',
+        '  Line one  \nLine two  ',
+      );
+      expect(prisma.lyricsReport.create).toHaveBeenCalledWith({
+        data: {
+          ...target,
+          reporterId: 'user-1',
+          reason: 'Wrong lines',
+          proposedLyrics: 'Line one  \nLine two',
+        },
       });
     });
   });
