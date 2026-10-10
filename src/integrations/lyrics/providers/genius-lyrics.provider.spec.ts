@@ -69,7 +69,9 @@ describe('GeniusLyricsProvider', () => {
       thumbnailUrl: null,
       matchScore: 0.9,
     });
-    http.get.mockReturnValue(of({ data: '<html><body>Not found</body></html>' }));
+    http.get.mockReturnValue(
+      of({ data: '<html><body>Not found</body></html>' }),
+    );
     await expect(
       provider.findLyrics({ title: 'Song', artist: 'Artist' }),
     ).resolves.toBeNull();

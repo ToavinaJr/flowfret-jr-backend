@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TranscriptionStatus } from '@prisma/client';
 import type { Job } from 'bullmq';
-import { LyricsAlignmentService } from '../integrations/lyrics/lyrics-alignment.service';
 import type {
   TranscriptionJobData,
   TranscriptionSegment,
@@ -22,7 +21,6 @@ export class TranscriptionMessageHandler {
   constructor(
     private readonly repository: TranscriptionsRepository,
     private readonly events: TranscriptionEvents,
-    private readonly lyricsAlignment: LyricsAlignmentService,
   ) {}
 
   async handle(
@@ -214,20 +212,6 @@ export class TranscriptionMessageHandler {
           bufferedUntil: message.duration,
           readyToPlay: true,
         });
-        void this.lyricsAlignment
-          .upgradeAfterTranscription({
-            provider: updated.provider,
-            trackId: updated.trackId,
-            title: updated.title ?? undefined,
-            artist: updated.artist ?? undefined,
-            duration: updated.duration ?? undefined,
-            segments,
-          })
-          .catch((error) =>
-            this.logger.warn(
-              `Lyrics alignment skipped: ${error instanceof Error ? error.message : 'unknown error'}`,
-            ),
-          );
         return;
       }
       case WORKER_MESSAGE.FAILED:

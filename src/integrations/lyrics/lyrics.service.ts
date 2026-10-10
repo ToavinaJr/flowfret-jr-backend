@@ -9,6 +9,7 @@ import type { Lyrics, TrackMetadata } from './interfaces/lyrics.interface';
 import type { LyricsProvider } from './interfaces/lyrics-provider.interface';
 import { LrclibProvider } from './providers/lrclib.provider';
 import { GeniusLyricsProvider } from './providers/genius-lyrics.provider';
+import { LlmWebSearchLyricsProvider } from './providers/llm-web-search-lyrics.provider';
 
 @Injectable()
 export class LyricsService {
@@ -18,9 +19,10 @@ export class LyricsService {
   constructor(
     lrclib: LrclibProvider,
     geniusLyrics: GeniusLyricsProvider,
+    llmWebSearchLyrics: LlmWebSearchLyricsProvider,
     private readonly cache: LyricsCacheService,
   ) {
-    this.providers = [lrclib, geniusLyrics];
+    this.providers = [lrclib, geniusLyrics, llmWebSearchLyrics];
   }
 
   async findLyrics(track: TrackMetadata): Promise<Lyrics | null> {
