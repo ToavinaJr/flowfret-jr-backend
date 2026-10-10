@@ -10,6 +10,7 @@ import type { Lyrics, TrackMetadata } from './interfaces/lyrics.interface';
 import type { LyricsProvider } from './interfaces/lyrics-provider.interface';
 import { LrclibProvider } from './providers/lrclib.provider';
 import { GeniusLyricsProvider } from './providers/genius-lyrics.provider';
+import { LyricsOverrideProvider } from './providers/lyrics-override.provider';
 import { TononkiraLyricsProvider } from './providers/tononkira-lyrics.provider';
 import { LlmWebSearchLyricsProvider } from './providers/llm-web-search-lyrics.provider';
 
@@ -19,6 +20,7 @@ export class LyricsService {
   private readonly providers: readonly LyricsProvider[];
 
   constructor(
+    override: LyricsOverrideProvider,
     lrclib: LrclibProvider,
     geniusLyrics: GeniusLyricsProvider,
     tononkiraLyrics: TononkiraLyricsProvider,
@@ -26,6 +28,7 @@ export class LyricsService {
     private readonly cache: LyricsCacheService,
   ) {
     this.providers = [
+      override,
       lrclib,
       geniusLyrics,
       tononkiraLyrics,

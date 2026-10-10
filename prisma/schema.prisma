@@ -296,6 +296,8 @@ model User {
   playlistItemsAdded      PlaylistItem[]           @relation("PlaylistItemsAddedByUser")
   listeningHistory        ListeningHistory[]
   teachingLessonReminders TeachingLessonReminder[]
+  lyricsReports           LyricsReport[]           @relation("LyricsReportsByReporter")
+  lyricsOverrides         LyricsOverride[]
 
   @@index([isDeleted, createdAt(sort: Desc)])
   @@index([isDeleted, status])
@@ -846,6 +848,47 @@ model PostReport {
   @@index([status, createdAt(sort: Desc)])
   @@index([isDeleted, createdAt(sort: Desc)])
   @@map("post_reports")
+}
+
+model LyricsReport {
+  id         String       @id @default(uuid()) @db.Uuid
+  provider   String       @db.VarChar(30)
+  trackId    String       @map("track_id") @db.VarChar(255)
+  title      String       @db.VarChar(500)
+  artist     String       @db.VarChar(500)
+  reporterId String       @map("reporter_id") @db.Uuid
+  reason     String       @db.Text
+  proposedLyrics String?  @map("proposed_lyrics") @db.Text
+  status     ReportStatus @default(OPEN)
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  reviewedAt DateTime?    @map("reviewed_at") @db.Timestamptz(6)
+  isDeleted  Boolean      @default(false) @map("is_deleted")
+  deletedAt  DateTime?    @map("deleted_at") @db.Timestamptz(6)
+
+  reporter User @relation("LyricsReportsByReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([provider, trackId, status])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("lyrics_reports")
+}
+
+model LyricsOverride {
+  id              String   @id @default(uuid()) @db.Uuid
+  provider        String   @db.VarChar(30)
+  trackId         String   @map("track_id") @db.VarChar(255)
+  title           String   @db.VarChar(500)
+  artist          String   @db.VarChar(500)
+  plainLyrics     String   @map("plain_lyrics") @db.Text
+  synced          Boolean  @default(false)
+  lines           Json     @db.JsonB
+  updatedByUserId String   @map("updated_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updatedBy User @relation(fields: [updatedByUserId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, trackId])
+  @@map("lyrics_overrides")
 }
 
 model PostMention {

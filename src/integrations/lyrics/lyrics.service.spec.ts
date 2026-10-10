@@ -3,6 +3,7 @@ import type { LyricsCacheService } from './lyrics-cache.service';
 import type { LrclibProvider } from './providers/lrclib.provider';
 import type { GeniusLyricsProvider } from './providers/genius-lyrics.provider';
 import type { LlmWebSearchLyricsProvider } from './providers/llm-web-search-lyrics.provider';
+import type { LyricsOverrideProvider } from './providers/lyrics-override.provider';
 import type { TononkiraLyricsProvider } from './providers/tononkira-lyrics.provider';
 import {
   LYRICS_CACHE_TTL_SECONDS,
@@ -10,6 +11,7 @@ import {
 } from './lyrics.constants';
 
 describe('LyricsService', () => {
+  const overrideProvider = { findLyrics: jest.fn() };
   const provider = { findLyrics: jest.fn() };
   const geniusProvider = { findLyrics: jest.fn() };
   const tononkiraProvider = { findLyrics: jest.fn() };
@@ -19,10 +21,12 @@ describe('LyricsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    overrideProvider.findLyrics.mockResolvedValue(null);
     geniusProvider.findLyrics.mockResolvedValue(null);
     tononkiraProvider.findLyrics.mockResolvedValue(null);
     llmWebSearchProvider.findLyrics.mockResolvedValue(null);
     service = new LyricsService(
+      overrideProvider as unknown as LyricsOverrideProvider,
       provider as unknown as LrclibProvider,
       geniusProvider as unknown as GeniusLyricsProvider,
       tononkiraProvider as unknown as TononkiraLyricsProvider,
