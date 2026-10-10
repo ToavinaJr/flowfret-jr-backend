@@ -9,6 +9,7 @@ import { LyricsService } from './lyrics.service';
 import { GeniusLyricsProvider } from './providers/genius-lyrics.provider';
 import { LlmWebSearchLyricsProvider } from './providers/llm-web-search-lyrics.provider';
 import { LrclibProvider } from './providers/lrclib.provider';
+import { TononkiraLyricsProvider } from './providers/tononkira-lyrics.provider';
 
 @Module({
   imports: [HttpModule, GeniusModule, WebSearchModule, AzureOpenAiModule],
@@ -18,6 +19,7 @@ import { LrclibProvider } from './providers/lrclib.provider';
     LyricsCacheService,
     LrclibProvider,
     GeniusLyricsProvider,
+    TononkiraLyricsProvider,
     LlmWebSearchLyricsProvider,
   ],
   exports: [LyricsService],

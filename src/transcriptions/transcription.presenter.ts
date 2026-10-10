@@ -39,6 +39,7 @@ export function toTranscriptionResponse(
   jobId: string | null,
   cached: boolean,
 ): TranscriptionResponse {
+  const resolvedSegments = segments(item.segments);
   return {
     transcriptionId: item.id,
     provider: item.provider,
@@ -53,10 +54,13 @@ export function toTranscriptionResponse(
     readyToPlay: item.readyToPlay,
     bufferedUntil: item.bufferedUntil,
     progress: item.progress,
-    segments: segments(item.segments),
+    segments: resolvedSegments,
     language: item.requestedLanguage === 'auto' ? null : item.requestedLanguage,
     detectedLanguage: item.detectedLanguage,
-    lrcAvailable: Boolean(item.lrcContent),
+    // A completed transcription always produces a non-empty .lrc file (it
+    // always has a header), even when Whisper detected zero sung segments —
+    // so lrcAvailable must also require real segments, not just lrcContent.
+    lrcAvailable: Boolean(item.lrcContent) && resolvedSegments.length > 0,
     processingPhase: item.processingPhase,
     error: item.errorCode
       ? {
