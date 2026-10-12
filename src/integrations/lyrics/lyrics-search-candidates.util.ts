@@ -28,7 +28,12 @@ export function buildLyricsSearchCandidates(
     return [{ ...track, title: cleanedTitle }];
   }
 
-  const [first, ...rest] = cleanedTitle.split(/\s*-\s*/).filter(Boolean);
+  // Official channels often paste titles with a typographic dash (en dash
+  // "–", em dash "—", horizontal bar "―", minus sign "−") instead of a
+  // plain ASCII hyphen - splitting on "-" alone would miss those and fall
+  // through to the no-dash case below, leaving the artist name stuck
+  // inside the title text that gets sent to lyrics providers.
+  const [first, ...rest] = cleanedTitle.split(/\s*[-–—―−]\s*/).filter(Boolean);
   if (!first || rest.length === 0) {
     return [{ ...track, title: cleanedTitle }];
   }

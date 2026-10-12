@@ -51,6 +51,32 @@ describe('buildLyricsSearchCandidates', () => {
     ]);
   });
 
+  it('splits on a typographic en dash, not just the ASCII hyphen', () => {
+    expect(
+      buildLyricsSearchCandidates({
+        title: 'Roch Voisine – Ne viens pas (Clip officiel)',
+        artist: 'Some Channel',
+        provider: 'YOUTUBE',
+      }),
+    ).toEqual([
+      { title: 'Ne viens pas', artist: 'Roch Voisine', provider: 'YOUTUBE' },
+      { title: 'Roch Voisine', artist: 'Ne viens pas', provider: 'YOUTUBE' },
+    ]);
+  });
+
+  it('splits on an em dash too', () => {
+    expect(
+      buildLyricsSearchCandidates({
+        title: 'Artist — Title',
+        artist: 'Channel',
+        provider: 'YOUTUBE',
+      }),
+    ).toEqual([
+      { title: 'Title', artist: 'Artist', provider: 'YOUTUBE' },
+      { title: 'Artist', artist: 'Title', provider: 'YOUTUBE' },
+    ]);
+  });
+
   it('falls back to the cleaned title alone when there is no dash', () => {
     expect(
       buildLyricsSearchCandidates({
