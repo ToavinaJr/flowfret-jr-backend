@@ -80,6 +80,50 @@ describe('LyricsService', () => {
     );
   });
 
+  it('estimates per-line timing for an unsynced provider result when the duration is known', async () => {
+    cache.get.mockResolvedValue(undefined);
+    const lyrics = {
+      provider: 'genius',
+      synced: false,
+      instrumental: false,
+      plainLyrics: 'First line\nSecond line',
+      lines: [
+        { startTimeMs: null, text: 'First line' },
+        { startTimeMs: null, text: 'Second line' },
+      ],
+    };
+    provider.findLyrics.mockResolvedValue(lyrics);
+    const result = await service.findLyrics({
+      title: 'Song',
+      artist: 'Artist',
+      duration: 60,
+    });
+    expect(result?.provider).toBe('genius');
+    expect(result?.synced).toBe(true);
+    expect(result?.lines[0]).toEqual({ startTimeMs: 0, text: 'First line' });
+    expect(result?.lines[1].startTimeMs).toBeGreaterThan(0);
+    const [, cachedValue] = cache.set.mock.calls[0] as [
+      string,
+      { synced: boolean },
+    ];
+    expect(cachedValue.synced).toBe(true);
+  });
+
+  it('leaves an unsynced result untouched when the duration is unknown', async () => {
+    cache.get.mockResolvedValue(undefined);
+    const lyrics = {
+      provider: 'genius',
+      synced: false,
+      instrumental: false,
+      plainLyrics: 'First line',
+      lines: [{ startTimeMs: null, text: 'First line' }],
+    };
+    provider.findLyrics.mockResolvedValue(lyrics);
+    await expect(
+      service.findLyrics({ title: 'Song', artist: 'Artist' }),
+    ).resolves.toBe(lyrics);
+  });
+
   it('returns an override immediately, without consulting the cache', async () => {
     const override = {
       provider: 'override',
