@@ -5,14 +5,14 @@ import { buildLyricsCacheKey } from './lyrics-cache-key.util';
 import { LyricsCacheService } from './lyrics-cache.service';
 import { LyricsReportsService } from './lyrics-reports.service';
 import { LYRICS_CACHE_TTL_SECONDS } from './lyrics.constants';
-import type { Lyrics } from './interfaces/lyrics.interface';
+import type { Lyrics, LyricLine } from './interfaces/lyrics.interface';
 
 export interface LyricsOverrideInput {
   provider: string;
   trackId: string;
   title: string;
   artist: string;
-  plainLyrics: string;
+  lines: LyricLine[];
 }
 
 @Injectable()
@@ -33,11 +33,12 @@ export class LyricsOverrideService {
     input: LyricsOverrideInput,
     updatedByUserId: string,
   ): Promise<LyricsOverride> {
-    const { provider, trackId, title, artist, plainLyrics } = input;
-    const lines = plainLyrics
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+    const { provider, trackId, title, artist } = input;
+    const lines = input.lines
+      .map((line) => ({ ...line, text: line.text.trim() }))
+      .filter((line) => line.text.length > 0);
+    const plainLyrics = lines.map((line) => line.text).join('\n');
+    const synced = lines.some((line) => line.startTimeMs !== null);
 
     const override = await this.prisma.lyricsOverride.upsert({
       where: { provider_trackId: { provider, trackId } },
@@ -47,7 +48,7 @@ export class LyricsOverrideService {
         title,
         artist,
         plainLyrics,
-        synced: false,
+        synced,
         lines,
         updatedByUserId,
       },
@@ -55,7 +56,7 @@ export class LyricsOverrideService {
         title,
         artist,
         plainLyrics,
-        synced: false,
+        synced,
         lines,
         updatedByUserId,
       },
@@ -64,10 +65,10 @@ export class LyricsOverrideService {
     const key = buildLyricsCacheKey({ provider, id: trackId, title, artist });
     const result: Lyrics = {
       provider: 'override',
-      synced: false,
+      synced,
       instrumental: false,
       plainLyrics,
-      lines: lines.map((text) => ({ startTimeMs: null, text })),
+      lines,
     };
     await this.cache.set(key, result, LYRICS_CACHE_TTL_SECONDS);
     await this.reports.resolveOpenReportsFor(provider, trackId);

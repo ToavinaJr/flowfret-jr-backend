@@ -29,14 +29,18 @@ describe('LyricsOverrideService', () => {
     });
   });
 
-  it('splits plainLyrics into trimmed non-empty lines, upserts, writes through the cache and resolves open reports', async () => {
+  it('trims lines, drops empty ones, upserts, writes through the cache and resolves open reports', async () => {
     prisma.lyricsOverride.upsert.mockResolvedValue({ id: 'override-1' });
     const input = {
       provider: 'YOUTUBE',
       trackId: 'abc',
       title: 'Song',
       artist: 'Artist',
-      plainLyrics: '  Line one  \n\n  Line two  \n',
+      lines: [
+        { startTimeMs: null, text: '  Line one  ' },
+        { startTimeMs: null, text: '   ' },
+        { startTimeMs: null, text: '  Line two  ' },
+      ],
     };
 
     await service.save(input, 'admin-1');
@@ -45,18 +49,31 @@ describe('LyricsOverrideService', () => {
       [
         {
           where: unknown;
-          create: { lines: string[]; updatedByUserId: string };
-          update: { lines: string[]; updatedByUserId: string };
+          create: {
+            lines: Array<{ startTimeMs: number | null; text: string }>;
+            synced: boolean;
+            updatedByUserId: string;
+          };
+          update: {
+            lines: Array<{ startTimeMs: number | null; text: string }>;
+            synced: boolean;
+            updatedByUserId: string;
+          };
         },
       ]
     >;
     const upsertCall = upsertCalls[0][0];
+    const expectedLines = [
+      { startTimeMs: null, text: 'Line one' },
+      { startTimeMs: null, text: 'Line two' },
+    ];
     expect(upsertCall.where).toEqual({
       provider_trackId: { provider: 'YOUTUBE', trackId: 'abc' },
     });
-    expect(upsertCall.create.lines).toEqual(['Line one', 'Line two']);
+    expect(upsertCall.create.lines).toEqual(expectedLines);
+    expect(upsertCall.create.synced).toBe(false);
     expect(upsertCall.create.updatedByUserId).toBe('admin-1');
-    expect(upsertCall.update.lines).toEqual(['Line one', 'Line two']);
+    expect(upsertCall.update.lines).toEqual(expectedLines);
     expect(upsertCall.update.updatedByUserId).toBe('admin-1');
 
     const key = buildLyricsCacheKey({
@@ -78,15 +95,34 @@ describe('LyricsOverrideService', () => {
     expect(cacheKey).toBe(key);
     expect(cacheValue.provider).toBe('override');
     expect(cacheValue.synced).toBe(false);
-    expect(cacheValue.plainLyrics).toBe(input.plainLyrics);
-    expect(cacheValue.lines).toEqual([
-      { startTimeMs: null, text: 'Line one' },
-      { startTimeMs: null, text: 'Line two' },
-    ]);
+    expect(cacheValue.plainLyrics).toBe('Line one\nLine two');
+    expect(cacheValue.lines).toEqual(expectedLines);
     expect(typeof cacheTtl).toBe('number');
     expect(reports.resolveOpenReportsFor).toHaveBeenCalledWith(
       'YOUTUBE',
       'abc',
     );
+  });
+
+  it('marks the result synced when at least one line has a real timestamp', async () => {
+    prisma.lyricsOverride.upsert.mockResolvedValue({ id: 'override-1' });
+    await service.save(
+      {
+        provider: 'YOUTUBE',
+        trackId: 'abc',
+        title: 'Song',
+        artist: 'Artist',
+        lines: [
+          { startTimeMs: 0, text: 'Line one' },
+          { startTimeMs: null, text: 'Line two' },
+        ],
+      },
+      'admin-1',
+    );
+    const [, cacheValue] = cache.set.mock.calls[0] as [
+      string,
+      { synced: boolean },
+    ];
+    expect(cacheValue.synced).toBe(true);
   });
 });
