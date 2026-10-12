@@ -20,7 +20,7 @@ export class LyricsService {
   private readonly providers: readonly LyricsProvider[];
 
   constructor(
-    override: LyricsOverrideProvider,
+    private readonly override: LyricsOverrideProvider,
     lrclib: LrclibProvider,
     geniusLyrics: GeniusLyricsProvider,
     tononkiraLyrics: TononkiraLyricsProvider,
@@ -28,7 +28,6 @@ export class LyricsService {
     private readonly cache: LyricsCacheService,
   ) {
     this.providers = [
-      override,
       lrclib,
       geniusLyrics,
       tononkiraLyrics,
@@ -37,6 +36,14 @@ export class LyricsService {
   }
 
   async findLyrics(track: TrackMetadata): Promise<Lyrics | null> {
+    // Checked before the generic cache, keyed only by provider+trackId (a
+    // single indexed Postgres lookup): an admin override must win the
+    // instant it's saved, even if this exact track was already cached as
+    // "not found" moments earlier (e.g. the search that led the admin to
+    // add the override in the first place).
+    const overrideResult = await this.override.findLyrics(track);
+    if (overrideResult) return overrideResult;
+
     const key = buildLyricsCacheKey(track);
     const cached = await this.cache.get(key);
     if (cached !== undefined) {

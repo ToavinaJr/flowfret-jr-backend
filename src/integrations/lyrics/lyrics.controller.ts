@@ -14,13 +14,16 @@ import { ReportStatus, UserRole } from '@prisma/client';
 import { Public } from '../../auth/public.decorator';
 import { RateLimits } from '../../auth/rate-limit.decorator';
 import { Roles } from '../../auth/roles.decorator';
+import { estimateLyricsTiming } from './estimate-lyrics-timing.util';
 import { GetLyricsDto } from './dto/get-lyrics.dto';
+import { ImportTononkiraLyricsDto } from './dto/import-tononkira-lyrics.dto';
 import { ReportLyricsDto } from './dto/report-lyrics.dto';
 import { UpdateLyricsOverrideDto } from './dto/update-lyrics-override.dto';
 import { UpdateLyricsReportStatusDto } from './dto/update-lyrics-report-status.dto';
 import { LyricsOverrideService } from './lyrics-override.service';
 import { LyricsReportsService } from './lyrics-reports.service';
 import { LyricsService } from './lyrics.service';
+import { TononkiraLyricsProvider } from './providers/tononkira-lyrics.provider';
 
 type AuthRequest = { user: { sub: string } };
 
@@ -30,6 +33,7 @@ export class LyricsController {
     private readonly lyrics: LyricsService,
     private readonly reports: LyricsReportsService,
     private readonly overrides: LyricsOverrideService,
+    private readonly tononkira: TononkiraLyricsProvider,
   ) {}
 
   @Get()
@@ -116,5 +120,17 @@ export class LyricsController {
   @Roles(UserRole.ADMIN)
   saveOverride(@Body() dto: UpdateLyricsOverrideDto, @Req() req: AuthRequest) {
     return this.overrides.save(dto, req.user.sub);
+  }
+
+  @Get('tononkira-import')
+  @Roles(UserRole.ADMIN)
+  async importFromTononkira(@Query() query: ImportTononkiraLyricsDto) {
+    const lines = await this.tononkira.fetchFromUrl(query.url);
+    if (!lines) throw new NotFoundException('No lyrics found at that URL');
+    return {
+      lines: query.duration
+        ? estimateLyricsTiming(lines, query.duration)
+        : lines.map((text) => ({ startTimeMs: null, text })),
+    };
   }
 }

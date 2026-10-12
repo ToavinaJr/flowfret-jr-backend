@@ -39,6 +39,50 @@ export class TononkiraLyricsProvider implements LyricsProvider {
     if (!artistSlug || !titleSlug) return null;
 
     const url = `${TONONKIRA_BASE_URL}/hira/${artistSlug}/${titleSlug}`;
+    const lines = await this.fetchLines(url);
+    if (!lines) return null;
+    this.logger.log(
+      `Tononkira lyrics found for ${track.artist} - ${track.title}`,
+    );
+    const synced = typeof track.duration === 'number' && track.duration > 0;
+    return {
+      provider: 'tononkira',
+      synced,
+      instrumental: false,
+      plainLyrics: lines.join('\n'),
+      lines: synced
+        ? estimateLyricsTiming(lines, track.duration as number)
+        : lines.map((text) => ({ startTimeMs: null, text })),
+    };
+  }
+
+  /**
+   * Lets an admin import lyrics from a Tononkira URL they found manually.
+   * The deterministic artist/title slug guess in findLyrics() only works
+   * when the track's known title/artist match the page's exact spelling —
+   * for a YouTube video titled differently than the Tononkira page (a
+   * common mismatch for Malagasy covers/uploads), guessing can never find
+   * it, so the admin pastes the real URL instead.
+   */
+  async fetchFromUrl(url: string): Promise<string[] | null> {
+    if (!this.isTononkiraUrl(url)) return null;
+    return this.fetchLines(url);
+  }
+
+  private isTononkiraUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      return (
+        (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+        (parsed.hostname === 'tononkira.serasera.org' ||
+          parsed.hostname.endsWith('.tononkira.serasera.org'))
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private async fetchLines(url: string): Promise<string[] | null> {
     try {
       const response = await firstValueFrom(
         this.http.get<string>(url, {
@@ -48,20 +92,7 @@ export class TononkiraLyricsProvider implements LyricsProvider {
         }),
       );
       const lines = this.extractLines(response.data);
-      if (lines.length === 0) return null;
-      this.logger.log(
-        `Tononkira lyrics found for ${track.artist} - ${track.title}`,
-      );
-      const synced = typeof track.duration === 'number' && track.duration > 0;
-      return {
-        provider: 'tononkira',
-        synced,
-        instrumental: false,
-        plainLyrics: lines.join('\n'),
-        lines: synced
-          ? estimateLyricsTiming(lines, track.duration as number)
-          : lines.map((text) => ({ startTimeMs: null, text })),
-      };
+      return lines.length > 0 ? lines : null;
     } catch (error) {
       if (error instanceof AxiosError && error.response?.status === 404) {
         // Expected: this track just isn't on Tononkira.

@@ -120,4 +120,49 @@ describe('TononkiraLyricsProvider', () => {
     ).resolves.toBeNull();
     expect(http.get).not.toHaveBeenCalled();
   });
+
+  describe('fetchFromUrl', () => {
+    it('fetches and extracts lines from an admin-supplied Tononkira URL', async () => {
+      http.get.mockReturnValue(
+        of({
+          data: `<html><body>
+            <div class="print my-3 fst-italic">(byline)</div>
+            <div id="random1234">First line<br>Second line<br></div>
+          </body></html>`,
+        }),
+      );
+      await expect(
+        provider.fetchFromUrl(
+          'https://tononkira.serasera.org/hira/dadazily/ny-ainga',
+        ),
+      ).resolves.toEqual(['First line', 'Second line']);
+      expect(http.get).toHaveBeenCalledWith(
+        'https://tononkira.serasera.org/hira/dadazily/ny-ainga',
+        expect.any(Object),
+      );
+    });
+
+    it('rejects URLs outside the tononkira.serasera.org domain', async () => {
+      await expect(
+        provider.fetchFromUrl('https://evil.example.com/hira/x/y'),
+      ).resolves.toBeNull();
+      expect(http.get).not.toHaveBeenCalled();
+    });
+
+    it('rejects malformed URLs', async () => {
+      await expect(provider.fetchFromUrl('not a url')).resolves.toBeNull();
+      expect(http.get).not.toHaveBeenCalled();
+    });
+
+    it('returns null when the page has no lyrics container', async () => {
+      http.get.mockReturnValue(
+        of({ data: '<html><body>Not found</body></html>' }),
+      );
+      await expect(
+        provider.fetchFromUrl(
+          'https://tononkira.serasera.org/hira/dadazily/ny-ainga',
+        ),
+      ).resolves.toBeNull();
+    });
+  });
 });

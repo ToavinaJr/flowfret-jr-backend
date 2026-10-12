@@ -79,4 +79,25 @@ describe('LyricsService', () => {
       LYRICS_NOT_FOUND_TTL_SECONDS,
     );
   });
+
+  it('returns an override immediately, without consulting the cache', async () => {
+    const override = {
+      provider: 'override',
+      synced: false,
+      instrumental: false,
+      plainLyrics: 'Line one',
+      lines: [{ startTimeMs: null, text: 'Line one' }],
+    };
+    overrideProvider.findLyrics.mockResolvedValue(override);
+    await expect(
+      service.findLyrics({
+        provider: 'YOUTUBE',
+        id: 'abc',
+        title: 'Song',
+        artist: 'Artist',
+      }),
+    ).resolves.toBe(override);
+    expect(cache.get).not.toHaveBeenCalled();
+    expect(provider.findLyrics).not.toHaveBeenCalled();
+  });
 });
