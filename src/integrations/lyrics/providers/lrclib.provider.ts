@@ -102,7 +102,6 @@ export class LrclibProvider implements LyricsProvider {
         duration: track.duration,
       });
     if (track.duration) attempts.push({ ...base, duration: track.duration });
-    if (!track.duration) attempts.push(base);
     const normalized = this.lightlyNormalizeTitle(track.title);
     if (normalized !== track.title && track.duration)
       attempts.push({
@@ -110,6 +109,13 @@ export class LrclibProvider implements LyricsProvider {
         artist_name: track.artist,
         duration: track.duration,
       });
+    // LRCLIB's duration match has little tolerance, so a known duration
+    // that's off by even a few seconds (a different cut/upload of the same
+    // song) 404s every attempt above even though the song is in LRCLIB's
+    // catalog. A final duration-less lookup trades precision for a real
+    // chance at a synced match instead of silently falling through to an
+    // unsynced provider.
+    attempts.push(base);
     return attempts
       .filter(
         (attempt, index, all) =>
@@ -118,7 +124,7 @@ export class LrclibProvider implements LyricsProvider {
               JSON.stringify(candidate) === JSON.stringify(attempt),
           ) === index,
       )
-      .slice(0, 3);
+      .slice(0, 4);
   }
 
   private lightlyNormalizeTitle(title: string): string {

@@ -104,6 +104,50 @@ describe('LrclibProvider', () => {
     expect(http.get).toHaveBeenCalledTimes(2);
   });
 
+  it('falls back to a duration-less lookup when every duration-based attempt 404s', async () => {
+    const notFound = new AxiosError(
+      'missing',
+      undefined,
+      undefined,
+      undefined,
+      {
+        status: 404,
+        statusText: '',
+        headers: new AxiosHeaders(),
+        config: { headers: new AxiosHeaders() },
+        data: null,
+      },
+    );
+    http.get
+      .mockReturnValueOnce(throwError(() => notFound))
+      .mockReturnValueOnce(
+        of({
+          data: {
+            instrumental: false,
+            plainLyrics: 'Plain',
+            syncedLyrics: '[00:12.40]Line',
+          },
+        }),
+      );
+    await expect(
+      provider.findLyrics({ title: 'Song', artist: 'Artist', duration: 120 }),
+    ).resolves.toEqual({
+      provider: 'lrclib',
+      synced: true,
+      instrumental: false,
+      plainLyrics: 'Plain',
+      lines: [{ startTimeMs: 12400, text: 'Line' }],
+    });
+    expect(http.get).toHaveBeenCalledTimes(2);
+    const calls = http.get.mock.calls as Array<
+      [string, { params: Record<string, unknown> }]
+    >;
+    expect(calls[1][1].params).toEqual({
+      track_name: 'Song',
+      artist_name: 'Artist',
+    });
+  });
+
   it('handles timeout without retrying', async () => {
     http.get.mockReturnValue(
       throwError(() => new AxiosError('timeout', 'ECONNABORTED')),
