@@ -27,7 +27,7 @@ describe('NotificationsResolver', () => {
 
     await expect(
       resolver.actorAvatarUrl(
-        { payload: { actorId: 'actor-id' } } as never,
+        { payload: { senderId: 'actor-id' } } as never,
         { req: { user: { sub: 'viewer-id' } } },
       ),
     ).resolves.toBe('avatar.png');

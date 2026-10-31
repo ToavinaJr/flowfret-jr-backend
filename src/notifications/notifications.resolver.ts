@@ -19,6 +19,15 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 
+function actorIdFromNotification(notification: NotificationModel): string | null {
+  const payload = notification.payload;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+    return null;
+  const data = payload as Record<string, unknown>;
+  const actorId = data.actorId ?? data.senderId;
+  return typeof actorId === 'string' ? actorId : null;
+}
+
 @Resolver(() => NotificationModel)
 export class NotificationsResolver {
   constructor(
@@ -31,11 +40,8 @@ export class NotificationsResolver {
     @Parent() notification: NotificationModel,
     @Context() context: { req: { user: { sub: string } } },
   ): Promise<string | null> {
-    const payload = notification.payload;
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload))
-      return Promise.resolve(null);
-    const actorId = (payload as Record<string, unknown>).actorId;
-    if (typeof actorId !== 'string') return Promise.resolve(null);
+    const actorId = actorIdFromNotification(notification);
+    if (!actorId) return Promise.resolve(null);
     return this.usersService.socialAvatarUrl(actorId, context.req.user.sub);
   }
 
@@ -43,11 +49,8 @@ export class NotificationsResolver {
   actor(
     @Parent() notification: NotificationModel,
   ): Promise<UserModel | null> {
-    const payload = notification.payload;
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload))
-      return Promise.resolve(null);
-    const actorId = (payload as Record<string, unknown>).actorId;
-    if (typeof actorId !== 'string') return Promise.resolve(null);
+    const actorId = actorIdFromNotification(notification);
+    if (!actorId) return Promise.resolve(null);
     return this.prisma.user.findFirst({
       where: { id: actorId, isDeleted: false, status: 'ACTIVE' },
     });
