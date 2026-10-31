@@ -122,7 +122,10 @@ export class CloudinaryService {
     return { url: result.secure_url, publicId: result.public_id };
   }
 
-  async uploadTeachingFile(file: UploadedImage): Promise<{
+  async uploadTeachingFile(
+    file: UploadedImage,
+    folderName = 'teaching',
+  ): Promise<{
     url: string;
     publicId: string;
     resourceType: TeachingResourceType;
@@ -148,7 +151,7 @@ export class CloudinaryService {
     const cloudName = getRequiredConfig(this.config, 'CLOUDINARY_CLOUD_NAME');
     const apiKey = getRequiredConfig(this.config, 'CLOUDINARY_API_KEY');
     const apiSecret = getRequiredConfig(this.config, 'CLOUDINARY_API_SECRET');
-    const folder = `${getRequiredConfig(this.config, 'CLOUDINARY_FOLDER')}/teaching`;
+    const folder = `${getRequiredConfig(this.config, 'CLOUDINARY_FOLDER')}/${folderName}`;
     const timestamp = Math.floor(Date.now() / 1000);
     const signature = createHash('sha1')
       .update(

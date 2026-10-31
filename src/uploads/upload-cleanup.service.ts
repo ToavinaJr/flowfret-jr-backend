@@ -35,6 +35,27 @@ export class UploadCleanupService implements OnModuleInit, OnModuleDestroy {
   }
 
   async processPending(uploadIds?: string[]): Promise<void> {
+    if (!uploadIds) {
+      const expiredAttachments = await this.prisma.upload.updateMany({
+        where: {
+          sourceType: 'MESSAGE',
+          status: 'AVAILABLE',
+          isDeleted: false,
+          createdAt: { lt: new Date(Date.now() - 60 * 60 * 1000) },
+          messageAttachments: { none: {} },
+        },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          cleanupPending: true,
+          status: 'DELETED',
+        },
+      });
+      if (expiredAttachments.count > 0)
+        this.logger.log(
+          `Expired ${expiredAttachments.count} unattached chat image upload(s)`,
+        );
+    }
     const uploads = await this.prisma.upload.findMany({
       where: {
         cleanupPending: true,

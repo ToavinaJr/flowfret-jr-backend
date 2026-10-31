@@ -146,6 +146,17 @@ enum NotificationType {
   TEACHING_LESSON_CANCELLED
   TEACHING_LESSON_COMPLETED
   TEACHING_LESSON_REMINDER
+  CHAT_MESSAGE
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum ConversationParticipantRole {
+  ADMIN
+  MEMBER
 }
 
 enum ReportStatus {
@@ -298,6 +309,9 @@ model User {
   teachingLessonReminders TeachingLessonReminder[]
   lyricsReports           LyricsReport[]           @relation("LyricsReportsByReporter")
   lyricsOverrides         LyricsOverride[]
+  createdConversations    Conversation[] @relation("ConversationCreator")
+  conversationMemberships ConversationParticipant[]
+  sentChatMessages        ChatMessage[]
 
   @@index([isDeleted, createdAt(sort: Desc)])
   @@index([isDeleted, status])
@@ -697,6 +711,7 @@ model Upload {
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   attachments PostAttachment[]
   teachingMaterial TeachingMaterial?
+  messageAttachments MessageAttachment[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, isDeleted])
@@ -705,6 +720,80 @@ model Upload {
   @@index([cleanupPending, isDeleted])
   @@index([isDeleted, createdAt(sort: Desc)])
   @@map("uploads")
+}
+
+model Conversation {
+  id          String           @id @default(uuid()) @db.Uuid
+  type        ConversationType
+  name        String?          @db.VarChar(80)
+  directKey   String?          @unique(map: "conversations_direct_key_unique") @map("direct_key") @db.VarChar(73)
+  creatorId   String           @map("creator_id") @db.Uuid
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  isDeleted   Boolean          @default(false) @map("is_deleted")
+  deletedAt   DateTime?        @map("deleted_at") @db.Timestamptz(6)
+
+  creator      User                       @relation("ConversationCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  participants ConversationParticipant[]
+  messages     ChatMessage[]
+
+  @@index([updatedAt(sort: Desc)])
+  @@index([isDeleted, updatedAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String                     @id @default(uuid()) @db.Uuid
+  conversationId String                     @map("conversation_id") @db.Uuid
+  userId         String                     @map("user_id") @db.Uuid
+  nickname       String?                    @db.VarChar(50)
+  role           ConversationParticipantRole @default(MEMBER)
+  joinedAt       DateTime                   @default(now()) @map("joined_at") @db.Timestamptz(6)
+  lastReadAt     DateTime?                  @map("last_read_at") @db.Timestamptz(6)
+  isDeleted      Boolean                    @default(false) @map("is_deleted")
+  deletedAt      DateTime?                  @map("deleted_at") @db.Timestamptz(6)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId], map: "conversation_participants_conversation_user_unique")
+  @@index([userId, isDeleted, joinedAt(sort: Desc)])
+  @@index([conversationId, isDeleted])
+  @@map("conversation_participants")
+}
+
+model ChatMessage {
+  id             String    @id @default(uuid()) @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  senderId       String    @map("sender_id") @db.Uuid
+  body           String?   @db.VarChar(5000)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  editedAt       DateTime? @map("edited_at") @db.Timestamptz(6)
+  isDeleted      Boolean   @default(false) @map("is_deleted")
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  conversation Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User               @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  attachments  MessageAttachment[]
+
+  @@index([conversationId, isDeleted, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([senderId, createdAt(sort: Desc)])
+  @@map("chat_messages")
+}
+
+model MessageAttachment {
+  id        String   @id @default(uuid()) @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  uploadId  String   @unique(map: "message_attachments_upload_id_unique") @map("upload_id") @db.Uuid
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  upload  Upload      @relation(fields: [uploadId], references: [id], onDelete: Restrict)
+
+  @@unique([messageId, position], map: "message_attachments_message_position_unique")
+  @@index([messageId, position])
+  @@map("message_attachments")
 }
 
 model Notification {

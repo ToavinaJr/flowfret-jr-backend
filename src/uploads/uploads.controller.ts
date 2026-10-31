@@ -35,6 +35,7 @@ import {
   TeachingEnrollmentStatus,
   UploadAccessType,
   UploadSourceType,
+  UploadResourceType,
   UploadStatus,
 } from '@prisma/client';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
@@ -67,6 +68,143 @@ export class UploadsController {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {}
+
+  @Post('message-images')
+  @RateLimits({ limit: 10, windowSeconds: 60, failClosed: true })
+  @UseInterceptors(
+    ConcurrentUploadsInterceptor,
+    FilesInterceptor('images', 4, {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_IMAGE_BYTES, files: 4 },
+    }),
+  )
+  async messageImages(
+    @UploadedFiles() files: UploadedImage[],
+    @Req() req: { user: { sub: string } },
+  ) {
+    if (!files?.length)
+      throw new BadRequestException('At least one image is required.');
+    const incomingBytes = files.reduce((total, file) => total + file.size, 0);
+    const used = await this.prisma.upload.aggregate({
+      where: { userId: req.user.sub, isDeleted: false },
+      _sum: { fileSize: true },
+    });
+    if (
+      (used._sum.fileSize ?? 0n) + BigInt(incomingBytes) >
+      BigInt(this.storageQuotaBytes())
+    )
+      throw new ApplicationException(
+        'UPLOAD_QUOTA_EXCEEDED',
+        'The storage quota has been reached.',
+        HttpStatus.BAD_REQUEST,
+      );
+    const stored = await Promise.allSettled(
+      files.map((file) => this.cloudinary.uploadTeachingFile(file, 'messages')),
+    );
+    const completed = stored
+      .filter(
+        (
+          item,
+        ): item is PromiseFulfilledResult<
+          Awaited<ReturnType<CloudinaryService['uploadTeachingFile']>>
+        > => item.status === 'fulfilled',
+      )
+      .map((item) => item.value);
+    const failed = stored.find((item) => item.status === 'rejected');
+    if (failed) {
+      await Promise.allSettled(
+        completed.map((item) =>
+          this.cloudinary.deleteTeachingFile(item.publicId, item.resourceType),
+        ),
+      );
+      throw failed.reason;
+    }
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const result: Array<{ id: string }> = [];
+        for (let index = 0; index < files.length; index += 1) {
+          const file = files[index];
+          const cloud = completed[index];
+          if (
+            !file.mimetype.startsWith('image/') ||
+            cloud.resourceType !== 'IMAGE'
+          )
+            throw new BadRequestException(
+              'Only image attachments are accepted.',
+            );
+          const upload = await tx.upload.create({
+            data: {
+              userId: req.user.sub,
+              fileName: file.originalname.slice(0, 255),
+              fileType: file.mimetype,
+              fileSize: BigInt(file.size),
+              storagePath: cloud.url,
+              storagePublicId: cloud.publicId,
+              status: UploadStatus.AVAILABLE,
+              sourceType: UploadSourceType.MESSAGE,
+              resourceType: UploadResourceType.IMAGE,
+              accessType: UploadAccessType.AUTHENTICATED,
+            },
+            select: { id: true },
+          });
+          result.push(upload);
+        }
+        return result;
+      });
+    } catch (error) {
+      await Promise.allSettled(
+        completed.map((item) =>
+          this.cloudinary.deleteTeachingFile(item.publicId, item.resourceType),
+        ),
+      );
+      throw error;
+    }
+  }
+
+  @Get('message-images/:id')
+  async messageImageContent(
+    @Param('id') id: string,
+    @Req() req: { user: { sub: string } },
+    @Res() res: Response,
+  ) {
+    const attachment = await this.prisma.messageAttachment.findFirst({
+      where: {
+        uploadId: id,
+        message: {
+          isDeleted: false,
+          conversation: {
+            isDeleted: false,
+            participants: { some: { userId: req.user.sub, isDeleted: false } },
+          },
+        },
+        upload: {
+          isDeleted: false,
+          status: UploadStatus.AVAILABLE,
+          sourceType: UploadSourceType.MESSAGE,
+          accessType: UploadAccessType.AUTHENTICATED,
+          resourceType: UploadResourceType.IMAGE,
+        },
+      },
+      include: { upload: true },
+    });
+    if (!attachment) throw new NotFoundException('Image not found.');
+    const url = this.cloudinary.authenticatedDeliveryUrl(
+      attachment.upload.storagePath,
+      'IMAGE',
+    );
+    const upstream = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    if (!upstream.ok)
+      throw new BadGatewayException(
+        'Image storage is temporarily unavailable.',
+      );
+    res.setHeader('Content-Type', attachment.upload.fileType);
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (upstream.body)
+      await pipeline(upstream.body as unknown as NodeJS.ReadableStream, res);
+    else res.end();
+  }
 
   @Post('images')
   @RateLimits(

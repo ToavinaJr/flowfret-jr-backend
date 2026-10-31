@@ -17,13 +17,14 @@ describe('UploadCleanupService', () => {
     const findMany = jest
       .fn()
       .mockRejectedValue(new Error('database mismatch'));
+    const updateMany = jest.fn().mockResolvedValue({ count: 0 });
     const service = new UploadCleanupService(
-      { upload: { findMany } } as unknown as PrismaService,
+      { upload: { findMany, updateMany } } as unknown as PrismaService,
       {} as CloudinaryService,
     );
 
     service.onModuleInit();
-    jest.advanceTimersByTime(5 * 60 * 1000);
+    await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
     await Promise.resolve();
     await Promise.resolve();
     service.onModuleDestroy();

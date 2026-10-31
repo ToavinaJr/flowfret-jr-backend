@@ -23,6 +23,7 @@ import { RequestLoaders } from './common/request-loaders';
 import { ChordTranscriptionsModule } from './chord-transcriptions/chord-transcriptions.module';
 import { AdminModule } from './admin/admin.module';
 import { TeachingModule } from './teaching/teaching.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { TeachingModule } from './teaching/teaching.module';
     ChordTranscriptionsModule,
     AdminModule,
     TeachingModule,
+    ChatModule,
     GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
       inject: [ConfigService, PrismaService],
