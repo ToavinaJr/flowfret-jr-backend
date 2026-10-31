@@ -8,7 +8,6 @@ import {
   ConversationParticipantRole,
   ConversationType,
   FriendshipStatus,
-  NotificationType,
   Prisma,
   UploadAccessType,
   UploadResourceType,
@@ -278,36 +277,6 @@ export class ChatService {
         where: { id: conversationId },
         data: { updatedAt: created.createdAt },
       });
-      const recipients = await tx.conversationParticipant.findMany({
-        where: { conversationId, isDeleted: false, userId: { not: userId } },
-        select: { userId: true },
-      });
-      const preferences = await tx.notificationPreference.findMany({
-        where: {
-          userId: { in: recipients.map((r) => r.userId) },
-          type: NotificationType.CHAT_MESSAGE,
-          enabled: false,
-        },
-        select: { userId: true },
-      });
-      const muted = new Set(preferences.map((p) => p.userId));
-      const recipientIds = recipients
-        .map((r) => r.userId)
-        .filter((id) => !muted.has(id));
-      if (recipientIds.length)
-        await tx.notification.createMany({
-          data: recipientIds.map((id) => ({
-            userId: id,
-            type: NotificationType.CHAT_MESSAGE,
-            payload: {
-              conversationId,
-              messageId: created.id,
-              senderId: userId,
-              actorUsername: created.sender.username,
-            },
-            dedupeKey: `chat:${created.id}:${id}`,
-          })),
-        });
       return created;
     });
     const result = this.toMessage(message);

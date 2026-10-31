@@ -63,7 +63,11 @@ export class NotificationsResolver {
     @Args('after', { type: () => String, nullable: true }) after?: string,
   ) {
     return this.prisma.notification.findMany({
-      where: { userId: context.req.user.sub, isDeleted: false },
+      where: {
+        userId: context.req.user.sub,
+        isDeleted: false,
+        type: { not: NotificationType.CHAT_MESSAGE },
+      },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: Math.min(100, Math.max(1, take)),
       ...(after ? { cursor: { id: after }, skip: 1 } : {}),
@@ -79,6 +83,7 @@ export class NotificationsResolver {
         userId: context.req.user.sub,
         isDeleted: false,
         readAt: null,
+        type: { not: NotificationType.CHAT_MESSAGE },
       },
     });
   }

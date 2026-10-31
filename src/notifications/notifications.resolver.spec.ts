@@ -47,7 +47,35 @@ describe('NotificationsResolver', () => {
       resolver.unreadNotificationCount({ req: { user: { sub: 'user-id' } } }),
     ).resolves.toBe(3);
     expect(prisma.notification.count).toHaveBeenCalledWith({
-      where: { userId: 'user-id', isDeleted: false, readAt: null },
+      where: {
+        userId: 'user-id',
+        isDeleted: false,
+        readAt: null,
+        type: { not: 'CHAT_MESSAGE' },
+      },
     });
+  });
+
+  it('omits stored chat-message notifications from the global feed', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const resolver = new NotificationsResolver(
+      { notification: { findMany } } as unknown as PrismaService,
+      {} as UsersService,
+    );
+
+    await resolver.myNotifications(
+      { req: { user: { sub: 'user-id' } } },
+      25,
+    );
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: 'user-id',
+          isDeleted: false,
+          type: { not: 'CHAT_MESSAGE' },
+        },
+      }),
+    );
   });
 });
