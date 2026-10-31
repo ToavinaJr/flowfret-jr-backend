@@ -11,9 +11,11 @@ export class NotificationsService {
     actorId: string,
     actorUsername: string,
     recipientId: string,
+    friendshipId: string,
   ): Promise<void> {
     await this.createMany([recipientId], NotificationType.FRIEND_REQUEST, {
-      ...(await this.actorPayload(actorId, actorUsername)),
+      ...this.actorPayload(actorId, actorUsername),
+      friendshipId,
       action: AUDIT_ACTION.FRIEND_REQUESTED,
     });
   }
@@ -25,7 +27,7 @@ export class NotificationsService {
   ): Promise<void> {
     const friendIds = await this.friendIds(actorId);
     await this.createMany(friendIds, NotificationType.FRIEND_POST, {
-      ...(await this.actorPayload(actorId, actorUsername)),
+      ...this.actorPayload(actorId, actorUsername),
       postId,
       action: AUDIT_ACTION.POST_CREATED,
     });
@@ -40,7 +42,7 @@ export class NotificationsService {
   ): Promise<void> {
     if (postAuthorId !== actorId)
       await this.createMany([postAuthorId], NotificationType.POST_COMMENT, {
-        ...(await this.actorPayload(actorId, actorUsername)),
+        ...this.actorPayload(actorId, actorUsername),
         postId,
         commentId,
         action: AUDIT_ACTION.COMMENT_CREATED,
@@ -62,7 +64,7 @@ export class NotificationsService {
   ): Promise<void> {
     if (postAuthorId !== actorId)
       await this.createMany([postAuthorId], NotificationType.POST_LIKE, {
-        ...(await this.actorPayload(actorId, actorUsername)),
+        ...this.actorPayload(actorId, actorUsername),
         postId,
         action: AUDIT_ACTION.POST_LIKED,
       });
@@ -81,7 +83,7 @@ export class NotificationsService {
     recipientId: string,
   ): Promise<void> {
     await this.createMany([recipientId], NotificationType.FRIEND_ACCEPTED, {
-      ...(await this.actorPayload(actorId, actorUsername)),
+      ...this.actorPayload(actorId, actorUsername),
       action: AUDIT_ACTION.FRIEND_ACCEPTED,
     });
   }
@@ -116,23 +118,16 @@ export class NotificationsService {
       (id) => id !== actorId && id !== postAuthorId && engaged.has(id),
     );
     await this.createMany(recipients, NotificationType.FOLLOWED_POST_ACTIVITY, {
-      ...(await this.actorPayload(actorId, actorUsername)),
+      ...this.actorPayload(actorId, actorUsername),
       postId,
       postAuthorUsername: postAuthor?.username ?? null,
       action,
     });
   }
 
-  private async actorPayload(actorId: string, actorUsername: string) {
-    const profile = await this.prisma.profile.findFirst({
-      where: { userId: actorId, isDeleted: false },
-      select: { avatarUrl: true },
-    });
-    return {
-      actorId,
-      actorUsername,
-      actorAvatarUrl: profile?.avatarUrl ?? null,
-    };
+  private actorPayload(actorId: string, actorUsername: string) {
+    // The avatar is resolved per viewer by the GraphQL field, never copied here.
+    return { actorId, actorUsername };
   }
 
   private async friendIds(userId: string): Promise<string[]> {

@@ -17,12 +17,20 @@ import {
   UserStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { visibleAvatarUrl } from '../users/avatar-visibility';
 import { ChatRealtimeService } from './chat-realtime.service';
 
 const chatInclude = {
   participants: {
     where: { isDeleted: false },
-    include: { user: { select: { id: true, username: true } } },
+    include: {
+      user: {
+        select: {
+          id: true,
+          username: true,
+        },
+      },
+    },
     orderBy: { joinedAt: 'asc' as const },
   },
   messages: {
@@ -70,14 +78,10 @@ export class ChatService {
           name: conversation.name,
           updatedAt: latest?.createdAt ?? conversation.updatedAt,
           unreadCount,
-          participants: conversation.participants.map((p) => ({
-            id: p.id,
-            userId: p.userId,
-            username: p.user.username,
-            nickname: p.nickname,
-            role: p.role,
-            lastReadAt: p.lastReadAt,
-          })),
+          participants: await this.toParticipants(
+            conversation.participants,
+            userId,
+          ),
           lastMessage: latest ? this.toMessage(latest) : null,
         };
       }),
@@ -96,7 +100,7 @@ export class ChatService {
       where: { directKey },
       include: chatInclude,
     });
-    if (existing) return this.toConversation(existing);
+    if (existing) return this.toConversation(existing, userId);
     try {
       const created = await this.prisma.conversation.create({
         data: {
@@ -112,7 +116,7 @@ export class ChatService {
         },
         include: chatInclude,
       });
-      return this.toConversation(created);
+      return this.toConversation(created, userId);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -122,7 +126,7 @@ export class ChatService {
           where: { directKey },
           include: chatInclude,
         });
-        if (raced) return this.toConversation(raced);
+        if (raced) return this.toConversation(raced, userId);
       }
       throw error;
     }
@@ -163,7 +167,7 @@ export class ChatService {
       },
       include: chatInclude,
     });
-    return this.toConversation(conversation);
+    return this.toConversation(conversation, userId);
   }
 
   async messages(
@@ -364,7 +368,7 @@ export class ChatService {
       data: { name: normalizedName },
       include: chatInclude,
     });
-    return this.toConversation(updated);
+    return this.toConversation(updated, userId);
   }
 
   async addGroupMembers(
@@ -421,7 +425,7 @@ export class ChatService {
         where: { id: conversationId },
         include: chatInclude,
       })
-      .then((item) => this.toConversation(item));
+      .then((item) => this.toConversation(item, userId));
   }
 
   async removeGroupMember(
@@ -570,10 +574,30 @@ export class ChatService {
       );
   }
 
-  private toConversation(
+  private toParticipants(
+    participants: Prisma.ConversationGetPayload<{
+      include: typeof chatInclude;
+    }>['participants'],
+    viewerId: string,
+  ) {
+    return Promise.all(
+      participants.map(async (p) => ({
+        id: p.id,
+        userId: p.userId,
+        username: p.user.username,
+        avatarUrl: await visibleAvatarUrl(this.prisma, p.userId, viewerId),
+        nickname: p.nickname,
+        role: p.role,
+        lastReadAt: p.lastReadAt,
+      })),
+    );
+  }
+
+  private async toConversation(
     conversation: Prisma.ConversationGetPayload<{
       include: typeof chatInclude;
     }>,
+    viewerId: string,
   ) {
     return {
       id: conversation.id,
@@ -581,14 +605,10 @@ export class ChatService {
       name: conversation.name,
       updatedAt: conversation.messages[0]?.createdAt ?? conversation.updatedAt,
       unreadCount: 0,
-      participants: conversation.participants.map((p) => ({
-        id: p.id,
-        userId: p.userId,
-        username: p.user.username,
-        nickname: p.nickname,
-        role: p.role,
-        lastReadAt: p.lastReadAt,
-      })),
+      participants: await this.toParticipants(
+        conversation.participants,
+        viewerId,
+      ),
       lastMessage: conversation.messages[0]
         ? this.toMessage(conversation.messages[0])
         : null,

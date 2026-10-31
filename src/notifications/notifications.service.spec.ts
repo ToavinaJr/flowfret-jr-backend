@@ -3,7 +3,6 @@ import { NotificationsService } from './notifications.service';
 
 describe('NotificationsService', () => {
   const prisma = {
-    profile: { findFirst: jest.fn() },
     friendship: { findMany: jest.fn() },
     postLike: { findMany: jest.fn() },
     comment: { findMany: jest.fn() },
@@ -15,7 +14,6 @@ describe('NotificationsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    prisma.profile.findFirst.mockResolvedValue({ avatarUrl: 'avatar.jpg' });
     prisma.friendship.findMany.mockResolvedValue([]);
     prisma.postLike.findMany.mockResolvedValue([]);
     prisma.comment.findMany.mockResolvedValue([]);
@@ -26,7 +24,12 @@ describe('NotificationsService', () => {
   });
 
   it('notifies the recipient when a friend request is sent', async () => {
-    await service.friendRequested('actor-id', 'alice', 'recipient-id');
+    await service.friendRequested(
+      'actor-id',
+      'alice',
+      'recipient-id',
+      'friendship-id',
+    );
 
     expect(prisma.notification.createMany).toHaveBeenCalledWith({
       data: [
@@ -36,7 +39,7 @@ describe('NotificationsService', () => {
           payload: {
             actorId: 'actor-id',
             actorUsername: 'alice',
-            actorAvatarUrl: 'avatar.jpg',
+            friendshipId: 'friendship-id',
             action: 'FRIEND_REQUESTED',
           },
         },
@@ -49,7 +52,12 @@ describe('NotificationsService', () => {
       { userId: 'recipient-id' },
     ]);
 
-    await service.friendRequested('actor-id', 'alice', 'recipient-id');
+    await service.friendRequested(
+      'actor-id',
+      'alice',
+      'recipient-id',
+      'friendship-id',
+    );
 
     expect(prisma.notification.createMany).not.toHaveBeenCalled();
   });
@@ -66,7 +74,6 @@ describe('NotificationsService', () => {
           payload: {
             actorId: 'actor-id',
             actorUsername: 'alice',
-            actorAvatarUrl: 'avatar.jpg',
             postId: 'post-id',
             action: 'POST_LIKED',
           },

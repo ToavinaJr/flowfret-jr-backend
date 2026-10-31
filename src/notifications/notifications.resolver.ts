@@ -1,16 +1,57 @@
-import { Args, Context, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
+import {
+  Args,
+  Context,
+  Int,
+  Mutation,
+  Parent,
+  Query,
+  ResolveField,
+  Resolver,
+} from '@nestjs/graphql';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { NotificationType } from '@prisma/client';
 import { CONFIGURABLE_NOTIFICATION_TYPES } from '../common/domain.constants';
 import {
   NotificationModel,
   NotificationPreferenceModel,
+  UserModel,
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
 
 @Resolver(() => NotificationModel)
 export class NotificationsResolver {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly usersService: UsersService,
+  ) {}
+
+  @ResolveField(() => String, { nullable: true })
+  actorAvatarUrl(
+    @Parent() notification: NotificationModel,
+    @Context() context: { req: { user: { sub: string } } },
+  ): Promise<string | null> {
+    const payload = notification.payload;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+      return Promise.resolve(null);
+    const actorId = (payload as Record<string, unknown>).actorId;
+    if (typeof actorId !== 'string') return Promise.resolve(null);
+    return this.usersService.socialAvatarUrl(actorId, context.req.user.sub);
+  }
+
+  @ResolveField(() => UserModel, { nullable: true })
+  actor(
+    @Parent() notification: NotificationModel,
+  ): Promise<UserModel | null> {
+    const payload = notification.payload;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+      return Promise.resolve(null);
+    const actorId = (payload as Record<string, unknown>).actorId;
+    if (typeof actorId !== 'string') return Promise.resolve(null);
+    return this.prisma.user.findFirst({
+      where: { id: actorId, isDeleted: false, status: 'ACTIVE' },
+    });
+  }
 
   @Query(() => [NotificationModel], { name: 'myNotifications' })
   myNotifications(

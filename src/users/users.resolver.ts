@@ -77,6 +77,14 @@ export class UsersResolver {
     return this.usersService.profile(user, context.req.user.sub);
   }
 
+  @ResolveField(() => String, { name: 'avatarUrl', nullable: true })
+  avatarUrl(
+    @Parent() user: UserModel,
+    @Context() context: RequestContext,
+  ): Promise<string | null> {
+    return this.usersService.socialAvatarUrl(user.id, context.req.user.sub);
+  }
+
   @ResolveField(() => [PostModel], { name: 'authoredPosts' })
   authoredPosts(
     @Parent() user: UserModel,

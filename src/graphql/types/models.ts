@@ -31,6 +31,7 @@ export class UserModel {
   @HideField() googleId?: string | null;
   @Field(() => UserStatus) status!: UserStatus;
   @Field(() => UserRole) role!: UserRole;
+  @Field(() => String, { nullable: true }) avatarUrl?: string | null;
   @HideField()
   lastLoginAt!: Date | null;
   @Field(() => GraphQLISODateTime) createdAt!: Date;
@@ -138,8 +139,10 @@ export class NotificationModel {
   @Field() userId!: string;
   @Field(() => NotificationType) type!: NotificationType;
   @Field(() => GraphQLJSON) payload!: Prisma.JsonValue;
+  @Field(() => String, { nullable: true }) actorAvatarUrl?: string | null;
   @Field(() => GraphQLISODateTime, { nullable: true }) readAt!: Date | null;
   @Field(() => GraphQLISODateTime) createdAt!: Date;
+  @Field(() => UserModel, { nullable: true }) actor?: UserModel | null;
   @Field(() => UserModel) user?: UserModel;
 }
 

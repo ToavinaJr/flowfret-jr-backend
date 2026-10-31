@@ -11,6 +11,7 @@ export class ChatParticipant {
   @Field(() => ID) id!: string;
   @Field(() => ID) userId!: string;
   @Field() username!: string;
+  @Field(() => String, { nullable: true }) avatarUrl!: string | null;
   @Field(() => String, { nullable: true }) nickname!: string | null;
   @Field(() => ConversationParticipantRole) role!: ConversationParticipantRole;
   @Field(() => Date, { nullable: true }) lastReadAt!: Date | null;

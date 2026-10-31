@@ -103,6 +103,7 @@ export class FriendshipsCommandService {
       actor.sub,
       actor.username ?? '',
       receiverId,
+      friendship.id,
     );
     return friendship;
   }

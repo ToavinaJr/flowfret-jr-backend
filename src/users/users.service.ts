@@ -12,6 +12,7 @@ import {
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { toPostModel } from '../posts/post.mapper';
+import { visibleAvatarUrl } from './avatar-visibility';
 
 @Injectable()
 export class UsersService {
@@ -56,6 +57,10 @@ export class UsersService {
       return profile;
     if (profile.visibility === ProfileVisibility.PRIVATE) return null;
     return (await this.areFriends(user.id, viewerId)) ? profile : null;
+  }
+
+  socialAvatarUrl(userId: string, viewerId: string): Promise<string | null> {
+    return visibleAvatarUrl(this.prisma, userId, viewerId);
   }
 
   async authoredPosts(userId: string, viewerId: string): Promise<PostModel[]> {
