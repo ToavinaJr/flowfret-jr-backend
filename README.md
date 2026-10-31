@@ -254,6 +254,12 @@ POSTGRES_PASSWORD=compose-validation-only docker compose -f docker-compose.yml -
 
 The temporary `POSTGRES_PASSWORD` assignment only satisfies interpolation of the unused local `db` service in the base Compose file; it is not the hosted database password and must not be added to `.env`. `--no-deps` leaves the existing local database and Redis containers untouched. Verify that the VPS cookie file exists before starting the worker.
 
+When a release adds a Prisma migration (for example the private chat tables), apply it on the VPS with the real `.env` before using the feature. Do not prefix this command with `POSTGRES_PASSWORD`: the database password must come from `.env`. Without this step the API fails with Prisma `P2021` errors (`table ... does not exist`) and the frontend shows a generic error.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.vps.yml run --rm --no-deps backend npx prisma migrate deploy
+```
+
 The frontend receives the canonical `https://api.audius.co/v1/tracks/:id/stream` URL. It retries that endpoint when an Audius storage node is temporarily unreachable; signed storage-node URLs are never persisted or returned as the durable player URL.
 
 ### Admin GraphQL foundation
