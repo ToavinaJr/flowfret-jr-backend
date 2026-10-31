@@ -266,9 +266,12 @@ export class UploadsController {
     }
     try {
       const uploads = await this.prisma.$transaction(async (tx) => {
-        const records = await Promise.all(
-          uploaded.map((result, index) =>
-            tx.upload.create({
+        const records: Array<{ id: string; storagePath: string }> = [];
+        // Interactive transactions share one PostgreSQL connection. Keep
+        // each query awaited before issuing the next one on that connection.
+        for (const [index, result] of uploaded.entries()) {
+          records.push(
+            await tx.upload.create({
               data: {
                 userId: req.user.sub,
                 fileName: files[index].originalname,
@@ -281,8 +284,8 @@ export class UploadsController {
               },
               select: { id: true, storagePath: true },
             }),
-          ),
-        );
+          );
+        }
         await tx.auditLog.create({
           data: {
             actorId: req.user.sub,
