@@ -38,6 +38,10 @@ services:
         sync: false
       - key: YOUTUBE_COOKIES_FILE
         sync: false
+      - key: YOUTUBE_PROXY_URL
+        sync: false
+      - key: YOUTUBE_DL_VERBOSE
+        value: 'false'
       - key: LLM_PROVIDER
         value: whisper
       - key: HF_HOME

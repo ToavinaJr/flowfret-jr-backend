@@ -29,6 +29,7 @@ export class YouTubeAudioService implements OnModuleInit {
   onModuleInit(): void {
     try {
       const cookieFile = this.cookieFile();
+      const proxyUrl = this.proxyUrl();
       this.logger.log(
         JSON.stringify({
           event: 'youtube.extractor_config',
@@ -37,6 +38,8 @@ export class YouTubeAudioService implements OnModuleInit {
             resolve(process.cwd(), '.python-packages', 'yt_dlp'),
           ),
           cookiesConfigured: Boolean(cookieFile),
+          proxyConfigured: Boolean(proxyUrl),
+          verboseExtractor: this.verboseExtractor(),
           ...(cookieFile ? this.cookieDiagnostics(cookieFile) : {}),
         }),
       );
@@ -90,14 +93,15 @@ export class YouTubeAudioService implements OnModuleInit {
     const potProviderUrl = this.config
       .get<string>('YOUTUBE_POT_PROVIDER_URL')
       ?.trim();
+    const proxyUrl = this.proxyUrl();
+    const verboseExtractor = this.verboseExtractor();
     const child = spawn(
       python,
       [
         '-m',
         'yt_dlp',
         '--no-playlist',
-        '--quiet',
-        '--no-warnings',
+        ...(verboseExtractor ? ['--verbose'] : ['--quiet', '--no-warnings']),
         '--no-progress',
         '--js-runtimes',
         'node',
@@ -108,6 +112,7 @@ export class YouTubeAudioService implements OnModuleInit {
               `youtubepot-bgutilhttp:base_url=${potProviderUrl}`,
             ]
           : []),
+        ...(proxyUrl ? ['--proxy', proxyUrl] : []),
         '--format',
         'ba[ext=m4a]/ba[ext=webm]/ba/b',
         '--match-filter',
@@ -132,6 +137,8 @@ export class YouTubeAudioService implements OnModuleInit {
         videoId,
         cookiesConfigured: Boolean(cookieFile),
         potProviderConfigured: Boolean(potProviderUrl),
+        proxyConfigured: Boolean(proxyUrl),
+        verboseExtractor,
         activeExtractions: this.activeExtractions,
         maxBytes,
         maxDuration,
@@ -211,20 +218,21 @@ export class YouTubeAudioService implements OnModuleInit {
         output.end();
         return;
       }
-      const detail = this.safeExtractorDetail(stderr);
+      const category = this.extractorFailureCategory(stderr);
+      const detail = this.safeExtractorDetail(stderr, proxyUrl);
       this.logger.warn(
         JSON.stringify({
           event: 'youtube.audio_extraction_failed',
           diagnosticId,
           videoId,
           code,
-          category: this.extractorFailureCategory(stderr),
+          category,
+          proxyConfigured: Boolean(proxyUrl),
           durationMs: Date.now() - startedAt,
           bytes,
           detail,
         }),
       );
-      const category = this.extractorFailureCategory(stderr);
       output.destroy(
         Object.assign(
           new BadGatewayException(
@@ -257,6 +265,14 @@ export class YouTubeAudioService implements OnModuleInit {
       this.config.get<string>('WHISPER_PYTHON_BIN')?.trim() ||
       'python3'
     );
+  }
+
+  private proxyUrl(): string | undefined {
+    return this.config.get<string>('YOUTUBE_PROXY_URL')?.trim() || undefined;
+  }
+
+  private verboseExtractor(): boolean {
+    return this.config.get<string>('YOUTUBE_DL_VERBOSE')?.trim() === 'true';
   }
 
   /**
@@ -322,6 +338,12 @@ export class YouTubeAudioService implements OnModuleInit {
   }
 
   private extractorFailureCategory(stderr: string): string {
+    if (/http error 403|http 403|403 forbidden/i.test(stderr)) {
+      return 'youtube_http_403';
+    }
+    if (/http error 429|http 429|429 too many requests/i.test(stderr)) {
+      return 'youtube_rate_limited';
+    }
     if (
       /does not pass filter|duration.{0,30}(?:limit|long)|longer than/i.test(
         stderr,
@@ -352,9 +374,13 @@ export class YouTubeAudioService implements OnModuleInit {
     return 'unknown_extractor_failure';
   }
 
-  private safeExtractorDetail(stderr: string): string {
+  private safeExtractorDetail(
+    stderr: string,
+    proxyUrl?: string,
+  ): string {
     return stderr
-      .replace(/https?:\/\/\S+/gi, '[redacted-url]')
+      .replace(proxyUrl ?? /$^/, '[redacted-proxy]')
+      .replace(/(?:https?|socks[45a-z]*):\/\/\S+/gi, '[redacted-url]')
       .replace(/(cookie|authorization):\s*\S+/gi, '$1: [redacted]')
       .trim()
       .slice(-800);

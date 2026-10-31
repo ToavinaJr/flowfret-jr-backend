@@ -199,6 +199,16 @@ named `youtube-cookies.txt` containing authorized cookies in Netscape format,
 then configure `YOUTUBE_COOKIES_FILE=/etc/secrets/youtube-cookies.txt`. Never
 commit this file or print its contents in application logs.
 
+To compare extraction from a different egress IP, configure the optional
+`YOUTUBE_PROXY_URL` on the service that runs `YouTubeAudioService` (the API for
+chord analysis, and any transcription worker that extracts YouTube audio).
+Use a stable HTTP(S) or SOCKS proxy endpoint for the initial test; the setting
+is passed to yt-dlp as `--proxy`. Store proxy credentials in the deployment's
+secret store and never commit the URL. Set `YOUTUBE_DL_VERBOSE=true` temporarily
+to collect yt-dlp diagnostics; application logs redact URLs and the configured
+proxy value. Turn it off after the comparison. A proxy may change IP-related
+rejections, but does not guarantee that YouTube will allow extraction.
+
 `start:render` performs a narrowly scoped recovery for the corrected
 `20260923180000_transcription_provider` migration. This allows an existing
 Render/Neon database left in Prisma state `P3009` to recover without an

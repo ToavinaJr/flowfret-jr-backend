@@ -46,6 +46,13 @@ export function validateEnvironment(
   environment: Record<string, unknown>,
   options: { requireMail?: boolean; requireWeb?: boolean } = {},
 ): Record<string, unknown> {
+  validateOptionalUrl(
+    environment.YOUTUBE_PROXY_URL,
+    'YOUTUBE_PROXY_URL',
+    ['http:', 'https:', 'socks4:', 'socks4a:', 'socks5:', 'socks5h:'],
+  );
+  validateOptionalBoolean(environment.YOUTUBE_DL_VERBOSE, 'YOUTUBE_DL_VERBOSE');
+
   for (const key of POSITIVE_INTEGER_KEYS) {
     const raw = environment[key];
     if (raw === undefined || raw === '') continue;
@@ -98,6 +105,33 @@ export function validateEnvironment(
     }
   }
   return environment;
+}
+
+function validateOptionalUrl(
+  value: unknown,
+  key: string,
+  protocols: readonly string[],
+): void {
+  if (value === undefined || value === '') return;
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`${key} must be a valid URL`);
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${key} must be a valid URL`);
+  }
+  if (!protocols.includes(url.protocol) || !url.hostname || url.hash) {
+    throw new Error(`${key} must use a supported proxy URL protocol`);
+  }
+}
+
+function validateOptionalBoolean(value: unknown, key: string): void {
+  if (value === undefined || value === '') return;
+  if (typeof value !== 'string' || !['true', 'false'].includes(value)) {
+    throw new Error(`${key} must be true or false`);
+  }
 }
 
 function requireNonEmpty(value: unknown, key: string): void {
