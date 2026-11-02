@@ -44,7 +44,11 @@ const ALLOWED_TRANSCRIPTION_PROVIDERS = ['whisper', 'azure'] as const;
 
 export function validateEnvironment(
   environment: Record<string, unknown>,
-  options: { requireMail?: boolean; requireWeb?: boolean } = {},
+  options: {
+    requireMail?: boolean;
+    requireWeb?: boolean;
+    requireMediaStorage?: boolean;
+  } = {},
 ): Record<string, unknown> {
   validateOptionalUrl(
     environment.YOUTUBE_PROXY_URL,
@@ -65,11 +69,23 @@ export function validateEnvironment(
     throw new Error('REDIS_TLS must be true or false');
   if (typeof redisTls === 'string' && !['true', 'false'].includes(redisTls))
     throw new Error('REDIS_TLS must be true or false');
+  validateDatabaseUrl(environment.DATABASE_URL);
+  validateOptionalUrl(environment.REDIS_URL, 'REDIS_URL', ['redis:', 'rediss:']);
+  validateOptionalUrl(environment.REDIS_PRIVATE_URL, 'REDIS_PRIVATE_URL', ['redis:', 'rediss:']);
   validateEnum(
     environment.MUSIC_PROVIDER,
     'MUSIC_PROVIDER',
     ALLOWED_MUSIC_PROVIDERS,
   );
+  if (environment.LLM_PROVIDER === 'azure') {
+    requireNonEmpty(environment.AZURE_OPENAI_ENDPOINT, 'AZURE_OPENAI_ENDPOINT');
+    requireNonEmpty(environment.AZURE_OPENAI_API_KEY, 'AZURE_OPENAI_API_KEY');
+  }
+  if (options.requireMediaStorage) {
+    for (const key of ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET']) {
+      requireNonEmpty(environment[key], key);
+    }
+  }
   validateEnum(
     environment.LLM_PROVIDER,
     'LLM_PROVIDER',
@@ -105,6 +121,19 @@ export function validateEnvironment(
     }
   }
   return environment;
+}
+
+function validateDatabaseUrl(value: unknown): void {
+  if (value === undefined || value === '') return;
+  if (typeof value !== 'string') throw new Error('DATABASE_URL must be a valid PostgreSQL URL');
+  try {
+    const url = new URL(value);
+    if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname || !url.pathname || url.hash) {
+      throw new Error();
+    }
+  } catch {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL URL');
+  }
 }
 
 function validateOptionalUrl(

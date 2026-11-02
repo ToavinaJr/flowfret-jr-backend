@@ -22,6 +22,7 @@ import { StemsProcessor } from './stems.processor';
         validateEnvironment(environment, {
           requireMail: false,
           requireWeb: false,
+          requireMediaStorage: true,
         }),
       envFilePath: [
         `.env.${process.env.NODE_ENV ?? 'development'}.local`,
