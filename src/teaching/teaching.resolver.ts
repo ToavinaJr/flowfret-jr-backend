@@ -12,22 +12,20 @@ import {
   TeachingLessonStatus,
   TeachingMode,
   TeachingPriceUnit,
-  UserRole,
   UserStatus,
   Prisma,
 } from '@prisma/client';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
-import { Roles } from '../auth/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateTeachingCourseInput,
-  InstructorProfileModel,
   TeachingCourseModel,
   TeachingEnrollmentModel,
   UpdateTeachingCourseInput,
   UpdateTeachingEnrollmentInput,
-  UpsertInstructorProfileInput,
 } from './teaching.types';
+import { TeachingAccessPolicy } from './teaching-access.policy';
+import { normalizeOptionalText } from './teaching.utils';
 
 type TeachingContext = { req: { user: { sub: string; role?: string } } };
 const activeEnrollmentStatuses: TeachingEnrollmentStatus[] = [
@@ -38,167 +36,10 @@ const activeEnrollmentStatuses: TeachingEnrollmentStatus[] = [
 
 @Resolver()
 export class TeachingResolver {
-  constructor(private readonly prisma: PrismaService) {}
-
-  @Query(() => InstructorProfileModel, {
-    name: 'myInstructorProfile',
-    nullable: true,
-  })
-  myInstructorProfile(@Context() context: TeachingContext) {
-    return this.prisma.instructorProfile
-      .findFirst({
-        where: { userId: context.req.user.sub, isDeleted: false },
-      })
-      .then((profile) =>
-        profile
-          ? {
-              ...profile,
-              storageQuotaBytes: profile.storageQuotaBytes.toString(),
-            }
-          : null,
-      );
-  }
-
-  @Roles(UserRole.ADMIN)
-  @Query(() => [InstructorProfileModel], { name: 'adminInstructorProfiles' })
-  adminInstructorProfiles(
-    @Args('status', { type: () => InstructorStatus, nullable: true })
-    status?: InstructorStatus,
-  ) {
-    return this.prisma.instructorProfile
-      .findMany({
-        where: { isDeleted: false, ...(status ? { status } : {}) },
-        orderBy: { createdAt: 'asc' },
-        take: 200,
-      })
-      .then((profiles) =>
-        profiles.map((profile) => ({
-          ...profile,
-          storageQuotaBytes: profile.storageQuotaBytes.toString(),
-        })),
-      );
-  }
-
-  @Roles(UserRole.ADMIN)
-  @Mutation(() => InstructorProfileModel)
-  async setInstructorStorageQuota(
-    @Args('id') id: string,
-    @Args('storageQuotaBytes') value: string,
-    @Context() context: TeachingContext,
-  ) {
-    if (!/^\d+$/.test(value)) throw new BadRequestException('Quota invalide.');
-    const quota = BigInt(value);
-    if (quota < 50n * 1024n * 1024n || quota > 1024n * 1024n * 1024n * 1024n)
-      throw new BadRequestException(
-        'Le quota doit être compris entre 50 Mio et 1 Tio.',
-      );
-    const profile = await this.prisma.instructorProfile.findFirst({
-      where: { id, isDeleted: false },
-    });
-    if (!profile) throw new NotFoundException('Profil enseignant introuvable.');
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.instructorProfile.update({
-        where: { id },
-        data: { storageQuotaBytes: quota },
-      });
-      await tx.auditLog.create({
-        data: {
-          actorId: context.req.user.sub,
-          action: 'TEACHER_STORAGE_QUOTA_UPDATED',
-          entityType: 'instructor_profile',
-          entityId: id,
-          metadata: { storageQuotaBytes: value },
-        },
-      });
-      return row;
-    });
-    return {
-      ...updated,
-      storageQuotaBytes: updated.storageQuotaBytes.toString(),
-    };
-  }
-
-  @Roles(UserRole.ADMIN)
-  @Mutation(() => InstructorProfileModel)
-  async reviewInstructorProfile(
-    @Args('id') id: string,
-    @Args('status', { type: () => InstructorStatus }) status: InstructorStatus,
-    @Context() context: TeachingContext,
-  ) {
-    const reviewableStatuses: InstructorStatus[] = [
-      InstructorStatus.APPROVED,
-      InstructorStatus.REJECTED,
-      InstructorStatus.SUSPENDED,
-    ];
-    if (!reviewableStatuses.includes(status))
-      throw new BadRequestException('Statut de validation invalide.');
-    const profile = await this.prisma.instructorProfile.findFirst({
-      where: { id, isDeleted: false },
-    });
-    if (!profile) throw new NotFoundException('Profil enseignant introuvable.');
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.instructorProfile.update({
-        where: { id },
-        data: { status },
-      });
-      await tx.auditLog.create({
-        data: {
-          actorId: context.req.user.sub,
-          action: AUDIT_ACTION.TEACHER_PROFILE_UPSERTED,
-          entityType: AUDIT_ENTITY.INSTRUCTOR_PROFILE,
-          entityId: id,
-          metadata: { status, reviewed: true },
-        },
-      });
-      return updated;
-    });
-    return {
-      ...updated,
-      storageQuotaBytes: updated.storageQuotaBytes.toString(),
-    };
-  }
-
-  @Mutation(() => InstructorProfileModel)
-  async upsertInstructorProfile(
-    @Args('data') data: UpsertInstructorProfileInput,
-    @Context() context: TeachingContext,
-  ) {
-    await this.assertActiveUser(context.req.user.sub);
-    const clean = {
-      headline: normalizeOptionalText(data.headline),
-      biography: normalizeOptionalText(data.biography),
-      experienceYears: data.experienceYears,
-      specialties: normalizeList(data.specialties),
-      languages: normalizeList(data.languages),
-    };
-    const profile = await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.instructorProfile.findUnique({
-        where: { userId: context.req.user.sub },
-      });
-      const result = existing
-        ? await tx.instructorProfile.update({
-            where: { id: existing.id },
-            data: { ...clean, isDeleted: false, deletedAt: null },
-          })
-        : await tx.instructorProfile.create({
-            data: { userId: context.req.user.sub, ...clean },
-          });
-      await tx.auditLog.create({
-        data: {
-          actorId: context.req.user.sub,
-          action: AUDIT_ACTION.TEACHER_PROFILE_UPSERTED,
-          entityType: AUDIT_ENTITY.INSTRUCTOR_PROFILE,
-          entityId: result.id,
-          metadata: { status: result.status },
-        },
-      });
-      return result;
-    });
-    return {
-      ...profile,
-      storageQuotaBytes: profile.storageQuotaBytes.toString(),
-    };
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly accessPolicy: TeachingAccessPolicy,
+  ) {}
 
   @Query(() => [TeachingCourseModel], { name: 'publishedTeachingCourses' })
   publishedTeachingCourses(
@@ -476,7 +317,7 @@ export class TeachingResolver {
     @Context() context: TeachingContext,
   ) {
     const studentId = context.req.user.sub;
-    const student = await this.assertActiveUser(studentId);
+    const student = await this.accessPolicy.assertActiveUser(studentId);
     const course = await this.prisma.teachingCourse.findFirst({
       where: {
         id: courseId,
@@ -563,7 +404,7 @@ export class TeachingResolver {
       courseId,
       context.req.user.sub,
     );
-    await this.assertActiveUser(studentId);
+    await this.accessPolicy.assertActiveUser(studentId);
     if (studentId === context.req.user.sub)
       throw new BadRequestException(
         'Vous ne pouvez pas vous inviter vous-même.',
@@ -806,16 +647,6 @@ export class TeachingResolver {
     return updated;
   }
 
-  private async assertActiveUser(userId: string) {
-    const user = await this.prisma.user.findFirst({
-      where: { id: userId, status: UserStatus.ACTIVE, isDeleted: false },
-      select: { id: true, username: true },
-    });
-    if (!user)
-      throw new ForbiddenException('Un compte FlowFret actif est requis.');
-    return user;
-  }
-
   private async requireInstructor(userId: string) {
     const profile = await this.prisma.instructorProfile.findFirst({
       where: { userId, isDeleted: false },
@@ -913,19 +744,6 @@ export class TeachingResolver {
       data: { userId, type: notificationType, payload },
     });
   }
-}
-
-function normalizeOptionalText(
-  value: string | null | undefined,
-): string | null | undefined {
-  if (value === undefined || value === null) return value;
-  const result = value.trim();
-  return result.length ? result : null;
-}
-
-function normalizeList(values: string[] | undefined): string[] | undefined {
-  if (!values) return values;
-  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
 function validateCourseShape(data: {

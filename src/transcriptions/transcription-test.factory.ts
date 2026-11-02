@@ -96,6 +96,7 @@ export function createTranscriptionFixture(
     access,
     diagnostics,
     capacity,
+    queueService,
     repository,
     queue,
     events,

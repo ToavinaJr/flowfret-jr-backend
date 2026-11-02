@@ -92,6 +92,9 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication<NestExpressApplication>();
+    // Expected HTTP failures (for example oversized request bodies) are asserted
+    // by the e2e tests; keep Nest's exception logger from printing them as errors.
+    app.useLogger(false);
     app.useBodyParser('json', { limit: '64kb' });
     await app.init();
     prisma = app.get(PrismaService);

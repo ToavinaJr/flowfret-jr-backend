@@ -68,53 +68,19 @@ export class TranscriptionQueueService {
       );
       return jobId;
     }
-    try {
-      await this.operation(
-        'add',
-        this.queue.add(
-          TRANSCRIPTION_JOB,
-          {
-            transcriptionId: item.id,
-            trackId: dto.trackId,
-            provider: dto.provider ?? MusicProvider.AUDIUS,
-            audioUrl: dto.audioUrl,
-            language: dto.language,
-            model: dto.model,
-          },
-          {
-            jobId,
-            attempts: this.attemptsConfig(),
-            backoff: { type: 'exponential', delay: 5_000 },
-            removeOnComplete: { age: 3600, count: 100 },
-            removeOnFail: { age: 86_400, count: 500 },
-          },
-        ),
-      );
-      this.logger.log(
-        JSON.stringify({
-          event: 'transcription.enqueued',
-          transcriptionId: item.id,
-          trackId: dto.trackId,
-          jobId,
-          queueState: 'waiting',
-          transcriptionStatus: item.status,
-        }),
-      );
-      return jobId;
-    } catch (error) {
-      this.logger.error(
-        JSON.stringify({
-          event: 'transcription.enqueue_failed',
-          transcriptionId: item.id,
-          trackId: dto.trackId,
-          error: error instanceof Error ? error.message : String(error),
-        }),
-      );
-      throw new ServiceUnavailableException({
-        code: TRANSCRIPTION_ERROR_CODE.REDIS_UNAVAILABLE,
-        message: 'Transcription queue is unavailable',
-      });
-    }
+    await this.addJob(
+      jobId,
+      {
+        transcriptionId: item.id,
+        trackId: dto.trackId,
+        provider: dto.provider ?? MusicProvider.AUDIUS,
+        audioUrl: dto.audioUrl,
+        language: dto.language,
+        model: dto.model,
+      },
+      item,
+    );
+    return jobId;
   }
 
   async jobCounts(
@@ -138,8 +104,8 @@ export class TranscriptionQueueService {
       item.provider,
     );
     const jobId = `${baseId}-retry-${item.manualRetryCount + 1}`;
-    await this.queue.add(
-      TRANSCRIPTION_JOB,
+    await this.addJob(
+      jobId,
       {
         transcriptionId: item.id,
         trackId: item.trackId,
@@ -148,15 +114,52 @@ export class TranscriptionQueueService {
         language,
         model: item.model,
       },
-      {
-        jobId,
-        attempts: this.attemptsConfig(),
-        backoff: { type: 'exponential', delay: 5_000 },
-        removeOnComplete: { age: 3600, count: 100 },
-        removeOnFail: { age: 86_400, count: 500 },
-      },
+      item,
     );
     return jobId;
+  }
+
+  private async addJob(
+    jobId: string,
+    data: TranscriptionJobData,
+    item: Transcription,
+  ): Promise<void> {
+    try {
+      await this.operation(
+        'add',
+        this.queue.add(TRANSCRIPTION_JOB, data, {
+          jobId,
+          attempts: this.attemptsConfig(),
+          backoff: { type: 'exponential', delay: 5_000 },
+          removeOnComplete: { age: 3600, count: 100 },
+          removeOnFail: { age: 86_400, count: 500 },
+        }),
+      );
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: 'transcription.enqueue_failed',
+          transcriptionId: item.id,
+          trackId: item.trackId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      if (error instanceof ServiceUnavailableException) throw error;
+      throw new ServiceUnavailableException({
+        code: TRANSCRIPTION_ERROR_CODE.REDIS_UNAVAILABLE,
+        message: 'Transcription queue is unavailable',
+      });
+    }
+    this.logger.log(
+      JSON.stringify({
+        event: 'transcription.enqueued',
+        transcriptionId: item.id,
+        trackId: item.trackId,
+        jobId,
+        queueState: 'waiting',
+        transcriptionStatus: item.status,
+      }),
+    );
   }
 
   async removeJobsForTranscriptions(
