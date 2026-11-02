@@ -1,6 +1,6 @@
-export function isDebugEnabled(): boolean {
+export function isDebugEnabled(value: string | undefined): boolean {
   return ['1', 'true', 'yes', 'on'].includes(
-    (process.env.DEBUG ?? '').trim().toLowerCase(),
+    (value ?? '').trim().toLowerCase(),
   );
 }
 

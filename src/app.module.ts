@@ -24,18 +24,14 @@ import { ChordTranscriptionsModule } from './chord-transcriptions/chord-transcri
 import { AdminModule } from './admin/admin.module';
 import { TeachingModule } from './teaching/teaching.module';
 import { ChatModule } from './chat/chat.module';
+import { getEnvironmentFilePaths } from './common/environment';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnvironment,
-      envFilePath: [
-        `.env.${process.env.NODE_ENV ?? 'development'}.local`,
-        `.env.${process.env.NODE_ENV ?? 'development'}`,
-        '.env.local',
-        '.env',
-      ],
+      envFilePath: getEnvironmentFilePaths(),
     }),
     PrismaModule,
     AuthModule,
@@ -81,7 +77,12 @@ import { ChatModule } from './chat/chat.module';
           res,
           loaders: new RequestLoaders(prisma),
         }),
-        formatError: formatGraphQLError,
+        formatError: (formattedError, error) =>
+          formatGraphQLError(
+            formattedError,
+            error,
+            config.get<string>('DEBUG'),
+          ),
       }),
     }),
   ],

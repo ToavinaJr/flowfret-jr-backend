@@ -50,11 +50,14 @@ export function validateEnvironment(
     requireMediaStorage?: boolean;
   } = {},
 ): Record<string, unknown> {
-  validateOptionalUrl(
-    environment.YOUTUBE_PROXY_URL,
-    'YOUTUBE_PROXY_URL',
-    ['http:', 'https:', 'socks4:', 'socks4a:', 'socks5:', 'socks5h:'],
-  );
+  validateOptionalUrl(environment.YOUTUBE_PROXY_URL, 'YOUTUBE_PROXY_URL', [
+    'http:',
+    'https:',
+    'socks4:',
+    'socks4a:',
+    'socks5:',
+    'socks5h:',
+  ]);
   validateOptionalBoolean(environment.YOUTUBE_DL_VERBOSE, 'YOUTUBE_DL_VERBOSE');
 
   for (const key of POSITIVE_INTEGER_KEYS) {
@@ -70,27 +73,52 @@ export function validateEnvironment(
   if (typeof redisTls === 'string' && !['true', 'false'].includes(redisTls))
     throw new Error('REDIS_TLS must be true or false');
   validateDatabaseUrl(environment.DATABASE_URL);
-  validateOptionalUrl(environment.REDIS_URL, 'REDIS_URL', ['redis:', 'rediss:']);
-  validateOptionalUrl(environment.REDIS_PRIVATE_URL, 'REDIS_PRIVATE_URL', ['redis:', 'rediss:']);
+  validateOptionalUrl(environment.REDIS_URL, 'REDIS_URL', [
+    'redis:',
+    'rediss:',
+  ]);
+  validateOptionalUrl(environment.REDIS_PRIVATE_URL, 'REDIS_PRIVATE_URL', [
+    'redis:',
+    'rediss:',
+  ]);
+  validateOptionalBoolean(environment.DEBUG, 'DEBUG', [
+    'true',
+    'false',
+    '1',
+    '0',
+    'yes',
+    'no',
+    'on',
+    'off',
+  ]);
   validateEnum(
     environment.MUSIC_PROVIDER,
     'MUSIC_PROVIDER',
     ALLOWED_MUSIC_PROVIDERS,
   );
-  if (environment.LLM_PROVIDER === 'azure') {
-    requireNonEmpty(environment.AZURE_OPENAI_ENDPOINT, 'AZURE_OPENAI_ENDPOINT');
-    requireNonEmpty(environment.AZURE_OPENAI_API_KEY, 'AZURE_OPENAI_API_KEY');
-  }
-  if (options.requireMediaStorage) {
-    for (const key of ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET']) {
-      requireNonEmpty(environment[key], key);
-    }
-  }
   validateEnum(
     environment.LLM_PROVIDER,
     'LLM_PROVIDER',
     ALLOWED_TRANSCRIPTION_PROVIDERS,
   );
+  if (environment.LLM_PROVIDER === 'azure') {
+    requireNonEmpty(environment.AZURE_OPENAI_ENDPOINT, 'AZURE_OPENAI_ENDPOINT');
+    requireNonEmpty(environment.AZURE_OPENAI_API_KEY, 'AZURE_OPENAI_API_KEY');
+    validateOptionalUrl(
+      environment.AZURE_OPENAI_ENDPOINT,
+      'AZURE_OPENAI_ENDPOINT',
+      ['https:'],
+    );
+  }
+  if (options.requireMediaStorage) {
+    for (const key of [
+      'CLOUDINARY_CLOUD_NAME',
+      'CLOUDINARY_API_KEY',
+      'CLOUDINARY_API_SECRET',
+    ]) {
+      requireNonEmpty(environment[key], key);
+    }
+  }
   if (environment.NODE_ENV === 'production' && options.requireWeb !== false) {
     const jwtSecret = environment.JWT_SECRET;
     if (typeof jwtSecret !== 'string' || jwtSecret.trim().length < 32) {
@@ -125,10 +153,16 @@ export function validateEnvironment(
 
 function validateDatabaseUrl(value: unknown): void {
   if (value === undefined || value === '') return;
-  if (typeof value !== 'string') throw new Error('DATABASE_URL must be a valid PostgreSQL URL');
+  if (typeof value !== 'string')
+    throw new Error('DATABASE_URL must be a valid PostgreSQL URL');
   try {
     const url = new URL(value);
-    if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname || !url.pathname || url.hash) {
+    if (
+      !['postgres:', 'postgresql:'].includes(url.protocol) ||
+      !url.hostname ||
+      !url.pathname ||
+      url.hash
+    ) {
       throw new Error();
     }
   } catch {
@@ -156,10 +190,14 @@ function validateOptionalUrl(
   }
 }
 
-function validateOptionalBoolean(value: unknown, key: string): void {
+function validateOptionalBoolean(
+  value: unknown,
+  key: string,
+  allowed: readonly string[] = ['true', 'false'],
+): void {
   if (value === undefined || value === '') return;
-  if (typeof value !== 'string' || !['true', 'false'].includes(value)) {
-    throw new Error(`${key} must be true or false`);
+  if (typeof value !== 'string' || !allowed.includes(value.toLowerCase())) {
+    throw new Error(`${key} must be a valid boolean value`);
   }
 }
 

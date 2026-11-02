@@ -100,6 +100,7 @@ function isExpectedAnonymousRefreshFailure(
 export function formatGraphQLError(
   formattedError: GraphQLFormattedError,
   error: unknown,
+  debug?: string,
 ): GraphQLFormattedError {
   const original = getOriginalException(error);
 
@@ -113,7 +114,10 @@ export function formatGraphQLError(
     };
   }
 
-  if (isDebugEnabled() && !isExpectedAnonymousRefreshFailure(formattedError, original)) {
+  if (
+    isDebugEnabled(debug) &&
+    !isExpectedAnonymousRefreshFailure(formattedError, original)
+  ) {
     const event = JSON.stringify({
       event: 'graphql.request_failed',
       message: formattedError.message,

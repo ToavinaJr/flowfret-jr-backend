@@ -1,18 +1,20 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { StemsWorkerModule } from './stems/stems-worker.module';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('StemsWorkerBootstrap');
+  const app = await NestFactory.createApplicationContext(StemsWorkerModule);
+  const config = app.get(ConfigService);
   logger.log(
     JSON.stringify({
       event: 'stems_worker.starting',
-      nodeEnv: process.env.NODE_ENV,
-      databaseConfigured: Boolean(process.env.DATABASE_URL),
-      model: process.env.DEMUCS_MODEL ?? 'htdemucs',
+      nodeEnv: config.get<string>('NODE_ENV'),
+      databaseConfigured: Boolean(config.get<string>('DATABASE_URL')),
+      model: config.get<string>('DEMUCS_MODEL') ?? 'htdemucs',
     }),
   );
-  const app = await NestFactory.createApplicationContext(StemsWorkerModule);
   app.enableShutdownHooks();
   logger.log(JSON.stringify({ event: 'stems_worker.ready' }));
 }

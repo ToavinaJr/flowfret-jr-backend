@@ -9,10 +9,11 @@ import { StemsRepository } from './stems.repository';
 import { StemsAudioSourceService } from './stems-audio-source.service';
 import { StemsBridgeService } from './stems-bridge.service';
 import { CloudinaryService } from '../uploads/cloudinary.service';
+import { getEnvironmentPositiveInteger } from '../common/environment';
 
 @Injectable()
 @Processor(AUDIO_STEMS_QUEUE, {
-  concurrency: Number(process.env.AUDIO_STEMS_CONCURRENCY ?? 1),
+  concurrency: getEnvironmentPositiveInteger('AUDIO_STEMS_CONCURRENCY', 1),
 })
 export class StemsProcessor extends WorkerHost {
   private readonly logger = new Logger(StemsProcessor.name);

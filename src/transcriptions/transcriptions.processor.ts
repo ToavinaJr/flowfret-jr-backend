@@ -17,10 +17,11 @@ import {
 } from './transcriptions.constants';
 import { WhisperBridgeService } from './whisper-bridge.service';
 import { TranscriptionAudioSourceService } from './transcription-audio-source.service';
+import { getEnvironmentPositiveInteger } from '../common/environment';
 
 @Injectable()
 @Processor(TRANSCRIPTION_QUEUE, {
-  concurrency: Number(process.env.TRANSCRIPTION_CONCURRENCY ?? 1),
+  concurrency: getEnvironmentPositiveInteger('TRANSCRIPTION_CONCURRENCY', 1),
 })
 export class TranscriptionsProcessor extends WorkerHost {
   private readonly logger = new Logger(TranscriptionsProcessor.name);

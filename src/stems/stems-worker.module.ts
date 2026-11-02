@@ -13,6 +13,7 @@ import { StemsAudioSourceService } from './stems-audio-source.service';
 import { StemsBridgeService } from './stems-bridge.service';
 import { StemsWorkerConfigService } from './stems-worker-config.service';
 import { StemsProcessor } from './stems.processor';
+import { getEnvironmentFilePaths } from '../common/environment';
 
 @Module({
   imports: [
@@ -24,12 +25,7 @@ import { StemsProcessor } from './stems.processor';
           requireWeb: false,
           requireMediaStorage: true,
         }),
-      envFilePath: [
-        `.env.${process.env.NODE_ENV ?? 'development'}.local`,
-        `.env.${process.env.NODE_ENV ?? 'development'}`,
-        '.env.local',
-        '.env',
-      ],
+      envFilePath: getEnvironmentFilePaths(),
     }),
     PrismaModule,
     AudiusModule,

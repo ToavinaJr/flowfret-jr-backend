@@ -14,6 +14,7 @@ import { validateEnvironment } from '../common/validate-environment';
 import { getRedisOptions } from '../common/redis-config';
 import { TranscriptionMessageHandler } from './transcription-message-handler.service';
 import { WhisperWorkerConfigService } from './whisper-worker-config.service';
+import { getEnvironmentFilePaths } from '../common/environment';
 
 @Module({
   imports: [
@@ -24,12 +25,7 @@ import { WhisperWorkerConfigService } from './whisper-worker-config.service';
           requireMail: false,
           requireWeb: false,
         }),
-      envFilePath: [
-        `.env.${process.env.NODE_ENV ?? 'development'}.local`,
-        `.env.${process.env.NODE_ENV ?? 'development'}`,
-        '.env.local',
-        '.env',
-      ],
+      envFilePath: getEnvironmentFilePaths(),
     }),
     PrismaModule,
     AudiusModule,

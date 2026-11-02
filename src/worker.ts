@@ -1,25 +1,28 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { TranscriptionsWorkerModule } from './transcriptions/transcriptions-worker.module';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('TranscriptionWorkerBootstrap');
+  const app = await NestFactory.createApplicationContext(
+    TranscriptionsWorkerModule,
+  );
+  const config = app.get(ConfigService);
   logger.log(
     JSON.stringify({
       event: 'worker.starting',
-      nodeEnv: process.env.NODE_ENV,
-      redisHostConfigured: Boolean(process.env.REDIS_HOST),
-      redisUrlConfigured: Boolean(
-        process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL,
+      nodeEnv: config.get<string>('NODE_ENV'),
+      redisConfigured: Boolean(
+        config.get<string>('REDIS_HOST') ||
+        config.get<string>('REDIS_URL') ||
+        config.get<string>('REDIS_PRIVATE_URL'),
       ),
-      databaseConfigured: Boolean(process.env.DATABASE_URL),
-      audiusConfigured: Boolean(process.env.AUDIUS_ACCESS_TOKEN),
-      transcriptionProvider: process.env.LLM_PROVIDER ?? 'whisper',
-      model: process.env.WHISPER_MODEL ?? 'small',
+      databaseConfigured: Boolean(config.get<string>('DATABASE_URL')),
+      audiusConfigured: Boolean(config.get<string>('AUDIUS_ACCESS_TOKEN')),
+      transcriptionProvider: config.get<string>('LLM_PROVIDER') ?? 'whisper',
+      model: config.get<string>('WHISPER_MODEL') ?? 'small',
     }),
-  );
-  const app = await NestFactory.createApplicationContext(
-    TranscriptionsWorkerModule,
   );
   app.enableShutdownHooks();
   logger.log(JSON.stringify({ event: 'worker.ready' }));
