@@ -36,7 +36,10 @@ function context() {
     getClass: jest.fn().mockReturnValue({ name: 'TestResolver' }),
     getType: jest.fn().mockReturnValue('http'),
     switchToHttp: () => ({
-      getRequest: () => ({ ip: '127.0.0.1', user: { sub: 'user-id', role: UserRole.USER } }),
+      getRequest: () => ({
+        ip: '127.0.0.1',
+        user: { sub: 'user-id', role: UserRole.USER },
+      }),
     }),
   } as unknown as ExecutionContext;
 }
@@ -63,9 +66,9 @@ describe('RateLimitGuard', () => {
       .mockRejectedValue(new Error('redis unavailable'));
     const guard = createGuard(redisEval);
 
-    const error = await guard.canActivate(context()).catch(
-      (cause: unknown) => cause,
-    );
+    const error = await guard
+      .canActivate(context())
+      .catch((cause: unknown) => cause);
 
     expect(error).toBeInstanceOf(HttpException);
     expect((error as HttpException).getStatus()).toBe(503);

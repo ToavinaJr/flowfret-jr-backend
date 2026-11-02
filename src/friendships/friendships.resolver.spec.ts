@@ -66,6 +66,7 @@ describe('FriendshipsResolver notifications', () => {
       'actor-id',
       'alice',
       'recipient-id',
+      'friendship-id',
     );
   });
 

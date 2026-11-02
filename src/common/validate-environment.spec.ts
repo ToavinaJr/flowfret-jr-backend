@@ -101,4 +101,42 @@ describe('validateEnvironment', () => {
       'PORT must be a positive integer',
     );
   });
+
+  it('rejects malformed database and Redis connection URLs', () => {
+    expect(() =>
+      validateEnvironment({ DATABASE_URL: 'https://db.example' }),
+    ).toThrow('DATABASE_URL must be a valid PostgreSQL URL');
+    expect(() =>
+      validateEnvironment({ REDIS_URL: 'https://redis.example' }),
+    ).toThrow('REDIS_URL must use a supported proxy URL protocol');
+  });
+
+  it('requires valid Azure credentials only when Azure is selected', () => {
+    expect(() => validateEnvironment({ LLM_PROVIDER: 'azure' })).toThrow(
+      'AZURE_OPENAI_ENDPOINT must be configured when LLM_PROVIDER=azure is enabled',
+    );
+    expect(() =>
+      validateEnvironment({
+        LLM_PROVIDER: 'azure',
+        AZURE_OPENAI_ENDPOINT: 'https://example.openai.azure.com',
+        AZURE_OPENAI_API_KEY: 'test-key',
+      }),
+    ).not.toThrow();
+  });
+
+  it('requires Cloudinary credentials for the stems worker only', () => {
+    expect(() =>
+      validateEnvironment({}, { requireMediaStorage: true }),
+    ).toThrow(
+      'CLOUDINARY_CLOUD_NAME must be configured when the stems worker is enabled',
+    );
+    expect(() => validateEnvironment({})).not.toThrow();
+  });
+
+  it('validates the debug boolean without exposing its value', () => {
+    expect(() => validateEnvironment({ DEBUG: 'perhaps' })).toThrow(
+      'DEBUG must be a valid boolean value',
+    );
+    expect(() => validateEnvironment({ DEBUG: 'TRUE' })).not.toThrow();
+  });
 });

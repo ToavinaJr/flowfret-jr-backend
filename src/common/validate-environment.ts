@@ -102,8 +102,16 @@ export function validateEnvironment(
     ALLOWED_TRANSCRIPTION_PROVIDERS,
   );
   if (environment.LLM_PROVIDER === 'azure') {
-    requireNonEmpty(environment.AZURE_OPENAI_ENDPOINT, 'AZURE_OPENAI_ENDPOINT');
-    requireNonEmpty(environment.AZURE_OPENAI_API_KEY, 'AZURE_OPENAI_API_KEY');
+    requireFeatureConfig(
+      environment.AZURE_OPENAI_ENDPOINT,
+      'AZURE_OPENAI_ENDPOINT',
+      'LLM_PROVIDER=azure',
+    );
+    requireFeatureConfig(
+      environment.AZURE_OPENAI_API_KEY,
+      'AZURE_OPENAI_API_KEY',
+      'LLM_PROVIDER=azure',
+    );
     validateOptionalUrl(
       environment.AZURE_OPENAI_ENDPOINT,
       'AZURE_OPENAI_ENDPOINT',
@@ -116,7 +124,7 @@ export function validateEnvironment(
       'CLOUDINARY_API_KEY',
       'CLOUDINARY_API_SECRET',
     ]) {
-      requireNonEmpty(environment[key], key);
+      requireFeatureConfig(environment[key], key, 'the stems worker');
     }
   }
   if (environment.NODE_ENV === 'production' && options.requireWeb !== false) {
@@ -204,6 +212,16 @@ function validateOptionalBoolean(
 function requireNonEmpty(value: unknown, key: string): void {
   if (typeof value !== 'string' || !value.trim()) {
     throw new Error(`${key} must be configured in production`);
+  }
+}
+
+function requireFeatureConfig(
+  value: unknown,
+  key: string,
+  feature: string,
+): void {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`${key} must be configured when ${feature} is enabled`);
   }
 }
 

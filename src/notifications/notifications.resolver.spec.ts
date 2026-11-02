@@ -26,10 +26,9 @@ describe('NotificationsResolver', () => {
     );
 
     await expect(
-      resolver.actorAvatarUrl(
-        { payload: { senderId: 'actor-id' } } as never,
-        { req: { user: { sub: 'viewer-id' } } },
-      ),
+      resolver.actorAvatarUrl({ payload: { senderId: 'actor-id' } } as never, {
+        req: { user: { sub: 'viewer-id' } },
+      }),
     ).resolves.toBe('avatar.png');
     expect(socialAvatarUrl).toHaveBeenCalledWith('actor-id', 'viewer-id');
   });
@@ -63,10 +62,7 @@ describe('NotificationsResolver', () => {
       {} as UsersService,
     );
 
-    await resolver.myNotifications(
-      { req: { user: { sub: 'user-id' } } },
-      25,
-    );
+    await resolver.myNotifications({ req: { user: { sub: 'user-id' } } }, 25);
 
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({

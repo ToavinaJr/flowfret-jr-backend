@@ -12,6 +12,10 @@ import type { LyricsProvider } from '../interfaces/lyrics-provider.interface';
 import type { Lyrics, TrackMetadata } from '../interfaces/lyrics.interface';
 
 const TONONKIRA_BASE_URL = 'https://tononkira.serasera.org';
+const TONONKIRA_SOURCE =
+  /(?:\s*(?:nalaina\s+tao\s+amin['’]ny|from|via|source:?\s*)\s*)?tononkira\.serasera\.org/giu;
+const SECTION_HEADING =
+  /^\s*(?:(?:\[|\(|\{|-)\s*)?(?:refrain|bridge)\s*(?:\]|\)|\}|:|-)?\s*$/iu;
 
 /**
  * Dedicated source for Malagasy ("gasy") lyrics, which LRCLIB/Genius rarely
@@ -117,6 +121,13 @@ export class TononkiraLyricsProvider implements LyricsProvider {
       .text()
       .split('\n')
       .map((line) => line.trim())
+      .map((line) =>
+        line
+          .replace(TONONKIRA_SOURCE, '')
+          .replace(/^[\s([{-]+|[\s)\]}:.-]+$/g, '')
+          .trim(),
+      )
+      .filter((line) => !SECTION_HEADING.test(line))
       .filter((line) => line.length > 0);
   }
 

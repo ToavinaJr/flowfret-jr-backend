@@ -19,7 +19,9 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 
-function actorIdFromNotification(notification: NotificationModel): string | null {
+function actorIdFromNotification(
+  notification: NotificationModel,
+): string | null {
   const payload = notification.payload;
   if (!payload || typeof payload !== 'object' || Array.isArray(payload))
     return null;
@@ -46,9 +48,7 @@ export class NotificationsResolver {
   }
 
   @ResolveField(() => UserModel, { nullable: true })
-  actor(
-    @Parent() notification: NotificationModel,
-  ): Promise<UserModel | null> {
+  actor(@Parent() notification: NotificationModel): Promise<UserModel | null> {
     const actorId = actorIdFromNotification(notification);
     if (!actorId) return Promise.resolve(null);
     return this.prisma.user.findFirst({

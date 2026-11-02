@@ -63,6 +63,29 @@ describe('TononkiraLyricsProvider', () => {
     });
   });
 
+  it('removes source-domain mentions and standalone refrain/bridge headings', async () => {
+    http.get.mockReturnValue(
+      of({
+        data: `<html><body>
+          <div class="print my-3 fst-italic">(Nalaina tao amin'ny tononkira.serasera.org)</div>
+          <div id="random1234">
+            First line from tononkira.serasera.org<br>
+            [Refrain]<br>
+            Actual chorus line<br>
+            BRIDGE:<br>
+            Last line
+          </div>
+        </body></html>`,
+      }),
+    );
+
+    await expect(
+      provider.fetchFromUrl(
+        'https://tononkira.serasera.org/hira/dadazily/ny-ainga',
+      ),
+    ).resolves.toEqual(['First line', 'Actual chorus line', 'Last line']);
+  });
+
   it('estimates per-line timing and marks the result synced when a duration is known', async () => {
     http.get.mockReturnValue(
       of({

@@ -374,10 +374,7 @@ export class YouTubeAudioService implements OnModuleInit {
     return 'unknown_extractor_failure';
   }
 
-  private safeExtractorDetail(
-    stderr: string,
-    proxyUrl?: string,
-  ): string {
+  private safeExtractorDetail(stderr: string, proxyUrl?: string): string {
     return stderr
       .replace(proxyUrl ?? /$^/, '[redacted-proxy]')
       .replace(/(?:https?|socks[45a-z]*):\/\/\S+/gi, '[redacted-url]')

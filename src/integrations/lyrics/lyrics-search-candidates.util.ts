@@ -28,7 +28,6 @@ export function buildLyricsSearchCandidates(
     return [{ ...track, title: cleanedTitle }];
   }
 
-
   const [first, ...rest] = cleanedTitle.split(/\s*[-–—―−]\s*/).filter(Boolean);
   if (!first || rest.length === 0) {
     return [{ ...track, title: cleanedTitle }];

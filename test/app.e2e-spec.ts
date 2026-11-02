@@ -192,14 +192,10 @@ describe('AppController (e2e)', () => {
       expect(refreshBody.data?.refreshSession.accessToken).toEqual(
         expect.any(String),
       );
-      const responseCookie = cookiePair(
-        refreshResponse.headers as Record<string, unknown>,
-      );
+      const responseCookie = cookiePair(refreshResponse.headers);
       expect(responseCookie).toMatch(/^fretflow_refresh=.+/);
       refreshCookie = responseCookie as string;
-      const refreshAttributes = cookieHeader(
-        refreshResponse.headers as Record<string, unknown>,
-      );
+      const refreshAttributes = cookieHeader(refreshResponse.headers);
       expect(refreshAttributes).toMatch(/Max-Age=\d+/i);
       expect(refreshAttributes).toMatch(/Path=\/graphql/i);
       expect(refreshAttributes).toMatch(/HttpOnly/i);
@@ -209,7 +205,9 @@ describe('AppController (e2e)', () => {
         .set('Cookie', refreshCookie)
         .send({ query: LOGOUT_QUERY })
         .expect(200);
-      const logoutBody = logoutResponse.body as GraphQLBody<{ logout: boolean }>;
+      const logoutBody = logoutResponse.body as GraphQLBody<{
+        logout: boolean;
+      }>;
       expect(logoutBody.data?.logout).toBe(true);
 
       const revokedRefreshResponse = await request(app.getHttpServer())
@@ -217,7 +215,8 @@ describe('AppController (e2e)', () => {
         .set('Cookie', refreshCookie)
         .send({ query: REFRESH_QUERY })
         .expect(200);
-      const revokedRefreshBody = revokedRefreshResponse.body as GraphQLBody<unknown>;
+      const revokedRefreshBody =
+        revokedRefreshResponse.body as GraphQLBody<unknown>;
       expect(revokedRefreshBody.errors?.[0]).toMatchObject({
         extensions: { code: 'UNAUTHENTICATED' },
       });
