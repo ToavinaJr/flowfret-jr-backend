@@ -12,6 +12,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import type { Response } from 'express';
 import { YouTubeAudioService } from './youtube-audio.service';
+import { RateLimits } from '../../auth/rate-limit.decorator';
 
 @Controller('api/youtube')
 export class YouTubeAudioController {
@@ -20,6 +21,12 @@ export class YouTubeAudioController {
   constructor(private readonly audio: YouTubeAudioService) {}
 
   @Get(':videoId/audio')
+  @RateLimits(
+    { limit: 20, windowSeconds: 60, failClosed: true, identity: 'ip' },
+    { limit: 80, windowSeconds: 3600, failClosed: true, identity: 'ip' },
+    { limit: 30, windowSeconds: 60, failClosed: true, identity: 'user' },
+    { limit: 120, windowSeconds: 3600, failClosed: true, identity: 'user' },
+  )
   @Header('Cache-Control', 'private, no-store, max-age=0')
   @Header('Pragma', 'no-cache')
   stream(

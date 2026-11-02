@@ -41,8 +41,14 @@ export class RateLimitGuard implements CanActivate, OnModuleDestroy {
     );
     if (!policies?.length) return true;
     const request = this.request(context);
-    const identity = request.user?.sub ?? request.ip ?? 'unknown';
+    const defaultIdentity = request.user?.sub ?? request.ip ?? 'unknown';
     for (const [index, options] of policies.entries()) {
+      const identity =
+        options.identity === 'user'
+          ? (request.user?.sub ?? 'unknown')
+          : options.identity === 'ip'
+            ? (request.ip ?? 'unknown')
+            : defaultIdentity;
       const digest = createHash('sha256')
         .update(
           `${context.getClass().name}:${context.getHandler().name}:${identity}:${index}:${options.windowSeconds}`,

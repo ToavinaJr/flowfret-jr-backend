@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { ConfigService } from '@nestjs/config';
+import { getAllowedOrigins } from './common/cors-origins';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -21,31 +22,7 @@ async function bootstrap() {
   const port = positiveInteger(config.get<string>('PORT'), 3000);
   if (port > 65535) throw new Error('PORT must be between 1 and 65535.');
 
-  const allowedOrigins = new Set(
-    [
-      config.get<string>('APP_URL'),
-      ...(config.get<string>('CORS_ORIGINS') ?? '').split(','),
-      ...(production
-        ? []
-        : [
-            `http://localhost:${port}`,
-            `http://127.0.0.1:${port}`,
-            'http://localhost:5173',
-            'http://127.0.0.1:5173',
-            'http://localhost:8080',
-            'http://127.0.0.1:8080',
-          ]),
-    ]
-      .map((value) => value?.trim())
-      .filter((value): value is string => Boolean(value))
-      .map((value) => {
-        try {
-          return new URL(value).origin;
-        } catch {
-          throw new Error(`Invalid CORS origin: ${value}`);
-        }
-      }),
-  );
+  const allowedOrigins = getAllowedOrigins(config);
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin || allowedOrigins.has(origin)) return callback(null, true);

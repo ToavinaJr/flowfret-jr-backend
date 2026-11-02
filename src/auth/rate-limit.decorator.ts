@@ -6,6 +6,7 @@ export type RateLimitOptions = {
   limit: number;
   windowSeconds: number;
   failClosed?: boolean;
+  identity?: 'user' | 'ip';
 };
 
 export const RateLimits = (...options: RateLimitOptions[]) =>

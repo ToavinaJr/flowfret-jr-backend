@@ -16,16 +16,19 @@ import type { Server, Socket } from 'socket.io';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatService } from './chat.service';
 import { ChatRealtimeService } from './chat-realtime.service';
+import { getAllowedOrigins } from '../common/cors-origins';
 
 type ChatSocket = Omit<Socket, 'data'> & { data: { userId?: string } };
 
 @WebSocketGateway({
   namespace: '/chat',
-  cors: { origin: true, credentials: true },
+  cors: { origin: chatCorsOrigin, credentials: true },
 })
 export class ChatGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
+  private static allowedOrigins: ReadonlySet<string> = new Set();
+
   @WebSocketServer() server!: Server;
   private readonly logger = new Logger(ChatGateway.name);
 
@@ -34,8 +37,14 @@ export class ChatGateway
     private readonly prisma: PrismaService,
     private readonly chat: ChatService,
     private readonly events: ChatRealtimeService,
-    private readonly config: ConfigService,
-  ) {}
+    config: ConfigService,
+  ) {
+    ChatGateway.allowedOrigins = getAllowedOrigins(config);
+  }
+
+  static isOriginAllowed(origin: string): boolean {
+    return ChatGateway.allowedOrigins.has(origin);
+  }
 
   afterInit(server: Server) {
     this.events.attach(server);
@@ -57,8 +66,7 @@ export class ChatGateway
       });
       if (!user) throw new Error('Inactive account');
       const origin = client.handshake.headers.origin;
-      const allowed = this.allowedOrigins();
-      if (origin && allowed.length && !allowed.includes(origin))
+      if (origin && !ChatGateway.isOriginAllowed(origin))
         throw new Error('Origin rejected');
       client.data.userId = user.id;
       await client.join(`user:${user.id}`);
@@ -97,22 +105,17 @@ export class ChatGateway
       await client.leave(`conversation:${body.conversationId}`);
     return { ok: true };
   }
+}
 
-  private allowedOrigins(): string[] {
-    const values = [
-      this.config.get<string>('APP_URL') ?? '',
-      ...(this.config.get<string>('CORS_ORIGINS') ?? '').split(','),
-    ];
-    return values
-      .map((value) => {
-        try {
-          return new URL(value.trim()).origin;
-        } catch {
-          return '';
-        }
-      })
-      .filter(Boolean);
+function chatCorsOrigin(
+  origin: string | undefined,
+  callback: (error: Error | null, allowed?: boolean) => void,
+): void {
+  if (!origin || ChatGateway.isOriginAllowed(origin)) {
+    callback(null, true);
+    return;
   }
+  callback(new Error('Origin not allowed by CORS.'), false);
 }
 
 function readSocketToken(client: {
