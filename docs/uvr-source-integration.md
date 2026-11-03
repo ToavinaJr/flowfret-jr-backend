@@ -34,16 +34,24 @@ le dé-écho et la séparation de tous les instruments ne sont pas exposés ici.
 2. Le worker extrait/décode l'audio avec les validations existantes.
 3. [L'adaptateur réel](../workers/stems/uvr_trained_worker.py) charge les poids
    préentraînés. Aucun repli silencieux vers les simulations.
-4. Le traitement externe utilise des fenêtres de 30 secondes et un chevauchement
-   de 25 %, avec accumulation Hann normalisée. Les extraits de 30 secondes ou
-   moins sont traités en une seule fenêtre. MDX applique aussi ses propres fenêtres.
-5. Chaque segment est normalisé à l'entrée et le même facteur de gain est
-   réappliqué à sa prédiction. Le traitement/export interne de la bibliothèque
-   reste celui d'UVR/audio-separator.
-6. Après réassemblage, `instrumental = original - vocal`, dans le domaine temporel.
-   Les WAV flottants vérifient la reconstruction à l'arrondi près. Les MP3 finaux
-   introduisent ensuite la perte de compression habituelle.
-7. Le stockage et le curseur progressif d'Equalizer restent ceux de FlowFret.
+4. Comme dans UVR, le morceau entier passe en un seul appel à la bibliothèque,
+   qui applique ses propres fenêtres chevauchantes (MDX, 25 %) ou segments
+   (Demucs). Il n'y a plus de découpage externe, donc plus de raccord artificiel
+   et un seul chargement du modèle.
+5. L'entrée est amenée à un pic de 1,0 avant l'appel, puis le gain d'origine est
+   rétabli à l'encodage MP3. Raison : en 0.48.0, `MDXSeparator.separate`
+   multiplie ses sorties par le pic de l'entrée, mais ne normalise l'entrée que
+   si elle dépasse le seuil. Tout autre morceau ressortirait atténué, et la voix
+   restante fuirait dans l'instrumental. Un pic de 1,0 rend ce facteur neutre.
+6. `uvr-mdx` : l'instrumental est celui de la bibliothèque,
+   `mix - vocals × compensation`, c'est-à-dire la méthode d'UVR. `uvr-ensemble` :
+   les deux modèles sont moyennés sur la voix seule (60/40), puis
+   `instrumental = mix - vocals` en flux, sans compensation. Les WAV intermédiaires
+   sont en virgule flottante ; seuls les MP3 finaux ajoutent de la perte.
+7. Les threads ONNX Runtime sont limités à `AUDIO_STEMS_CPU_THREADS`
+   (la bibliothèque ne limite pas sa session, donc elle prendrait tous les cœurs
+   de l'hôte), et la barre de progression des fenêtres MDX alimente la jauge.
+8. Le stockage et le curseur progressif d'Equalizer restent ceux de FlowFret.
 
 Le mode ensemble est plus coûteux : deux modèles et leurs calculs. Le chargement
 initial peut télécharger des poids ; `/models/uvr` les conserve entre les jobs.

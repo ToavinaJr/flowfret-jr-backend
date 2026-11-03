@@ -1,5 +1,10 @@
 # Equalizer : moteur UVR de démonstration
 
+> **Cette page décrit le mode simulé `uvr-demo`, qui ne sépare pas réellement la
+> voix.** Pour de vrais résultats, utiliser `AUDIO_STEMS_ENGINE=uvr-mdx` ou
+> `uvr-ensemble` ([uvr_trained_worker.py](./uvr_trained_worker.py)), décrits dans
+> [docs/uvr-source-integration.md](../../docs/uvr-source-integration.md).
+
 Le bouton Equalizer utilise les mêmes API, file BullMQ, stockage Cloudinary et
 mixeur progressif que Demucs. Le moteur `uvr-demo` exécute les deux estimateurs
 **simulés, sans poids entraînés** de [uvr_pipeline.py](./uvr_pipeline.py).
