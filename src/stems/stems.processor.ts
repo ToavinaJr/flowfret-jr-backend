@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { AudioStemStatus, MusicProvider } from '@prisma/client';
 import { readFile, rm } from 'node:fs/promises';
-import type { Job } from 'bullmq';
+import { UnrecoverableError, type Job } from 'bullmq';
 import type { AudioStemJobData } from './entities/stem.types';
 import { AUDIO_STEMS_QUEUE, STEMS_ERROR_CODE } from './stems.constants';
 import { StemsRepository } from './stems.repository';
@@ -40,7 +40,12 @@ export class StemsProcessor extends WorkerHost {
         attemptsMade: job.attemptsMade,
       }),
     );
-    const claimed = await this.repository.claimPending(audioStemId);
+    // BullMQ only grants this job to one worker. A stalled job can retain its
+    // previous DB state after the old worker died; completed/failed rows remain protected.
+    const claimed = await this.repository.claimPending(
+      audioStemId,
+      job.stalledCounter > 0,
+    );
     if (!claimed) {
       this.logger.warn(
         JSON.stringify({
@@ -53,13 +58,17 @@ export class StemsProcessor extends WorkerHost {
     }
     let extracted:
       { audioPath: string; cleanup: () => Promise<void> } | undefined;
+    let outputDirectory: string | undefined;
+    let progressWrites = Promise.resolve();
     try {
       const separationInput: {
         audioStemId: string;
         audioUrl?: string;
         audioPath?: string;
+        engineVersion?: string;
       } = {
         audioStemId,
+        engineVersion: job.data.engineVersion,
       };
       if (provider === MusicProvider.YOUTUBE) {
         extracted = await this.audioSources.extractYouTubeAudio(
@@ -74,7 +83,21 @@ export class StemsProcessor extends WorkerHost {
           audioUrl,
         );
       }
-      const result = await this.bridge.separate(separationInput);
+      await this.repository.update(audioStemId, {
+        status: AudioStemStatus.PROCESSING,
+      });
+      const result = await this.bridge.separate(separationInput, (progress) => {
+        progressWrites = progressWrites
+          .then(async () => {
+            await this.repository.update(audioStemId, { progress });
+          })
+          .catch(() => {
+            /* Repository logs progress-write failures. */
+          });
+      });
+      outputDirectory = result.tempDir;
+      await progressWrites;
+      await this.repository.update(audioStemId, { progress: 95 });
       const [vocals, instrumental] = await Promise.all([
         readFile(result.vocalsPath),
         readFile(result.instrumentalPath),
@@ -89,9 +112,9 @@ export class StemsProcessor extends WorkerHost {
           filename: `${audioStemId}-instrumental.mp3`,
         }),
       ]);
-      await rm(result.tempDir, { recursive: true, force: true });
       await this.repository.update(audioStemId, {
         status: AudioStemStatus.COMPLETED,
+        progress: 100,
         duration: result.duration,
         vocalsUrl: vocalsUpload.url,
         vocalsPublicId: vocalsUpload.publicId,
@@ -112,8 +135,11 @@ export class StemsProcessor extends WorkerHost {
         }),
       );
     } catch (error) {
+      await progressWrites;
       await this.handleFailure(job, error, startedAt);
     } finally {
+      if (outputDirectory)
+        await rm(outputDirectory, { recursive: true, force: true });
       if (extracted) await extracted.cleanup();
     }
   }
@@ -124,10 +150,20 @@ export class StemsProcessor extends WorkerHost {
     startedAt: number,
   ): Promise<never> {
     const { audioStemId } = job.data;
-    const finalAttempt = job.attemptsMade + 1 >= Number(job.opts.attempts ?? 1);
+    const code = this.errorCode(error);
+    const permanent = [
+      'AUDIO_TOO_LONG',
+      'AUDIO_TOO_LARGE',
+      'INVALID_AUDIO_URL',
+      'AUDIO_HOST_NOT_ALLOWED',
+      'DEMUCS_TIMEOUT',
+    ].includes(code);
+    const finalAttempt =
+      permanent || job.attemptsMade + 1 >= Number(job.opts.attempts ?? 1);
     if (!finalAttempt) {
       await this.repository.update(audioStemId, {
         status: AudioStemStatus.PENDING,
+        progress: 0,
       });
       this.logger.warn(
         JSON.stringify({
@@ -154,6 +190,7 @@ export class StemsProcessor extends WorkerHost {
         }),
       );
     }
+    if (permanent) throw new UnrecoverableError(code);
     throw error;
   }
 

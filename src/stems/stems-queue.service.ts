@@ -39,6 +39,14 @@ export class StemsQueueService {
   async enqueue(item: AudioStem, audioUrl: string): Promise<string> {
     const jobId = item.id;
     try {
+      const existing = await this.operation('getJob', this.queue.getJob(jobId));
+      if (
+        existing &&
+        (await this.operation('getJobState', existing.getState())) === 'failed'
+      ) {
+        await this.operation('retryJob', existing.retry());
+        return jobId;
+      }
       await this.operation(
         'add',
         this.queue.add(
@@ -48,6 +56,7 @@ export class StemsQueueService {
             trackId: item.trackId,
             provider: item.provider,
             audioUrl,
+            engineVersion: item.engineVersion,
           },
           {
             jobId,

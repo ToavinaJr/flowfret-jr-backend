@@ -5,6 +5,7 @@ export interface AudioStemJobData {
   trackId: string;
   provider: MusicProvider;
   audioUrl: string;
+  engineVersion?: string;
 }
 
 export type StemWorkerMessage =

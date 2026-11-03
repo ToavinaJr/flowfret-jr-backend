@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Single-shot vocal/instrumental separation via Demucs. Logs go to stderr only.
+"""Single-shot separation via Demucs or the explicit UVR demo engine.
 
-Spawned once per job (not a persistent server like transcribe.py --server):
-separation jobs are infrequent and single-shot, with no incremental progress
-to stream, so the overhead of a long-lived process isn't worth the complexity.
+Spawned once per job. Inference diagnostics go to stderr; structured progress
+and the final result are sent to the Node bridge on stdout.
 """
 from __future__ import annotations
 
 import json
+import os
+import re
+from collections import deque
+from threading import Thread
 import shutil
 import subprocess
 import sys
@@ -73,10 +76,41 @@ def probe_duration(path: Path) -> float:
     return max(0.0, float(result.stdout.strip()))
 
 
-def run_demucs(source: Path, output_dir: Path, model: str, mp3_bitrate: int, timeout_s: float) -> tuple[Path, Path]:
-    try:
-        subprocess.run(
-            [
+def run_demucs(source: Path, output_dir: Path, model: str, mp3_bitrate: int, timeout_s: float, cpu_threads: int = 2, model_dir: str | None = None) -> tuple[Path, Path]:
+    # BLAS sees host CPUs, not necessarily the Docker CPU quota. Avoid
+    # oversubscribing the two-core worker with competing inference threads.
+    environment = {**os.environ, "OMP_NUM_THREADS": str(cpu_threads),
+                   "MKL_NUM_THREADS": str(cpu_threads), "OPENBLAS_NUM_THREADS": str(cpu_threads)}
+    tail: deque[str] = deque(maxlen=20)
+    last_progress = 0
+
+    def consume_output(stream: Any) -> None:
+        nonlocal last_progress
+        for line in stream:
+            tail.append(line)
+            print(line.rstrip(), file=sys.stderr, flush=True)
+            # htdemucs has a single inference progress bar. Other models may
+            # contain several models; do not present their first bar as total progress.
+            match = re.search(r"(\d{1,3})%\|", line)
+            if model in ("uvr-demo", "uvr-mdx", "uvr-ensemble"):
+                demo_progress = re.search(r"Progression : ([\d.]+) %", line)
+                if demo_progress:
+                    progress = min(90, 5 + int(float(demo_progress.group(1)) * 0.85))
+                    if progress > last_progress:
+                        last_progress = progress
+                        emit({"type": "progress", "progress": progress})
+            if model == "htdemucs" and match and "seconds" in line:
+                progress = min(90, 5 + int(match.group(1)) * 85 // 100)
+                if progress > last_progress:
+                    last_progress = progress
+                    emit({"type": "progress", "progress": progress})
+
+    command = (
+        [sys.executable, str(Path(__file__).with_name("uvr_worker.py")),
+         str(source), str(output_dir / model / source.stem),
+         "--cpu-threads", str(cpu_threads), "--bitrate", str(mp3_bitrate)]
+        if model == "uvr-demo" else
+        [
                 sys.executable, "-m", "demucs",
                 "--two-stems", "vocals",
                 "--mp3", "--mp3-bitrate", str(mp3_bitrate),
@@ -84,14 +118,37 @@ def run_demucs(source: Path, output_dir: Path, model: str, mp3_bitrate: int, tim
                 "-n", model,
                 "-o", str(output_dir),
                 str(source),
-            ],
-            capture_output=True, timeout=timeout_s, check=True,
+        ]
+    )
+    if model in ("uvr-mdx", "uvr-ensemble"):
+        command = [sys.executable, str(Path(__file__).with_name("uvr_trained_worker.py")),
+                   str(source), str(output_dir / model / source.stem),
+                   "--cpu-threads", str(cpu_threads), "--bitrate", str(mp3_bitrate),
+                   "--model-dir", model_dir or str(Path.home() / ".cache/flowfret/uvr")]
+        if model == "uvr-ensemble":
+            command.append("--ensemble")
+    try:
+        child = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace", env=environment,
         )
+        assert child.stdout is not None
+        reader = Thread(target=consume_output, args=(child.stdout,), daemon=True)
+        reader.start()
+        try:
+            code = child.wait(timeout=timeout_s)
+        finally:
+            if child.poll() is None:
+                child.kill()
+            child.wait()
+            reader.join()
+            child.stdout.close()
+        if code != 0:
+            detail = "".join(tail)[-2000:]
+            raise WorkerError("DEMUCS_FAILED", f"Vocal separation failed: {detail}")
     except subprocess.TimeoutExpired as error:
         raise WorkerError("DEMUCS_TIMEOUT", "Vocal separation timed out") from error
-    except subprocess.CalledProcessError as error:
-        detail = (error.stderr or b"").decode("utf-8", errors="replace")[-500:]
-        raise WorkerError("DEMUCS_FAILED", f"Vocal separation failed: {detail}") from error
     stem_dir = output_dir / model / source.stem
     vocals_path = stem_dir / "vocals.mp3"
     instrumental_path = stem_dir / "no_vocals.mp3"
@@ -123,7 +180,7 @@ def process_request(request: dict[str, Any]) -> int:
         mp3_bitrate = int(options.get("mp3Bitrate", 192))
         timeout_s = max(1.0, float(options.get("timeoutMs", 600000)) / 1000)
         output_dir = temp_root / "output"
-        vocals_path, instrumental_path = run_demucs(downloaded, output_dir, model, mp3_bitrate, timeout_s)
+        vocals_path, instrumental_path = run_demucs(downloaded, output_dir, model, mp3_bitrate, timeout_s, int(options.get("cpuThreads", 2)), options.get("modelDir"))
         emit({
             "type": "completed",
             "duration": duration,

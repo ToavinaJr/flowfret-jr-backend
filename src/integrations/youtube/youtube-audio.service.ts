@@ -12,7 +12,10 @@ import { copyFileSync, existsSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, isAbsolute, join, resolve } from 'node:path';
 import { PassThrough, type Readable } from 'node:stream';
-import { YOUTUBE_VIDEO_ID_PATTERN } from './youtube.constants';
+import {
+  YOUTUBE_EXTRACTOR_UNAVAILABLE,
+  YOUTUBE_VIDEO_ID_PATTERN,
+} from './youtube.constants';
 
 export interface YouTubeAudioStream {
   stream: Readable;
@@ -56,9 +59,20 @@ export class YouTubeAudioService implements OnModuleInit {
     }
   }
 
-  createStream(videoId: string, diagnosticId?: string): YouTubeAudioStream {
+  createStream(
+    videoId: string,
+    diagnosticId?: string,
+    limits?: { maxDurationSeconds: number },
+  ): YouTubeAudioStream {
     if (!YOUTUBE_VIDEO_ID_PATTERN.test(videoId)) {
       throw new BadRequestException('Invalid YouTube video id');
+    }
+    if (
+      limits &&
+      (!Number.isSafeInteger(limits.maxDurationSeconds) ||
+        limits.maxDurationSeconds <= 0)
+    ) {
+      throw new BadRequestException('Invalid audio duration limit');
     }
     const maxConcurrent = this.number('YOUTUBE_AUDIO_MAX_CONCURRENT', 2);
     const cookieFile = this.cookieFile();
@@ -80,10 +94,9 @@ export class YouTubeAudioService implements OnModuleInit {
 
     const python = this.pythonBinary();
     const maxBytes = this.number('YOUTUBE_AUDIO_MAX_SIZE_MB', 30) * 1024 * 1024;
-    const maxDuration = Math.min(
-      300,
-      this.number('YOUTUBE_AUDIO_MAX_DURATION_SECONDS', 300),
-    );
+    const maxDuration =
+      limits?.maxDurationSeconds ??
+      Math.min(300, this.number('YOUTUBE_AUDIO_MAX_DURATION_SECONDS', 300));
     const timeoutMs = this.number('YOUTUBE_AUDIO_DOWNLOAD_TIMEOUT_MS', 120_000);
     const url = `https://www.youtube.com/watch?v=${videoId}`;
     const bundledPythonPackages = resolve(process.cwd(), '.python-packages');
@@ -198,7 +211,10 @@ export class YouTubeAudioService implements OnModuleInit {
           errorMessage: error.message,
         }),
       );
-      fail('YouTube audio extractor is unavailable');
+      fail(
+        'YouTube audio extractor is unavailable',
+        YOUTUBE_EXTRACTOR_UNAVAILABLE,
+      );
     });
     child.on('close', (code) => {
       if (finished) return;

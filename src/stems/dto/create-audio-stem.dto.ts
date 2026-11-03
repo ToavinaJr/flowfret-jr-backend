@@ -1,10 +1,10 @@
 import { Transform } from 'class-transformer';
-import { IsEnum, IsOptional, IsString, IsUrl, Length } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUrl, Length } from 'class-validator';
 import { MusicProvider } from '@prisma/client';
 
 export class CreateAudioStemDto {
   @Transform(({ value }: { value: unknown }) => value ?? MusicProvider.AUDIUS)
-  @IsEnum(MusicProvider)
+  @IsIn([MusicProvider.AUDIUS, MusicProvider.YOUTUBE])
   provider?: MusicProvider = MusicProvider.AUDIUS;
 
   @IsString()

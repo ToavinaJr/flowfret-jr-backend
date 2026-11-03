@@ -31,6 +31,7 @@ const POSITIVE_INTEGER_KEYS = [
   'YOUTUBE_AUDIO_DOWNLOAD_TIMEOUT_MS',
   'YOUTUBE_AUDIO_MAX_CONCURRENT',
   'AUDIO_STEMS_CONCURRENCY',
+  'AUDIO_STEMS_CPU_THREADS',
   'AUDIO_STEMS_MAX_QUEUE_DEPTH',
   'AUDIO_STEMS_TIMEOUT_MS',
   'AUDIO_STEMS_QUEUE_TIMEOUT_MS',
@@ -50,6 +51,12 @@ export function validateEnvironment(
     requireMediaStorage?: boolean;
   } = {},
 ): Record<string, unknown> {
+  validateEnum(environment.AUDIO_STEMS_ENGINE, 'AUDIO_STEMS_ENGINE', [
+    'demucs',
+    'uvr-demo',
+    'uvr-mdx',
+    'uvr-ensemble',
+  ]);
   validateOptionalUrl(environment.YOUTUBE_PROXY_URL, 'YOUTUBE_PROXY_URL', [
     'http:',
     'https:',

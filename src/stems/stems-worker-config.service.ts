@@ -31,6 +31,8 @@ export class StemsWorkerConfigService {
       'altego.net',
     ];
     return {
+      cpuThreads: this.number('AUDIO_STEMS_CPU_THREADS', 2),
+      modelDir: this.config.get<string>('AUDIO_STEMS_MODEL_DIR') || undefined,
       model: this.config.get<string>('DEMUCS_MODEL') ?? DEFAULT_DEMUCS_MODEL,
       mp3Bitrate: this.number('AUDIO_STEMS_MP3_BITRATE', 192),
       maxAudioSizeMb: this.number('TRANSCRIPTION_MAX_AUDIO_SIZE_MB', 100),

@@ -116,7 +116,9 @@ services:
       REDIS_PRIVATE_URL: ''
       REDIS_HOST: redis
       REDIS_TLS: 'false'
+      YOUTUBE_DL_PYTHON_BIN: python3
       AUDIO_STEMS_TEMP_DIR: /stems-tmp
+      AUDIO_STEMS_MODEL_DIR: /models/uvr
       TORCH_HOME: /models
       YOUTUBE_POT_PROVIDER_URL: http://pot-provider:4416
     # Placeholder safety net, not a tuned value: no Demucs benchmark has been

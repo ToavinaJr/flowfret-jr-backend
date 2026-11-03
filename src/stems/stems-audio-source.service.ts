@@ -8,6 +8,7 @@ import { MusicProvider } from '@prisma/client';
 import { AudiusService } from '../integrations/audius/audius.service';
 import { YouTubeAudioService } from '../integrations/youtube/youtube-audio.service';
 import { STEMS_ERROR_CODE } from './stems.constants';
+import { StemsWorkerConfigService } from './stems-worker-config.service';
 
 export interface ExtractedAudio {
   audioPath: string;
@@ -19,6 +20,7 @@ export class StemsAudioSourceService {
   constructor(
     private readonly audius: AudiusService,
     private readonly youtubeAudio: YouTubeAudioService,
+    private readonly workerConfig: StemsWorkerConfigService,
   ) {}
 
   async resolve(
@@ -43,7 +45,9 @@ export class StemsAudioSourceService {
     const audioPath = join(directory, 'source.audio');
     let extraction: ReturnType<YouTubeAudioService['createStream']> | undefined;
     try {
-      extraction = this.youtubeAudio.createStream(videoId, audioStemId);
+      extraction = this.youtubeAudio.createStream(videoId, audioStemId, {
+        maxDurationSeconds: this.workerConfig.options().maxDurationSeconds,
+      });
       await pipeline(extraction.stream, createWriteStream(audioPath));
       return {
         audioPath,

@@ -22,9 +22,14 @@ export class StemsWorkflowService {
     private readonly queue: StemsQueueService,
     private readonly capacity: StemsCapacityService,
   ) {
+    const engine = this.config.get<string>('AUDIO_STEMS_ENGINE');
     this.engineVersion =
-      this.config.get<string>('DEMUCS_ENGINE_VERSION') ??
-      DEFAULT_STEMS_ENGINE_VERSION;
+      engine === 'uvr-mdx' || engine === 'uvr-ensemble'
+        ? `${engine}-0.48.0-voc-ft-v1`
+        : engine === 'uvr-demo'
+          ? 'uvr-demo-v1'
+          : (this.config.get<string>('DEMUCS_ENGINE_VERSION') ??
+            DEFAULT_STEMS_ENGINE_VERSION);
   }
 
   async createOrGet(dto: CreateAudioStemDto): Promise<AudioStemResponse> {
@@ -77,6 +82,7 @@ export class StemsWorkflowService {
         });
       item = await this.repository.update(item.id, {
         status: AudioStemStatus.PENDING,
+        progress: 0,
         errorCode: null,
         errorMessage: null,
       });

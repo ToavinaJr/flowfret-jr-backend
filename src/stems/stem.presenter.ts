@@ -8,6 +8,7 @@ export interface AudioStemResponse {
   artist: string | null;
   status: AudioStemStatus;
   cached: boolean;
+  simulated: boolean;
   progress: number;
   duration: number | null;
   vocalsUrl: string | null;
@@ -27,6 +28,7 @@ export function toAudioStemResponse(
     artist: item.artist,
     status: item.status,
     cached,
+    simulated: item.engineVersion === 'uvr-demo-v1',
     progress: item.progress,
     duration: item.duration,
     vocalsUrl: item.vocalsUrl,

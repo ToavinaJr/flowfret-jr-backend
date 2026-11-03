@@ -57,3 +57,4 @@ jobs:
       - run: npm run validate
       - run: npm run test:e2e -- --runInBand
       - run: python -m unittest discover -s workers/transcription/tests -v
+      - run: python -m unittest discover -s workers/stems/tests -v

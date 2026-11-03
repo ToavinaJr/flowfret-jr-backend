@@ -1,0 +1,4 @@
+# Standalone demo dependencies. Docker supplies its CPU build of torch first.
+torch>=2.2,<3
+numpy>=1.26,<3
+soundfile>=0.12,<1

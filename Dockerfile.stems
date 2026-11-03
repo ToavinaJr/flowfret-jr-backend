@@ -19,12 +19,20 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     pip3 install --no-cache-dir --break-system-packages \
     -r /tmp/stems-requirements.txt \
     -r /tmp/youtube-requirements.txt
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/prisma ./prisma
-COPY --from=build /app/prisma.config.ts ./prisma.config.ts
-COPY --from=build /app/package*.json ./
-COPY workers/stems ./workers/stems
-RUN mkdir -p /models /stems-tmp && chown -R node:node /app /models /stems-tmp
+COPY workers/stems/requirements-uvr.txt /tmp/uvr-requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/uvr-requirements.txt
+COPY workers/stems/requirements-uvr-trained.txt /tmp/uvr-trained-requirements.txt
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential python3-dev && \
+    pip3 install --no-cache-dir --break-system-packages \
+    --extra-index-url https://download.pytorch.org/whl/cpu -r /tmp/uvr-trained-requirements.txt && \
+    apt-get purge -y --auto-remove build-essential python3-dev && rm -rf /var/lib/apt/lists/*
+COPY --chown=node:node --from=build /app/node_modules ./node_modules
+COPY --chown=node:node --from=build /app/dist ./dist
+COPY --chown=node:node --from=build /app/prisma ./prisma
+COPY --chown=node:node --from=build /app/prisma.config.ts ./prisma.config.ts
+COPY --chown=node:node --from=build /app/package*.json ./
+COPY --chown=node:node workers/stems ./workers/stems
+COPY --chown=node:node scripts/validate-stems.cjs ./scripts/validate-stems.cjs
+RUN mkdir -p /models /stems-tmp && chown node:node /app /models /stems-tmp
 USER node
 CMD ["node", "dist/stems-worker.js"]

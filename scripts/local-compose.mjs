@@ -46,40 +46,82 @@ if (
     'AUDIUS_ACCESS_TOKEN is required by the transcription worker. Add the Audius API bearer token to .env.development.local.',
   );
 }
+// This script is for local development only. The VPS override contains
+// production-only bind mounts (such as /etc/secrets/youtube-cookies.txt).
+const composeFiles = ['-f', 'docker-compose.yml'];
 const composeArgs =
   command === 'up'
-    ? ['compose', 'up', '-d', '--wait', 'db', 'redis']
-    : command === 'worker'
-      ? ['compose', 'up', '-d', '--build', 'transcription-worker']
-      : command === 'worker-start'
-        ? ['compose', 'up', '-d', '--no-build', 'transcription-worker']
-        : command === 'worker-logs'
-          ? ['compose', 'logs', '-f', 'transcription-worker']
-          : command === 'down'
-            ? ['compose', 'down']
-            : command === 'status'
-              ? ['compose', 'ps']
-              : null;
+    ? ['compose', ...composeFiles, 'up', '-d', '--wait', 'db', 'redis']
+    : command === 'backend-start'
+      ? ['compose', ...composeFiles, 'up', '-d', '--no-build', 'backend']
+      : ['worker', 'stems'].includes(command)
+        ? ['compose', ...composeFiles, 'build', 'stems-worker']
+        : command === 'equalizer'
+          ? ['compose', ...composeFiles, 'build', 'backend', 'stems-worker']
+        : command === 'worker-start'
+          ? [
+              'compose',
+              ...composeFiles,
+              'up',
+              '-d',
+              '--no-build',
+              'transcription-worker',
+              'stems-worker',
+            ]
+          : command === 'worker-logs'
+            ? [
+                'compose',
+                ...composeFiles,
+                'logs',
+                '-f',
+                'transcription-worker',
+                'stems-worker',
+              ]
+            : command === 'down'
+              ? ['compose', ...composeFiles, 'down']
+              : command === 'status'
+                ? ['compose', ...composeFiles, 'ps']
+                : null;
 
 if (!composeArgs) {
   throw new Error(
-    'Expected one of: up, worker, worker-start, worker-logs, down, status.',
+    'Expected one of: up, backend-start, worker, stems, equalizer, worker-start, worker-logs, down, status.',
   );
 }
 
-const result = spawnSync('docker', composeArgs, {
-  cwd: projectRoot,
-  env: {
-    ...process.env,
-    BACKEND_ENV_FILE: basename(environmentFile),
-    BACKEND_NODE_ENV: 'development',
-    POSTGRES_PASSWORD: postgresPassword,
-    POSTGRES_HOST_PORT: databaseUrl.port || '5432',
-    REDIS_HOST_PORT: redisUrl.port || '6379',
-  },
-  stdio: 'inherit',
-  windowsHide: true,
-});
+const composeEnvironment = {
+  ...process.env,
+  BACKEND_ENV_FILE: basename(environmentFile),
+  BACKEND_NODE_ENV: 'development',
+  POSTGRES_PASSWORD: postgresPassword,
+  POSTGRES_HOST_PORT: databaseUrl.port || '5432',
+  REDIS_HOST_PORT: redisUrl.port || '6379',
+};
+const runCompose = (args) =>
+  spawnSync('docker', args, {
+    cwd: projectRoot,
+    env: composeEnvironment,
+    stdio: 'inherit',
+    windowsHide: true,
+  });
 
-if (result.error) throw result.error;
-process.exitCode = result.status ?? 1;
+const buildResult = runCompose(composeArgs);
+if (buildResult.error) throw buildResult.error;
+if (!['worker', 'stems', 'equalizer'].includes(command) || buildResult.status !== 0) {
+  process.exitCode = buildResult.status ?? 1;
+} else {
+  const startResult = runCompose([
+    'compose',
+    ...composeFiles,
+    'up',
+    '-d',
+    '--no-build',
+    ...(command === 'equalizer'
+      ? ['backend', 'stems-worker']
+      : command === 'stems'
+        ? ['stems-worker']
+        : ['transcription-worker', 'stems-worker']),
+  ]);
+  if (startResult.error) throw startResult.error;
+  process.exitCode = startResult.status ?? 1;
+}

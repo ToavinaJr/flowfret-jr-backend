@@ -58,11 +58,20 @@ export class StemsRepository {
     );
   }
 
-  claimPending(id: string): Promise<boolean> {
+  claimPending(id: string, recoveringStalledJob = false): Promise<boolean> {
     return this.execute('claimPending', async () => {
       const result = await this.prisma.audioStem.updateMany({
-        where: { id, status: 'PENDING' },
-        data: { status: 'DOWNLOADING', attempts: { increment: 1 } },
+        where: {
+          id,
+          status: recoveringStalledJob
+            ? { in: ['PENDING', 'DOWNLOADING', 'PROCESSING'] }
+            : 'PENDING',
+        },
+        data: {
+          status: 'DOWNLOADING',
+          progress: 0,
+          attempts: { increment: 1 },
+        },
       });
       return result.count > 0;
     });
