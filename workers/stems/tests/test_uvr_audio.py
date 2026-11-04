@@ -48,6 +48,16 @@ class UvrAudioTest(unittest.TestCase):
         self.assertEqual(unit_peak(path), 1.0)
         self.assertEqual(float(np.abs(sf.read(path)[0]).max()), 0.0)
 
+    def test_unit_peak_handles_wav_with_text_chunk(self) -> None:
+        # ffmpeg writes a LIST/INFO chunk; libsndfile rejects r+ mode on it.
+        path = self.root / "tagged.wav"
+        with sf.SoundFile(path, "w", samplerate=44100, channels=2, format="WAV", subtype="FLOAT") as tagged:
+            tagged.title = "Lavf"
+            tagged.write(self.audio)
+        self.assertAlmostEqual(unit_peak(path), 0.5, places=6)
+        self.assertAlmostEqual(peak_of(path), 1.0, places=6)
+        self.assertEqual([p.name for p in self.root.iterdir()], ["tagged.wav"])
+
     def test_apply_gain_keeps_length(self) -> None:
         path = self.root / "a.wav"
         write_float(path, self.audio)

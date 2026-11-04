@@ -11,6 +11,8 @@ import { StemsBridgeService } from './stems-bridge.service';
 import { CloudinaryService } from '../uploads/cloudinary.service';
 import { getEnvironmentPositiveInteger } from '../common/environment';
 
+type StemStage = 'extract_audio' | 'separate' | 'upload' | 'save_result';
+
 @Injectable()
 @Processor(AUDIO_STEMS_QUEUE, {
   concurrency: getEnvironmentPositiveInteger('AUDIO_STEMS_CONCURRENCY', 1),
@@ -60,6 +62,9 @@ export class StemsProcessor extends WorkerHost {
       { audioPath: string; cleanup: () => Promise<void> } | undefined;
     let outputDirectory: string | undefined;
     let progressWrites = Promise.resolve();
+    // Most failures reach the client as one generic code; the stage says which
+    // part of the pipeline actually broke.
+    let stage: StemStage = 'extract_audio';
     try {
       const separationInput: {
         audioStemId: string;
@@ -83,6 +88,7 @@ export class StemsProcessor extends WorkerHost {
           audioUrl,
         );
       }
+      stage = 'separate';
       await this.repository.update(audioStemId, {
         status: AudioStemStatus.PROCESSING,
       });
@@ -97,6 +103,7 @@ export class StemsProcessor extends WorkerHost {
       });
       outputDirectory = result.tempDir;
       await progressWrites;
+      stage = 'upload';
       await this.repository.update(audioStemId, { progress: 95 });
       const [vocals, instrumental] = await Promise.all([
         readFile(result.vocalsPath),
@@ -112,6 +119,7 @@ export class StemsProcessor extends WorkerHost {
           filename: `${audioStemId}-instrumental.mp3`,
         }),
       ]);
+      stage = 'save_result';
       await this.repository.update(audioStemId, {
         status: AudioStemStatus.COMPLETED,
         progress: 100,
@@ -136,7 +144,7 @@ export class StemsProcessor extends WorkerHost {
       );
     } catch (error) {
       await progressWrites;
-      await this.handleFailure(job, error, startedAt);
+      await this.handleFailure(job, error, startedAt, stage);
     } finally {
       if (outputDirectory)
         await rm(outputDirectory, { recursive: true, force: true });
@@ -148,9 +156,11 @@ export class StemsProcessor extends WorkerHost {
     job: Job<AudioStemJobData>,
     error: unknown,
     startedAt: number,
+    stage: StemStage,
   ): Promise<never> {
     const { audioStemId } = job.data;
     const code = this.errorCode(error);
+    const cause = this.describeError(error);
     const permanent = [
       'AUDIO_TOO_LONG',
       'AUDIO_TOO_LARGE',
@@ -170,28 +180,46 @@ export class StemsProcessor extends WorkerHost {
           event: 'audio_stems.job_retry_scheduled',
           audioStemId,
           jobId: job.id,
-          errorCode: this.errorCode(error),
+          errorCode: code,
+          stage,
+          ...cause,
           nextAttempt: job.attemptsMade + 2,
         }),
       );
     } else {
-      await this.repository.markFailed(
-        audioStemId,
-        this.errorCode(error),
-        'Vocal separation failed',
-      );
+      // Log first: if the database is the thing that failed, markFailed throws.
       this.logger.error(
         JSON.stringify({
           event: 'audio_stems.job_failed',
           audioStemId,
           jobId: job.id,
-          errorCode: this.errorCode(error),
+          errorCode: code,
+          stage,
+          ...cause,
           elapsedMs: Date.now() - startedAt,
         }),
+      );
+      // The stored message reaches API clients: stage only, details stay in logs.
+      await this.repository.markFailed(
+        audioStemId,
+        code,
+        `Vocal separation failed (${stage})`,
       );
     }
     if (permanent) throw new UnrecoverableError(code);
     throw error;
+  }
+
+  private describeError(error: unknown) {
+    const failure = error instanceof Error ? error : new Error(String(error));
+    const clean = (text: string) =>
+      text.replace(/https?:\/\/\S+/gi, '[redacted-url]');
+    return {
+      errorName: failure.name,
+      // The end of a worker's output is where its real error is.
+      errorDetail: clean(failure.message).slice(-500),
+      stack: clean(failure.stack?.split('\n').slice(1, 5).join(' | ') ?? ''),
+    };
   }
 
   private errorCode(error: unknown): string {

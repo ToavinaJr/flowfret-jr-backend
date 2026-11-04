@@ -133,6 +133,9 @@ export class StemsBridgeService {
               audioStemId: input.audioStemId,
               duration: message.duration,
               cpuThreads: options.cpuThreads,
+              timeoutMs: options.timeoutMs,
+              maxDurationSeconds: options.maxDurationSeconds,
+              modelDirectoryConfigured: Boolean(options.modelDir),
             }),
           );
           onProgress?.(5);

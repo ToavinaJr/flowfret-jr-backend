@@ -77,8 +77,8 @@ def probe_duration(path: Path) -> float:
 
 
 def run_demucs(source: Path, output_dir: Path, model: str, mp3_bitrate: int, timeout_s: float, cpu_threads: int = 2, model_dir: str | None = None) -> tuple[Path, Path]:
-    # BLAS sees host CPUs, not necessarily the Docker CPU quota. Avoid
-    # oversubscribing the two-core worker with competing inference threads.
+    # BLAS sees host CPUs, not necessarily the Docker CPU quota. Match its
+    # thread pools to the configured worker allocation to avoid oversubscription.
     environment = {**os.environ, "OMP_NUM_THREADS": str(cpu_threads),
                    "MKL_NUM_THREADS": str(cpu_threads), "OPENBLAS_NUM_THREADS": str(cpu_threads)}
     tail: deque[str] = deque(maxlen=20)
@@ -128,6 +128,12 @@ def run_demucs(source: Path, output_dir: Path, model: str, mp3_bitrate: int, tim
         if model == "uvr-ensemble":
             command.append("--ensemble")
     try:
+        print(
+            f"UVR worker starting: model={model}, timeout_seconds={timeout_s:.0f}, "
+            f"cpu_threads={cpu_threads}, source_bytes={source.stat().st_size}",
+            file=sys.stderr,
+            flush=True,
+        )
         child = subprocess.Popen(
             command,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -146,9 +152,16 @@ def run_demucs(source: Path, output_dir: Path, model: str, mp3_bitrate: int, tim
             child.stdout.close()
         if code != 0:
             detail = "".join(tail)[-2000:]
-            raise WorkerError("DEMUCS_FAILED", f"Vocal separation failed: {detail}")
+            # 137 / -9 = killed by the kernel (usually the container memory limit).
+            raise WorkerError("DEMUCS_FAILED", f"Vocal separation failed (exit {code}): {detail}")
     except subprocess.TimeoutExpired as error:
-        raise WorkerError("DEMUCS_TIMEOUT", "Vocal separation timed out") from error
+        recent_output = re.sub(
+            r"https?://\S+", "[redacted-url]", "".join(tail)[-1200:]
+        ).strip()
+        detail = f"Vocal separation using {model} exceeded {timeout_s:g} seconds"
+        if recent_output:
+            detail += f"; last worker output: {recent_output}"
+        raise WorkerError("DEMUCS_TIMEOUT", detail) from error
     stem_dir = output_dir / model / source.stem
     vocals_path = stem_dir / "vocals.mp3"
     instrumental_path = stem_dir / "no_vocals.mp3"
@@ -198,7 +211,7 @@ def process_request(request: dict[str, Any]) -> int:
             shutil.rmtree(temp_root, ignore_errors=True)
         return 1
     except Exception as error:
-        fail("DEMUCS_FAILED", "Vocal separation worker failed")
+        fail("DEMUCS_FAILED", f"Vocal separation worker failed: {type(error).__name__}: {error}"[:1000])
         print(f"worker error: {type(error).__name__}: {error}", file=sys.stderr)
         if temp_root and temp_root.exists():
             shutil.rmtree(temp_root, ignore_errors=True)

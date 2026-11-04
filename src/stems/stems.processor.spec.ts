@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { MusicProvider } from '@prisma/client';
 import { Job, UnrecoverableError } from 'bullmq';
 import { StemsProcessor } from './stems.processor';
@@ -66,6 +67,40 @@ describe('StemsProcessor retry policy', () => {
       expect(cleanup).toHaveBeenCalledTimes(1);
     },
   );
+
+  it('records the failing stage and logs the real cause without exposing it', async () => {
+    const { processor, job, repository } = fixture('DEMUCS_FAILED');
+    job.opts.attempts = 1;
+    const killed = new Error(
+      'Demucs process exited without a result (code=137, signal=null) https://secret.example/x?token=abc',
+    );
+    (
+      processor as unknown as { bridge: { separate: jest.Mock } }
+    ).bridge.separate.mockRejectedValue(killed);
+    const logged = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+
+    await expect(processor.process(job)).rejects.toBe(killed);
+
+    expect(repository.markFailed).toHaveBeenCalledWith(
+      'one',
+      'DEMUCS_FAILED',
+      'Vocal separation failed (separate)',
+    );
+    const entry = JSON.parse(String(logged.mock.calls[0][0])) as Record<
+      string,
+      string
+    >;
+    expect(entry).toMatchObject({
+      event: 'audio_stems.job_failed',
+      stage: 'separate',
+      errorCode: 'DEMUCS_FAILED',
+    });
+    expect(entry.errorDetail).toContain('code=137');
+    expect(entry.errorDetail).not.toContain('secret.example');
+    logged.mockRestore();
+  });
 
   it('keeps retries for transient source failures and resets progress', async () => {
     const { processor, job, repository } = fixture('AUDIO_DOWNLOAD_FAILED');

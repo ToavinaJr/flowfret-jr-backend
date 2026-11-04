@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import logging
 import shutil
+import time
 from pathlib import Path
 
 import onnxruntime as ort
@@ -87,6 +88,7 @@ def main() -> None:
     source_wav = args.output / "source.wav"
     work_dir = args.output / "inference"
     work_dir.mkdir()
+    started_at = time.perf_counter()
     try:
         convert(["-i", str(args.source), "-vn", "-ac", "2", "-ar", str(SAMPLE_RATE),
                  "-c:a", "pcm_f32le", "-threads", str(args.cpu_threads), str(source_wav)])
@@ -95,9 +97,18 @@ def main() -> None:
         # input comes back attenuated and leaks into the instrumental. A peak of
         # exactly 1.0 makes that factor 1; the original level returns in the MP3.
         peak = unit_peak(source_wav)
-        frames = sf.info(source_wav).frames
+        source_info = sf.info(source_wav)
+        frames = source_info.frames
+        logger.info(
+            "Source decoded: duration_seconds=%.2f sample_rate=%d channels=%d "
+            "frames=%d bytes=%d model_weights_present=%s cpu_threads=%d",
+            source_info.duration, source_info.samplerate, source_info.channels,
+            frames, source_wav.stat().st_size,
+            (args.model_dir / MDX_MODEL).is_file(), args.cpu_threads,
+        )
         logger.info("Progression : 2.0 %")
         logger.info("Loading pretrained UVR model(s); first use may download weights")
+        model_started_at = time.perf_counter()
         separator = Separator(
             model_file_dir=str(args.model_dir), output_dir=str(work_dir),
             output_format="WAV", use_soundfile=True, sample_rate=SAMPLE_RATE,
@@ -113,6 +124,11 @@ def main() -> None:
             ensemble_weights=ENSEMBLE_WEIGHTS if args.ensemble else None,
         )
         separator.load_model([MDX_MODEL, DEMUCS_MODEL] if args.ensemble else MDX_MODEL)
+        logger.info(
+            "Model ready: engine=%s load_seconds=%.1f",
+            "uvr-ensemble" if args.ensemble else "uvr-mdx",
+            time.perf_counter() - model_started_at,
+        )
         outputs = separator.separate(
             str(source_wav), {"Vocals": "vocals", "Instrumental": "instrumental"})
         logger.info("Progression : 100.0 %")
@@ -128,6 +144,13 @@ def main() -> None:
             convert(["-i", str(stem), "-vn", "-af", f"volume={peak:.9g}",
                      "-c:a", "libmp3lame", "-b:a", f"{args.bitrate}k",
                      "-threads", str(args.cpu_threads), str(args.output / name)])
+        logger.info(
+            "Separation finished: duration_seconds=%.2f elapsed_seconds=%.1f "
+            "vocals_bytes=%d instrumental_bytes=%d",
+            source_info.duration, time.perf_counter() - started_at,
+            (args.output / "vocals.mp3").stat().st_size,
+            (args.output / "no_vocals.mp3").stat().st_size,
+        )
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
         source_wav.unlink(missing_ok=True)

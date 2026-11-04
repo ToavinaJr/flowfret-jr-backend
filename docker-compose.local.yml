@@ -1,0 +1,6 @@
+services:
+  stems-worker:
+    # Local UVR validation profile. Keep concurrency at one job while giving
+    # CPU inference enough headroom; the production/VPS compose stays separate.
+    mem_limit: 4g
+    cpus: '4.0'

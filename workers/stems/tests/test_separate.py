@@ -19,6 +19,7 @@ assert os.environ['OMP_NUM_THREADS'] == '2'
 assert os.environ['MKL_NUM_THREADS'] == '2'
 mode = os.environ.get('FAKE_DEMUCS_MODE')
 if mode == 'timeout':
+    print('inference pending at 73 percent', file=sys.stderr, flush=True)
     time.sleep(30)
 if mode == 'failure':
     print('specific decoder failure', file=sys.stderr)
@@ -38,10 +39,12 @@ class DemucsProcessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'demucs.py').write_text(FAKE_DEMUCS)
+            source = root / 'source.audio'
+            source.write_bytes(b'audio')
             with patch.dict(os.environ, {'PYTHONPATH': directory, 'FAKE_DEMUCS_MODE': mode}):
                 output = io.StringIO()
                 with contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
-                    vocals, backing = run_demucs(root / 'source.audio', root / 'out', 'htdemucs', 192, timeout)
+                    vocals, backing = run_demucs(source, root / 'out', 'htdemucs', 192, timeout)
                 self.assertEqual(vocals.read_bytes(), b'vocals')
                 self.assertEqual(backing.read_bytes(), b'instrumental')
                 return output.getvalue()
@@ -61,8 +64,10 @@ class DemucsProcessTests(unittest.TestCase):
 
     def test_timeout_terminates_process(self):
         with self.assertRaises(WorkerError) as caught:
-            self.run_fake('timeout', 0.3)
+            self.run_fake('timeout', 1.5)
         self.assertEqual(caught.exception.code, 'DEMUCS_TIMEOUT')
+        self.assertIn('using htdemucs exceeded 1.5 seconds', str(caught.exception))
+        self.assertIn('inference pending at 73 percent', str(caught.exception))
 
 
 if __name__ == '__main__':

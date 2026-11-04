@@ -76,6 +76,9 @@ services:
     init: true
     security_opt: ['no-new-privileges:true']
     cap_drop: ['ALL']
+    # Placeholder safety net, not a tuned value: no Demucs benchmark has been
+    # run on target hardware yet. Re-set these once Etape 0 of the karaoke
+    # plan (manual CPU/RAM benchmark) has real numbers.
     mem_limit: 2g
     cpus: '2.0'
     env_file: ${BACKEND_ENV_FILE:-.env}
@@ -121,9 +124,6 @@ services:
       AUDIO_STEMS_MODEL_DIR: /models/uvr
       TORCH_HOME: /models
       YOUTUBE_POT_PROVIDER_URL: http://pot-provider:4416
-    # Placeholder safety net, not a tuned value: no Demucs benchmark has been
-    # run on target hardware yet. Re-set these once Etape 0 of the karaoke
-    # plan (manual CPU/RAM benchmark) has real numbers.
     mem_limit: 2g
     cpus: '2.0'
     volumes:

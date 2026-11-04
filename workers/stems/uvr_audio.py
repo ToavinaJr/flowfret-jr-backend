@@ -23,15 +23,21 @@ def peak_of(path: Path) -> float:
 
 
 def apply_gain(path: Path, gain: float) -> None:
-    """Scale a float WAV in place."""
-    with sf.SoundFile(path, "r+") as audio:
-        while True:
-            start = audio.tell()
-            block = audio.read(BLOCK_FRAMES, dtype="float32", always_2d=True)
-            if not len(block):
-                return
-            audio.seek(start)
-            audio.write(block * np.float32(gain))
+    """Scale a float WAV, replacing the file.
+
+    Rewrites through a sibling file: libsndfile refuses read/write mode on WAVs
+    with text chunks, which is what ffmpeg writes.
+    """
+    scaled = path.with_name(f"{path.stem}.gain{path.suffix}")
+    try:
+        with sf.SoundFile(path) as source, sf.SoundFile(
+                scaled, "w", samplerate=source.samplerate, channels=source.channels,
+                format="WAV", subtype="FLOAT") as output:
+            for block in source.blocks(blocksize=BLOCK_FRAMES, dtype="float32", always_2d=True):
+                output.write(block * np.float32(gain))
+        scaled.replace(path)
+    finally:
+        scaled.unlink(missing_ok=True)
 
 
 def unit_peak(path: Path) -> float:

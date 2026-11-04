@@ -11,6 +11,11 @@ import {
 import type { LyricsProvider } from '../interfaces/lyrics-provider.interface';
 import type { Lyrics, TrackMetadata } from '../interfaces/lyrics.interface';
 
+const NON_LYRIC_SECTION_LABEL =
+  /^\[(?:intro|verse|chorus|refrain|pre[- ]chorus|post[- ]chorus|bridge|outro|hook|breakdown|interlude|instrumental|spoken|all|repeat)(?:\s+\d+)?(?:\s*[:-].*)?\]$/i;
+const LYRIC_SECTION_LABEL =
+  /\[(?:intro|verse|chorus|refrain|pre[- ]chorus|post[- ]chorus|bridge|outro|hook|breakdown|interlude|instrumental|spoken|all|repeat)(?:\s+\d+)?\b/i;
+
 @Injectable()
 export class GeniusLyricsProvider implements LyricsProvider {
   private readonly logger = new Logger(GeniusLyricsProvider.name);
@@ -64,14 +69,56 @@ export class GeniusLyricsProvider implements LyricsProvider {
       .toArray()
       .map((container) => {
         const node = $(container);
+        node
+          .find(
+            [
+              'script',
+              'style',
+              'svg',
+              'img',
+              'noscript',
+              'button',
+              'a[href="#about"]',
+              '[class*="SongBioPreview"]',
+              '[class*="LyricsHeader"]',
+            ].join(', '),
+          )
+          .remove();
         node.find('br').replaceWith('\n');
+        node.find('p, div').each((_, element) => {
+          $(element).prepend('\n').append('\n');
+        });
         return node.text();
       })
       .join('\n');
 
-    return text
+    const lines = text
       .split('\n')
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
+
+    // Genius pages may leak a song bio preview into the lyrics DOM. Drop only
+    // the leading preview when it has the recognizable "Read More" marker;
+    // preserve lyric text if a song happens to mention that phrase later on.
+    const readMoreIndex = lines.findIndex((line) =>
+      /\bread\s*more\b/i.test(line),
+    );
+    if (readMoreIndex >= 0) {
+      const nextSectionIndex = lines.findIndex(
+        (line, index) =>
+          index >= readMoreIndex &&
+          LYRIC_SECTION_LABEL.test(
+            index === readMoreIndex
+              ? line.slice(line.search(/\bread\s*more\b/i) + 'Read More'.length)
+              : line,
+          ),
+      );
+      if (nextSectionIndex >= 0) lines.splice(0, nextSectionIndex + 1);
+      else lines.splice(0, readMoreIndex + 1);
+    }
+
+    return lines
+      .map((line) => line.replace(/<\/?(?:img|svg|path)\b[^>]*>/gi, '').trim())
+      .filter((line) => line.length > 0 && !NON_LYRIC_SECTION_LABEL.test(line));
   }
 }

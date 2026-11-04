@@ -48,7 +48,12 @@ if (
 }
 // This script is for local development only. The VPS override contains
 // production-only bind mounts (such as /etc/secrets/youtube-cookies.txt).
-const composeFiles = ['-f', 'docker-compose.yml'];
+const composeFiles = [
+  '-f',
+  'docker-compose.yml',
+  '-f',
+  'docker-compose.local.yml',
+];
 const composeArgs =
   command === 'up'
     ? ['compose', ...composeFiles, 'up', '-d', '--wait', 'db', 'redis']

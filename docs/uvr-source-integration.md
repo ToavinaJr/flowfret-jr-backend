@@ -79,6 +79,35 @@ Les versions de cache `uvr-mdx-0.48.0-voc-ft-v1` et
 Les tâches anciennes conservent leur moteur. Changer la recette ou le modèle
 nécessite de changer la version du cache.
 
+## Mesures réelles (3 novembre 2026)
+
+Worker complet, Python 3.12, `audio-separator[cpu]==0.48.0`, 4 threads, modèle
+Voc_FT téléchargé. Entrée : 29 s de parole synthétisée (Windows SAPI) centrée,
+mixée à des accords et une basse, pic du mix 0,40. Coefficients de projection des
+MP3 décodés sur la parole et la musique de référence (1,00 = niveau exact) :
+
+| Moteur | Piste voix : parole / musique | Instrumental : parole / musique |
+| --- | --- | --- |
+| `uvr-mdx` | 0,91 / 0,00 | 0,04 / 0,97 |
+| `uvr-ensemble` | 0,91 / 0,00 | 0,06 / 0,97 |
+| `uvr-demo` (simulation) | 0,89 / **0,84** | 0,08 / **0,13** |
+
+Appel brut à `Separator` sur le même mix : la voix sort à **0,375** du bon niveau
+(voir l'étape 5). Il s'agit de parole synthétique, pas d'un chant enregistré :
+la mesure prouve la chaîne et le niveau, pas la qualité sur une vraie chanson.
+
+**Durée.** `uvr-mdx` : 100 s pour ces 29 s, dont environ 63 s d'inférence
+(8 fenêtres de ~7,6 s) et le téléchargement initial du modèle ; `uvr-ensemble` :
+146 s. Le coût d'inférence est proportionnel à la durée. Pour une durée maximale
+de 420 s, extrapolez plusieurs fois ce temps, et davantage à 2 threads :
+`AUDIO_STEMS_TIMEOUT_MS=600000` risque de ne pas suffire. Mesurez sur le serveur
+cible avant de fixer ce délai. En mode ensemble, la jauge reste à 45 % pendant
+Demucs, qui ne publie pas de progression.
+
+**Dépendance.** audio-separator 0.48.0 importe `audioread` sans le déclarer, et
+librosa 1.0 ne l'installe plus : sans `audioread` dans
+`requirements-uvr-trained.txt`, le worker plante à l'import.
+
 ## Validation
 
 Les tests de contrat couvrent le choix explicite des trois modes UVR, les
