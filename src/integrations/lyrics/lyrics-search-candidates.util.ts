@@ -9,6 +9,22 @@ function stripBracketedNoise(value: string): string {
     .trim();
 }
 
+const YOUTUBE_TRAILING_NOISE_PATTERN =
+  /(?:\s*[-|–—]\s*|\s+)(?:(?:official|officiel)\s+)?(?:lyrics?|lyric\s+video|music\s+video|video|clip|audio|visualizer|karaoke)(?:\s+(?:official|officiel|lyrics?|video))*\s*$/i;
+
+function stripYouTubeTrailingNoise(value: string): string {
+  let cleaned = value.trim();
+  let previous: string;
+  do {
+    previous = cleaned;
+    cleaned = cleaned
+      .replace(YOUTUBE_TRAILING_NOISE_PATTERN, '')
+      .replace(/\s*[-|–—]\s*$/, '')
+      .trim();
+  } while (cleaned !== previous);
+  return cleaned;
+}
+
 /**
  * Raw YouTube video titles commonly bake the artist into the title itself
  * ("Artist - Title [Clip Officiel]"), with only an unreliable uploader
@@ -23,7 +39,11 @@ function stripBracketedNoise(value: string): string {
 export function buildLyricsSearchCandidates(
   track: TrackMetadata,
 ): TrackMetadata[] {
-  const cleanedTitle = stripBracketedNoise(track.title) || track.title;
+  const withoutBracketedNoise = stripBracketedNoise(track.title) || track.title;
+  const cleanedTitle =
+    track.provider === 'YOUTUBE'
+      ? stripYouTubeTrailingNoise(withoutBracketedNoise) || track.title
+      : withoutBracketedNoise;
   if (track.provider !== 'YOUTUBE') {
     return [{ ...track, title: cleanedTitle }];
   }
