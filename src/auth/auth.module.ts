@@ -29,6 +29,7 @@ import { AccountResolver } from './account.resolver';
       useFactory: (configService: ConfigService): JwtModuleOptions => ({
         secret: requiredJwtSecret(configService),
         signOptions: {
+          algorithm: 'HS256',
           expiresIn: (configService.get<string>('JWT_ACCESS_EXPIRES_IN') ??
             '15m') as NonNullable<JwtModuleOptions['signOptions']>['expiresIn'],
         },

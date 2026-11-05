@@ -155,6 +155,7 @@ export class AuthResolver {
   }
 
   @Public()
+  @RateLimit(20, 900, true)
   @Mutation(() => Boolean)
   async logout(
     @Context('req') request: Request,
