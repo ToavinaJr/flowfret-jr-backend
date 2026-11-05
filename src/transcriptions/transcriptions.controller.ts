@@ -24,6 +24,8 @@ import { TranscriptionsService } from './transcriptions.service';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { UpdateTranscriptionLrcDto } from './dto/update-transcription-lrc.dto';
+import { ListTranscriptionsQueryDto } from './dto/list-transcriptions-query.dto';
+import { RateLimits } from '../auth/rate-limit.decorator';
 
 @Controller('api/transcriptions')
 @UseGuards(AuthGuard('jwt'))
@@ -34,6 +36,12 @@ export class TranscriptionsController {
   ) {}
 
   @Post()
+  @RateLimits(
+    { limit: 10, windowSeconds: 60, failClosed: true, identity: 'ip' },
+    { limit: 80, windowSeconds: 3600, failClosed: true, identity: 'ip' },
+    { limit: 5, windowSeconds: 60, failClosed: true, identity: 'user' },
+    { limit: 40, windowSeconds: 3600, failClosed: true, identity: 'user' },
+  )
   create(
     @Body() dto: CreateTranscriptionDto,
     @Req() req: { user: { sub: string } },
@@ -44,16 +52,9 @@ export class TranscriptionsController {
   @Get()
   list(
     @Req() req: { user: { sub: string } },
-    @Query('take') take?: string,
-    @Query('skip') skip?: string,
+    @Query() query: ListTranscriptionsQueryDto,
   ) {
-    const parsed = Number(take ?? 20);
-    const parsedSkip = Number(skip ?? 0);
-    return this.service.list(
-      req.user.sub,
-      Number.isInteger(parsed) ? parsed : 20,
-      Number.isInteger(parsedSkip) ? parsedSkip : 0,
-    );
+    return this.service.list(req.user.sub, query.take, query.skip);
   }
 
   @Get('diagnostics/queue')
@@ -111,6 +112,12 @@ export class TranscriptionsController {
   }
 
   @Post(':id/retry')
+  @RateLimits(
+    { limit: 10, windowSeconds: 60, failClosed: true, identity: 'ip' },
+    { limit: 40, windowSeconds: 3600, failClosed: true, identity: 'ip' },
+    { limit: 5, windowSeconds: 60, failClosed: true, identity: 'user' },
+    { limit: 20, windowSeconds: 3600, failClosed: true, identity: 'user' },
+  )
   retry(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RetryTranscriptionDto,
