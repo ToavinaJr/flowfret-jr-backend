@@ -2,11 +2,13 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import * as cheerio from 'cheerio';
 import { firstValueFrom } from 'rxjs';
+import { resolveSafeLyricsPage } from './lyrics-page-safety';
 import { AzureChatService } from '../../azure-openai/azure-chat.service';
 import { AZURE_OPENAI_MAX_PAGE_TEXT_LENGTH } from '../../azure-openai/azure-openai.constants';
 import { BingSearchService } from '../../web-search/bing-search.service';
 import {
   LYRICS_GROUNDING_MIN_OVERLAP_RATIO,
+  LYRICS_WEB_MAX_PAGE_BYTES,
   LYRICS_WEB_PAGE_TIMEOUT_MS,
   LYRICS_WEB_SEARCH_RESULT_COUNT,
   LYRICS_WEB_USER_AGENT,
@@ -73,14 +75,22 @@ export class LlmWebSearchLyricsProvider implements LyricsProvider {
   }
 
   private async fetchPageText(url: string): Promise<string | undefined> {
+    const target = await resolveSafeLyricsPage(url);
+    if (!target) return undefined;
+
     try {
       const response = await firstValueFrom(
-        this.http.get<string>(url, {
+        this.http.get<string>(target.url.href, {
           headers: { 'User-Agent': LYRICS_WEB_USER_AGENT },
           timeout: LYRICS_WEB_PAGE_TIMEOUT_MS,
           responseType: 'text',
+          httpsAgent: target.agent,
+          proxy: false,
+          maxRedirects: 0,
+          maxContentLength: LYRICS_WEB_MAX_PAGE_BYTES,
         }),
       );
+      if (typeof response.data !== 'string') return undefined;
       const $ = cheerio.load(response.data);
       $('script, style, nav, header, footer').remove();
       const text = $('body')

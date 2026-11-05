@@ -47,7 +47,7 @@ export class PasswordResetService {
       await this.mailService.sendPasswordResetEmail({
         to: user.email,
         username: user.username,
-        resetLink: `${appUrl.replace(/\/$/, '')}/reset-password?token=${token}`,
+        resetLink: `${appUrl.replace(/\/$/, '')}/reset-password#token=${token}`,
         expiresInMinutes: PASSWORD_RESET_TTL_MINUTES,
       });
     } catch (error) {
@@ -64,20 +64,31 @@ export class PasswordResetService {
     });
     if (!record || record.usedAt || record.expiresAt.getTime() < Date.now())
       throw new BadRequestException('Invalid or expired password reset link.');
-    const usedAt = new Date();
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: record.userId },
-        data: { passwordHash: await bcrypt.hash(password, 10) },
-      }),
-      this.prisma.passwordResetToken.updateMany({
-        where: { userId: record.userId, usedAt: null },
+    const passwordHash = await bcrypt.hash(password, 10);
+    await this.prisma.$transaction(async (transaction) => {
+      const usedAt = new Date();
+      const consumed = await transaction.passwordResetToken.updateMany({
+        where: {
+          id: record.id,
+          usedAt: null,
+          expiresAt: { gt: usedAt },
+        },
         data: { usedAt },
-      }),
-      this.prisma.refreshToken.updateMany({
+      });
+      if (consumed.count !== 1) {
+        throw new BadRequestException(
+          'Invalid or expired password reset link.',
+        );
+      }
+
+      await transaction.user.update({
+        where: { id: record.userId },
+        data: { passwordHash },
+      });
+      await transaction.refreshToken.updateMany({
         where: { userId: record.userId, revokedAt: null },
         data: { revokedAt: usedAt },
-      }),
-    ]);
+      });
+    });
   }
 }

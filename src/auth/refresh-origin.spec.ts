@@ -41,6 +41,19 @@ describe('assertRefreshOrigin', () => {
     ).toThrow(ForbiddenException);
   });
 
+  it.each([
+    'https://example.com.attacker.test',
+    'https://example.com:8443',
+    'null',
+  ])('rejects a non-exact production origin: %s', (origin) => {
+    expect(() =>
+      assertRefreshOrigin(
+        { headers: { origin } },
+        config({ NODE_ENV: 'production', APP_URL: 'https://example.com' }),
+      ),
+    ).toThrow(ForbiddenException);
+  });
+
   it('keeps origin-less local tools working in development', () => {
     expect(() =>
       assertRefreshOrigin({ headers: {} }, config({ NODE_ENV: 'test' })),

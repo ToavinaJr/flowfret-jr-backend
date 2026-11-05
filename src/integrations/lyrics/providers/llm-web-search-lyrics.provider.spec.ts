@@ -1,8 +1,13 @@
 import { HttpService } from '@nestjs/axios';
+import { lookup } from 'node:dns/promises';
 import { of } from 'rxjs';
 import type { AzureChatService } from '../../azure-openai/azure-chat.service';
 import type { BingSearchService } from '../../web-search/bing-search.service';
 import { LlmWebSearchLyricsProvider } from './llm-web-search-lyrics.provider';
+
+jest.mock('node:dns/promises', () => ({ lookup: jest.fn() }));
+
+const mockedLookup = lookup as jest.Mock;
 
 describe('LlmWebSearchLyricsProvider', () => {
   const search = { search: jest.fn() };
@@ -12,6 +17,7 @@ describe('LlmWebSearchLyricsProvider', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
     provider = new LlmWebSearchLyricsProvider(
       search as unknown as BingSearchService,
       chat as unknown as AzureChatService,
@@ -86,6 +92,55 @@ describe('LlmWebSearchLyricsProvider', () => {
       ],
     });
     expect(http.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('pins HTTPS requests to a validated public IPv4 address and caps the body', async () => {
+    search.search.mockResolvedValue([
+      { url: 'https://example.com/a', snippet: '' },
+    ]);
+    http.get.mockReturnValue(
+      of({ data: '<html><body>Safe page text</body></html>' }),
+    );
+    chat.extractLyrics.mockResolvedValue('Safe page text');
+
+    await provider.findLyrics({ title: 'Song', artist: 'Artist' });
+
+    expect(http.get).toHaveBeenCalledWith(
+      'https://example.com/a',
+      expect.objectContaining({
+        maxRedirects: 0,
+        maxContentLength: 1_000_000,
+        proxy: false,
+        httpsAgent: expect.any(Object) as object,
+      }),
+    );
+  });
+
+  it('does not fetch search results resolving to a private address', async () => {
+    search.search.mockResolvedValue([
+      { url: 'https://lyrics.example/a', snippet: '' },
+    ]);
+    mockedLookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+
+    await expect(
+      provider.findLyrics({ title: 'Song', artist: 'Artist' }),
+    ).resolves.toBeNull();
+    expect(http.get).not.toHaveBeenCalled();
+    expect(chat.extractLyrics).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-HTTPS, credentialed, and non-standard-port result URLs', async () => {
+    search.search.mockResolvedValue([
+      { url: 'http://example.com/a', snippet: '' },
+      { url: 'https://user:pass@example.com/a', snippet: '' },
+      { url: 'https://example.com:8443/a', snippet: '' },
+    ]);
+
+    await expect(
+      provider.findLyrics({ title: 'Song', artist: 'Artist' }),
+    ).resolves.toBeNull();
+    expect(http.get).not.toHaveBeenCalled();
+    expect(mockedLookup).not.toHaveBeenCalled();
   });
 
   it('returns null when every candidate fails the grounding check', async () => {
