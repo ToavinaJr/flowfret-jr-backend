@@ -27,8 +27,12 @@ export class TranscriptionsService {
     return this.access.get(id, userId);
   }
 
-  list(userId: string, take = 20): Promise<TranscriptionResponse[]> {
-    return this.access.list(userId, take);
+  list(
+    userId: string,
+    take = 20,
+    skip = 0,
+  ): Promise<{ nodes: TranscriptionResponse[]; totalCount: number }> {
+    return this.access.list(userId, take, skip);
   }
 
   getEventSnapshot(id: string, userId: string): Promise<TranscriptionEvent> {

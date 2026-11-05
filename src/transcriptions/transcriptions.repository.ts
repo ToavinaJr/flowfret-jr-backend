@@ -36,17 +36,27 @@ export class TranscriptionsRepository {
       this.prisma.transcription.findUnique({ where: { id } }),
     );
   }
-  listForUser(userId: string, take: number): Promise<Transcription[]> {
-    return this.execute('listForUser', () =>
-      this.prisma.transcription.findMany({
-        where: {
-          isDeleted: false,
-          accessors: { some: { userId } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: Math.min(50, Math.max(1, take)),
-      }),
-    );
+  async listForUser(
+    userId: string,
+    take: number,
+    skip: number,
+  ): Promise<{ items: Transcription[]; totalCount: number }> {
+    const where: Prisma.TranscriptionWhereInput = {
+      isDeleted: false,
+      accessors: { some: { userId } },
+    };
+    return this.execute('listForUser', async () => {
+      const [items, totalCount] = await this.prisma.$transaction([
+        this.prisma.transcription.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: Math.min(50, Math.max(1, take)),
+          skip: Math.max(0, skip),
+        }),
+        this.prisma.transcription.count({ where }),
+      ]);
+      return { items, totalCount };
+    });
   }
   findCompatible(
     provider: MusicProvider,

@@ -166,6 +166,12 @@ enum ReportStatus {
   RESOLVED
 }
 
+enum ContactMessageStatus {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+}
+
 enum AttachmentKind {
   AUDIO
   IMAGE
@@ -959,6 +965,20 @@ model LyricsReport {
   @@index([provider, trackId, status])
   @@index([status, createdAt(sort: Desc)])
   @@map("lyrics_reports")
+}
+
+model ContactMessage {
+  id        String               @id @default(uuid()) @db.Uuid
+  name      String               @db.VarChar(100)
+  email     String               @db.VarChar(254)
+  subject   String               @db.VarChar(160)
+  message   String               @db.Text
+  status    ContactMessageStatus @default(NEW)
+  createdAt DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("contact_messages")
 }
 
 model LyricsOverride {

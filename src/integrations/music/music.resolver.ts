@@ -36,8 +36,9 @@ export class MusicResolver {
   myListeningHistory(
     @Context() context: { req: { user: { sub: string } } },
     @Args('take', { type: () => Int, defaultValue: 20 }) take: number,
+    @Args('skip', { type: () => Int, defaultValue: 0 }) skip: number,
   ): Promise<MusicTrack[]> {
-    return this.listeningHistory.list(context.req.user.sub, take);
+    return this.listeningHistory.list(context.req.user.sub, take, skip);
   }
 
   @Mutation(() => Boolean, { name: 'recordTrackListen' })

@@ -25,6 +25,7 @@ import { AdminModule } from './admin/admin.module';
 import { TeachingModule } from './teaching/teaching.module';
 import { ChatModule } from './chat/chat.module';
 import { getEnvironmentFilePaths } from './common/environment';
+import { ContactModule } from './contact/contact.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { getEnvironmentFilePaths } from './common/environment';
     AdminModule,
     TeachingModule,
     ChatModule,
+    ContactModule,
     GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
       inject: [ConfigService, PrismaService],

@@ -42,11 +42,17 @@ export class TranscriptionsController {
   }
 
   @Get()
-  list(@Req() req: { user: { sub: string } }, @Query('take') take?: string) {
+  list(
+    @Req() req: { user: { sub: string } },
+    @Query('take') take?: string,
+    @Query('skip') skip?: string,
+  ) {
     const parsed = Number(take ?? 20);
+    const parsedSkip = Number(skip ?? 0);
     return this.service.list(
       req.user.sub,
       Number.isInteger(parsed) ? parsed : 20,
+      Number.isInteger(parsedSkip) ? parsedSkip : 0,
     );
   }
 

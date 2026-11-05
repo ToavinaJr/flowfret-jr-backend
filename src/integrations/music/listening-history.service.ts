@@ -47,11 +47,12 @@ export class ListeningHistoryService {
     return true;
   }
 
-  async list(userId: string, take: number): Promise<MusicTrack[]> {
+  async list(userId: string, take: number, skip = 0): Promise<MusicTrack[]> {
     const rows = await this.prisma.listeningHistory.findMany({
       where: { userId },
       orderBy: { lastPlayedAt: 'desc' },
       take: Math.min(50, Math.max(1, take)),
+      skip: Math.max(0, skip),
     });
     return rows.map((row) => ({
       provider: row.provider,

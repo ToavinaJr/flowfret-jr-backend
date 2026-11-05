@@ -49,7 +49,10 @@ export function createTranscriptionFixture(
     findCompatible: jest.fn().mockResolvedValue(existing),
     create: jest.fn().mockResolvedValue(transcriptionRecord),
     findById: jest.fn().mockResolvedValue(existing ?? transcriptionRecord),
-    listForUser: jest.fn().mockResolvedValue([existing ?? transcriptionRecord]),
+    listForUser: jest.fn().mockResolvedValue({
+      items: [existing ?? transcriptionRecord],
+      totalCount: 1,
+    }),
     update: jest.fn(),
     grantAccess: jest.fn().mockResolvedValue(undefined),
     hasAccess: jest.fn().mockResolvedValue(true),

@@ -33,9 +33,17 @@ export class TranscriptionAccessService {
     return toTranscriptionResponse(item, completed ? null : jobId, completed);
   }
 
-  async list(userId: string, take = 20): Promise<TranscriptionResponse[]> {
-    const items = await this.repository.listForUser(userId, take);
-    return items.map((item) =>
+  async list(
+    userId: string,
+    take = 20,
+    skip = 0,
+  ): Promise<{ nodes: TranscriptionResponse[]; totalCount: number }> {
+    const { items, totalCount } = await this.repository.listForUser(
+      userId,
+      take,
+      skip,
+    );
+    const nodes = items.map((item) =>
       toTranscriptionResponse(
         item,
         item.status === TranscriptionStatus.COMPLETED
@@ -52,6 +60,7 @@ export class TranscriptionAccessService {
         item.status === TranscriptionStatus.COMPLETED,
       ),
     );
+    return { nodes, totalCount };
   }
 
   async snapshot(id: string, userId: string): Promise<TranscriptionEvent> {

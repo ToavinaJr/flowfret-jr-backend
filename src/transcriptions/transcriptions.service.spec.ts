@@ -18,7 +18,9 @@ describe('TranscriptionsService', () => {
   const retry = jest.fn().mockResolvedValue(response);
   const get = jest.fn().mockResolvedValue(response);
   const snapshot = jest.fn().mockResolvedValue(event);
-  const list = jest.fn().mockResolvedValue([response]);
+  const list = jest
+    .fn()
+    .mockResolvedValue({ nodes: [response], totalCount: 1 });
   const lrc = jest
     .fn()
     .mockResolvedValue({ content: 'lrc', filename: 'track.lrc' });
@@ -52,8 +54,11 @@ describe('TranscriptionsService', () => {
   });
 
   it('delegates history reads to the access service', async () => {
-    await expect(service.list('user', 10)).resolves.toEqual([response]);
-    expect(list).toHaveBeenCalledWith('user', 10);
+    await expect(service.list('user', 10)).resolves.toEqual({
+      nodes: [response],
+      totalCount: 1,
+    });
+    expect(list).toHaveBeenCalledWith('user', 10, 0);
   });
 
   it('delegates snapshots to the access service', async () => {
