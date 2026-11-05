@@ -1,4 +1,4 @@
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { ContactMessageStatus } from '@prisma/client';
 import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
 
@@ -17,7 +17,6 @@ export class ListContactMessagesDto {
   skip = 0;
 
   @IsOptional()
-  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsEnum(ContactMessageStatus)
   status?: ContactMessageStatus;
 }
