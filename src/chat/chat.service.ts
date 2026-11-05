@@ -19,6 +19,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { visibleAvatarUrl } from '../users/avatar-visibility';
 import { ChatRealtimeService } from './chat-realtime.service';
 
+const CHAT_NICKNAME_MAX_LENGTH = 50;
+
 const chatInclude = {
   participants: {
     where: { isDeleted: false },
@@ -301,8 +303,10 @@ export class ChatService {
       throw new BadRequestException('Invalid conversation id.');
     await this.assertParticipant(conversationId, userId);
     const normalized = nickname?.trim() || null;
-    if (normalized && normalized.length > 50)
-      throw new BadRequestException('Nickname is limited to 50 characters.');
+    if (normalized && normalized.length > CHAT_NICKNAME_MAX_LENGTH)
+      throw new BadRequestException(
+        `Nickname is limited to ${CHAT_NICKNAME_MAX_LENGTH} characters.`,
+      );
     await this.prisma.conversationParticipant.update({
       where: { conversationId_userId: { conversationId, userId } },
       data: { nickname: normalized },

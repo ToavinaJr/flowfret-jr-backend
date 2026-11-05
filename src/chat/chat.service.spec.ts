@@ -19,6 +19,7 @@ describe('ChatService', () => {
       findFirst: jest.fn(),
       count: jest.fn(),
       updateMany: jest.fn(),
+      update: jest.fn(),
     },
   };
   const realtime = { publish: jest.fn() };
@@ -75,6 +76,44 @@ describe('ChatService', () => {
     await expect(
       service.assertParticipant('known-id', 'outsider'),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('trims a conversation nickname before saving it', async () => {
+    prisma.conversationParticipant.findFirst.mockResolvedValue({
+      id: 'membership',
+    });
+    prisma.conversationParticipant.update.mockResolvedValue({});
+
+    await service.setNickname(
+      userA,
+      '00000000-0000-4000-8000-000000000003',
+      '  Stage name  ',
+    );
+
+    expect(prisma.conversationParticipant.update).toHaveBeenCalledWith({
+      where: {
+        conversationId_userId: {
+          conversationId: '00000000-0000-4000-8000-000000000003',
+          userId: userA,
+        },
+      },
+      data: { nickname: 'Stage name' },
+    });
+  });
+
+  it('rejects conversation nicknames longer than 50 characters', async () => {
+    prisma.conversationParticipant.findFirst.mockResolvedValue({
+      id: 'membership',
+    });
+
+    await expect(
+      service.setNickname(
+        userA,
+        '00000000-0000-4000-8000-000000000003',
+        'x'.repeat(51),
+      ),
+    ).rejects.toThrow('Nickname is limited to 50 characters.');
+    expect(prisma.conversationParticipant.update).not.toHaveBeenCalled();
   });
 
   it('prevents the only group administrator from demoting themselves', async () => {
