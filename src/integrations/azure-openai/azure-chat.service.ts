@@ -59,7 +59,10 @@ export class AzureChatService {
               { role: 'system', content: LYRICS_EXTRACTION_SYSTEM_PROMPT },
               {
                 role: 'user',
-                content: `Song: "${track.title}" by "${track.artist}"\n\nPage text:\n${pageText}`,
+                content: JSON.stringify({
+                  track: { title: track.title, artist: track.artist },
+                  webpageText: pageText,
+                }),
               },
             ],
           },
