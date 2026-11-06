@@ -52,6 +52,7 @@ export class TeachingCourseModel {
   @Field(() => String, { nullable: true }) level!: string | null;
   @Field(() => TeachingCourseFormat) format!: TeachingCourseFormat;
   @Field(() => Int) maxStudents!: number;
+  @Field(() => Int) reservedSeats!: number;
   @Field(() => TeachingMode) teachingMode!: TeachingMode;
   /** Price is an integer in the smallest currency unit (for example cents). */
   @Field(() => Int) priceAmount!: number;

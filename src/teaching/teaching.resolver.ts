@@ -32,7 +32,28 @@ const activeEnrollmentStatuses: TeachingEnrollmentStatus[] = [
   TeachingEnrollmentStatus.REQUESTED,
   TeachingEnrollmentStatus.INVITED,
   TeachingEnrollmentStatus.ACTIVE,
+  TeachingEnrollmentStatus.PAUSED,
 ];
+
+const reservedSeatCount = {
+  _count: {
+    select: {
+      enrollments: {
+        where: {
+          isDeleted: false,
+          status: { in: activeEnrollmentStatuses },
+        },
+      },
+    },
+  },
+} satisfies Prisma.TeachingCourseInclude;
+
+function presentCourseWithSeats<T extends { _count: { enrollments: number } }>(
+  course: T,
+) {
+  const { _count, ...rest } = course;
+  return { ...rest, reservedSeats: _count.enrollments };
+}
 
 @Resolver()
 export class TeachingResolver {
@@ -42,12 +63,12 @@ export class TeachingResolver {
   ) {}
 
   @Query(() => [TeachingCourseModel], { name: 'publishedTeachingCourses' })
-  publishedTeachingCourses(
+  async publishedTeachingCourses(
     @Args('take', { type: () => Int, nullable: true }) take = 30,
     @Args('after', { nullable: true }) after?: string,
   ) {
     const safeTake = Math.min(Math.max(take, 1), 50);
-    return this.prisma.teachingCourse.findMany({
+    const courses = await this.prisma.teachingCourse.findMany({
       where: {
         status: TeachingCourseStatus.PUBLISHED,
         isDeleted: false,
@@ -58,23 +79,27 @@ export class TeachingResolver {
         },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      include: reservedSeatCount,
       take: safeTake,
       ...(after ? { skip: 1, cursor: { id: after } } : {}),
     });
+    return courses.map(presentCourseWithSeats);
   }
 
   @Query(() => [TeachingCourseModel], { name: 'myTeachingCourses' })
-  myTeachingCourses(@Context() context: TeachingContext) {
-    return this.prisma.teachingCourse.findMany({
+  async myTeachingCourses(@Context() context: TeachingContext) {
+    const courses = await this.prisma.teachingCourse.findMany({
       where: { isDeleted: false, instructor: { userId: context.req.user.sub } },
       orderBy: { updatedAt: 'desc' },
       take: 100,
+      include: reservedSeatCount,
     });
+    return courses.map(presentCourseWithSeats);
   }
 
   @Query(() => [TeachingCourseModel], { name: 'myEnrolledTeachingCourses' })
-  myEnrolledTeachingCourses(@Context() context: TeachingContext) {
-    return this.prisma.teachingCourse.findMany({
+  async myEnrolledTeachingCourses(@Context() context: TeachingContext) {
+    const courses = await this.prisma.teachingCourse.findMany({
       where: {
         isDeleted: false,
         enrollments: {
@@ -86,7 +111,9 @@ export class TeachingResolver {
         },
       },
       orderBy: { updatedAt: 'desc' },
+      include: reservedSeatCount,
     });
+    return courses.map(presentCourseWithSeats);
   }
 
   @Query(() => [TeachingEnrollmentModel], { name: 'myTeachingEnrollments' })
@@ -111,6 +138,33 @@ export class TeachingResolver {
       ...row,
       courseTitle: row.course.title,
       instructorUsername: row.course.instructor.user.username,
+    }));
+  }
+
+  @Query(() => [TeachingEnrollmentModel], {
+    name: 'myTeachingCourseEnrollments',
+  })
+  async myTeachingCourseEnrollments(@Context() context: TeachingContext) {
+    const rows = await this.prisma.teachingEnrollment.findMany({
+      where: {
+        isDeleted: false,
+        status: { in: activeEnrollmentStatuses },
+        course: {
+          isDeleted: false,
+          instructor: { userId: context.req.user.sub },
+        },
+      },
+      include: {
+        student: { select: { username: true } },
+        course: { select: { title: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 500,
+    });
+    return rows.map((row) => ({
+      ...row,
+      studentUsername: row.student.username,
+      courseTitle: row.course.title,
     }));
   }
 
@@ -139,6 +193,7 @@ export class TeachingResolver {
           durationMinutes: data.durationMinutes,
           status: TeachingCourseStatus.DRAFT,
         },
+        include: reservedSeatCount,
       });
       await tx.auditLog.create({
         data: {
@@ -151,7 +206,7 @@ export class TeachingResolver {
       });
       return created;
     });
-    return course;
+    return presentCourseWithSeats(course);
   }
 
   @Mutation(() => TeachingCourseModel)
@@ -199,6 +254,7 @@ export class TeachingResolver {
       const result = await tx.teachingCourse.update({
         where: { id },
         data: patch,
+        include: reservedSeatCount,
       });
       await tx.auditLog.create({
         data: {
@@ -211,7 +267,7 @@ export class TeachingResolver {
       });
       return result;
     });
-    return updated;
+    return presentCourseWithSeats(updated);
   }
 
   @Mutation(() => TeachingCourseModel)
@@ -235,6 +291,7 @@ export class TeachingResolver {
           isDeleted: true,
           deletedAt: new Date(),
         },
+        include: reservedSeatCount,
       });
       await tx.teachingEnrollment.updateMany({
         where: {
@@ -286,7 +343,7 @@ export class TeachingResolver {
           timeZone: lesson.timeZone,
         });
     }
-    return result.archived;
+    return { ...presentCourseWithSeats(result.archived), reservedSeats: 0 };
   }
 
   @Query(() => [TeachingEnrollmentModel], { name: 'teachingCourseEnrollments' })
@@ -534,6 +591,17 @@ export class TeachingResolver {
           courseId: enrollment.courseId,
           enrollmentId,
           studentId: context.req.user.sub,
+        },
+      );
+    else
+      await this.createNotification(
+        enrollment.course.instructor.userId,
+        'TEACHING_ENROLLMENT_UPDATED',
+        {
+          courseId: enrollment.courseId,
+          enrollmentId,
+          studentId: context.req.user.sub,
+          status: TeachingEnrollmentStatus.CANCELLED,
         },
       );
     return result;
