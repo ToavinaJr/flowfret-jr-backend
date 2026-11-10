@@ -66,6 +66,8 @@ export function validateEnvironment(
     'socks5h:',
   ]);
   validateOptionalBoolean(environment.YOUTUBE_DL_VERBOSE, 'YOUTUBE_DL_VERBOSE');
+  validateOptionalBoolean(environment.CHORD_TRANSCRIPTION, 'CHORD_TRANSCRIPTION');
+  validateOptionalBoolean(environment.LYRICS_TRANSCRIPTION, 'LYRICS_TRANSCRIPTION');
 
   for (const key of POSITIVE_INTEGER_KEYS) {
     const raw = environment[key];

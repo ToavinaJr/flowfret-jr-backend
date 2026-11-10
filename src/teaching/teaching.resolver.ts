@@ -35,7 +35,7 @@ const activeEnrollmentStatuses: TeachingEnrollmentStatus[] = [
   TeachingEnrollmentStatus.PAUSED,
 ];
 
-const reservedSeatCount = {
+const coursePresentationInclude = {
   _count: {
     select: {
       enrollments: {
@@ -46,13 +46,51 @@ const reservedSeatCount = {
       },
     },
   },
+  instructor: {
+    select: {
+      headline: true,
+      experienceYears: true,
+      specialties: true,
+      languages: true,
+      user: {
+        select: {
+          username: true,
+          profile: { select: { displayName: true, avatarUrl: true } },
+        },
+      },
+    },
+  },
 } satisfies Prisma.TeachingCourseInclude;
 
-function presentCourseWithSeats<T extends { _count: { enrollments: number } }>(
+function presentCourseWithSeats<
+  T extends {
+    _count: { enrollments: number };
+    instructor?: {
+      headline: string | null;
+      experienceYears: number | null;
+      specialties: string[];
+      languages: string[];
+      user: {
+        username: string;
+        profile: { displayName: string; avatarUrl: string | null } | null;
+      };
+    };
+  },
+>(
   course: T,
 ) {
-  const { _count, ...rest } = course;
-  return { ...rest, reservedSeats: _count.enrollments };
+  const { _count, instructor, ...rest } = course;
+  return {
+    ...rest,
+    reservedSeats: _count.enrollments,
+    instructorUsername: instructor?.user.username ?? null,
+    instructorDisplayName: instructor?.user.profile?.displayName ?? null,
+    instructorAvatarUrl: instructor?.user.profile?.avatarUrl ?? null,
+    instructorHeadline: instructor?.headline ?? null,
+    instructorExperienceYears: instructor?.experienceYears ?? null,
+    instructorSpecialties: instructor?.specialties ?? [],
+    instructorLanguages: instructor?.languages ?? [],
+  };
 }
 
 @Resolver()
@@ -79,7 +117,7 @@ export class TeachingResolver {
         },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      include: reservedSeatCount,
+      include: coursePresentationInclude,
       take: safeTake,
       ...(after ? { skip: 1, cursor: { id: after } } : {}),
     });
@@ -92,7 +130,7 @@ export class TeachingResolver {
       where: { isDeleted: false, instructor: { userId: context.req.user.sub } },
       orderBy: { updatedAt: 'desc' },
       take: 100,
-      include: reservedSeatCount,
+      include: coursePresentationInclude,
     });
     return courses.map(presentCourseWithSeats);
   }
@@ -111,7 +149,7 @@ export class TeachingResolver {
         },
       },
       orderBy: { updatedAt: 'desc' },
-      include: reservedSeatCount,
+      include: coursePresentationInclude,
     });
     return courses.map(presentCourseWithSeats);
   }
@@ -193,7 +231,7 @@ export class TeachingResolver {
           durationMinutes: data.durationMinutes,
           status: TeachingCourseStatus.DRAFT,
         },
-        include: reservedSeatCount,
+        include: coursePresentationInclude,
       });
       await tx.auditLog.create({
         data: {
@@ -254,7 +292,7 @@ export class TeachingResolver {
       const result = await tx.teachingCourse.update({
         where: { id },
         data: patch,
-        include: reservedSeatCount,
+        include: coursePresentationInclude,
       });
       await tx.auditLog.create({
         data: {
@@ -291,7 +329,7 @@ export class TeachingResolver {
           isDeleted: true,
           deletedAt: new Date(),
         },
-        include: reservedSeatCount,
+        include: coursePresentationInclude,
       });
       await tx.teachingEnrollment.updateMany({
         where: {

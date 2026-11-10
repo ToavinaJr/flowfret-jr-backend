@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MusicProvider, Prisma, TranscriptionStatus } from '@prisma/client';
 import { CreateTranscriptionDto } from './dto/create-transcription.dto';
@@ -123,6 +128,7 @@ export class TranscriptionWorkflowService {
       );
       return toTranscriptionResponse(item, null, true);
     }
+    this.assertLyricsTranscriptionEnabled();
     const jobId = await this.queue.enqueue(item, dto, this.engineVersion);
     await this.queueDiagnostics.log(item.id);
     if (created)
@@ -140,6 +146,7 @@ export class TranscriptionWorkflowService {
     audioUrl: string,
     userId: string,
   ): Promise<TranscriptionResponse> {
+    this.assertLyricsTranscriptionEnabled();
     const item = await this.access.requireOne(id, userId);
     if (item.status !== TranscriptionStatus.FAILED)
       throw new ConflictException({
@@ -184,5 +191,14 @@ export class TranscriptionWorkflowService {
     );
     await this.queueDiagnostics.log(id);
     return toTranscriptionResponse(reset, jobId, false);
+  }
+
+  private assertLyricsTranscriptionEnabled(): void {
+    if (this.config.get<string>('LYRICS_TRANSCRIPTION')?.trim().toLowerCase() === 'false') {
+      throw new ServiceUnavailableException({
+        code: 'LYRICS_TRANSCRIPTION_DISABLED',
+        message: 'Lyrics transcription is disabled by configuration.',
+      });
+    }
   }
 }
