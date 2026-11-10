@@ -76,9 +76,7 @@ function presentCourseWithSeats<
       };
     };
   },
->(
-  course: T,
-) {
+>(course: T) {
   const { _count, instructor, ...rest } = course;
   return {
     ...rest,

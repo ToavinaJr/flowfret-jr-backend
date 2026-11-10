@@ -61,10 +61,12 @@ export class TeachingCourseModel {
   @Field(() => Int) durationMinutes!: number;
   @Field(() => TeachingCourseStatus) status!: TeachingCourseStatus;
   @Field(() => String, { nullable: true }) instructorUsername!: string | null;
-  @Field(() => String, { nullable: true }) instructorDisplayName!: string | null;
+  @Field(() => String, { nullable: true })
+  instructorDisplayName!: string | null;
   @Field(() => String, { nullable: true }) instructorAvatarUrl!: string | null;
   @Field(() => String, { nullable: true }) instructorHeadline!: string | null;
-  @Field(() => Int, { nullable: true }) instructorExperienceYears!: number | null;
+  @Field(() => Int, { nullable: true })
+  instructorExperienceYears!: number | null;
   @Field(() => [String]) instructorSpecialties!: string[];
   @Field(() => [String]) instructorLanguages!: string[];
   @Field(() => GraphQLISODateTime) createdAt!: Date;
