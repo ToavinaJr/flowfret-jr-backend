@@ -41,6 +41,28 @@ export class MusicResolver {
     return this.listeningHistory.list(context.req.user.sub, take, skip);
   }
 
+  @Query(() => [MusicTrack], { name: 'myFavoriteMusic' })
+  myFavoriteMusic(
+    @Context() context: { req: { user: { sub: string } } },
+    @Args('take', { type: () => Int, defaultValue: 50 }) take: number,
+    @Args('skip', { type: () => Int, defaultValue: 0 }) skip: number,
+  ): Promise<MusicTrack[]> {
+    return this.listeningHistory.listFavorites(context.req.user.sub, take, skip);
+  }
+
+  @Mutation(() => Boolean, { name: 'setTrackFavorite' })
+  @RateLimits(
+    { limit: 60, windowSeconds: 60, failClosed: true },
+    { limit: 1000, windowSeconds: 86_400, failClosed: true },
+  )
+  setTrackFavorite(
+    @Args('track') track: RecordTrackListenInput,
+    @Args('favorite') favorite: boolean,
+    @Context() context: { req: { user: { sub: string } } },
+  ): Promise<boolean> {
+    return this.listeningHistory.setFavorite(context.req.user.sub, track, favorite);
+  }
+
   @Mutation(() => Boolean, { name: 'recordTrackListen' })
   @RateLimits(
     { limit: 60, windowSeconds: 60, failClosed: true },

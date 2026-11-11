@@ -74,6 +74,10 @@ export function validateEnvironment(
     environment.LYRICS_TRANSCRIPTION,
     'LYRICS_TRANSCRIPTION',
   );
+  validateOptionalBoolean(
+    environment.EQUALIZER_TRANSCRIPTION,
+    'EQUALIZER_TRANSCRIPTION',
+  );
 
   for (const key of POSITIVE_INTEGER_KEYS) {
     const raw = environment[key];

@@ -47,9 +47,90 @@ export class ListeningHistoryService {
     return true;
   }
 
+  async setFavorite(
+    userId: string,
+    input: RecordTrackListenInput,
+    favorite: boolean,
+  ): Promise<boolean> {
+    const providerTrackId = input.providerTrackId.trim();
+    const where = {
+      userId_provider_providerTrackId: {
+        userId,
+        provider: input.provider,
+        providerTrackId,
+      },
+    };
+    if (!favorite) {
+      await this.prisma.listeningHistory.updateMany({
+        where: { userId, provider: input.provider, providerTrackId },
+        data: { isFavorite: false },
+      });
+      return false;
+    }
+
+    const snapshot = {
+      title: input.title.trim(),
+      artists: input.artists.map((artist) => ({
+        id: artist.id.trim(),
+        name: artist.name.trim(),
+      })) as unknown as Prisma.InputJsonValue,
+      imageUrl: input.imageUrl ?? null,
+      externalUrl: input.externalUrl,
+      streamUrl: input.streamUrl,
+      album: input.album?.trim() || null,
+      genre: input.genre?.trim() || null,
+      isrc: input.isrc?.trim() || null,
+      durationMs: input.durationMs,
+      isFavorite: true,
+    };
+    await this.prisma.listeningHistory.upsert({
+      where,
+      update: snapshot,
+      create: {
+        userId,
+        provider: input.provider,
+        providerTrackId,
+        ...snapshot,
+        playCount: 0,
+      },
+    });
+    return true;
+  }
+
+  async listFavorites(
+    userId: string,
+    take = 50,
+    skip = 0,
+  ): Promise<MusicTrack[]> {
+    const rows = await this.prisma.listeningHistory.findMany({
+      where: { userId, isFavorite: true },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      take: Math.min(100, Math.max(1, take)),
+      skip: Math.max(0, skip),
+    });
+    return rows.map((row) => ({
+      provider: row.provider,
+      id: row.providerTrackId,
+      providerTrackId: row.providerTrackId,
+      audiusId: row.providerTrackId,
+      title: row.title,
+      artists: this.readArtists(row.artists),
+      imageUrl: row.imageUrl,
+      audiusUrl: row.externalUrl,
+      externalUrl: row.externalUrl,
+      album: row.album,
+      isrc: row.isrc,
+      streamUrl: row.streamUrl,
+      genre: row.genre,
+      geniusUrl: null,
+      geniusMatchScore: null,
+      durationMs: row.durationMs,
+    }));
+  }
+
   async list(userId: string, take: number, skip = 0): Promise<MusicTrack[]> {
     const rows = await this.prisma.listeningHistory.findMany({
-      where: { userId },
+      where: { userId, playCount: { gt: 0 } },
       orderBy: { lastPlayedAt: 'desc' },
       take: Math.min(50, Math.max(1, take)),
       skip: Math.max(0, skip),
@@ -79,13 +160,14 @@ export class ListeningHistoryService {
       by: ['provider', 'providerTrackId'],
       _sum: { playCount: true },
       orderBy: [{ _sum: { playCount: 'desc' } }, { providerTrackId: 'asc' }],
-      take: Math.min(10, Math.max(1, take)),
+      take: Math.min(50, Math.max(1, take * 5)),
     });
-    if (!rankings.length) return [];
+    const playedRankings = rankings.filter((ranking) => (ranking._sum.playCount ?? 0) > 0).slice(0, take);
+    if (!playedRankings.length) return [];
 
     const rows = await this.prisma.listeningHistory.findMany({
       where: {
-        OR: rankings.map(({ provider, providerTrackId }) => ({
+        OR: playedRankings.map(({ provider, providerTrackId }) => ({
           provider,
           providerTrackId,
         })),
@@ -98,7 +180,7 @@ export class ListeningHistoryService {
       if (!snapshots.has(key)) snapshots.set(key, row);
     }
 
-    return rankings.flatMap(({ provider, providerTrackId }) => {
+    return playedRankings.flatMap(({ provider, providerTrackId }) => {
       const row = snapshots.get(`${provider}:${providerTrackId}`);
       if (!row) return [];
       return [

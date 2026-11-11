@@ -356,6 +356,7 @@ model ListeningHistory {
   isrc            String?       @db.VarChar(32)
   durationMs      Int           @map("duration_ms")
   playCount       Int           @default(1) @map("play_count")
+  isFavorite      Boolean       @default(false) @map("is_favorite")
   lastPlayedAt    DateTime      @default(now()) @map("last_played_at") @db.Timestamptz(6)
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -364,6 +365,7 @@ model ListeningHistory {
 
   @@unique([userId, provider, providerTrackId], map: "listening_history_user_provider_track_unique")
   @@index([userId, lastPlayedAt(sort: Desc)])
+  @@index([userId, isFavorite, updatedAt(sort: Desc)])
   @@map("listening_history")
 }
 

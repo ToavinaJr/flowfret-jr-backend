@@ -12,11 +12,19 @@ export class AppController {
 
   @Public()
   @Get('api/features')
-  getRuntimeFeatures(): { chordTranscription: boolean } {
+  getRuntimeFeatures(): {
+    chordTranscription: boolean;
+    equalizerTranscription: boolean;
+  } {
     return {
       chordTranscription:
         this.config
           .get<string>('CHORD_TRANSCRIPTION')
+          ?.trim()
+          .toLowerCase() === 'true',
+      equalizerTranscription:
+        this.config
+          .get<string>('EQUALIZER_TRANSCRIPTION')
           ?.trim()
           .toLowerCase() === 'true',
     };
