@@ -58,6 +58,40 @@ export class TranscriptionsRepository {
       return { items, totalCount };
     });
   }
+  /**
+   * Read-only lookup of the transcription a user already has for a track:
+   * the latest completed one, otherwise the latest still in progress.
+   * Never creates a job.
+   */
+  findLatestAccessibleForTrack(
+    userId: string,
+    provider: MusicProvider,
+    trackId: string,
+  ): Promise<Transcription | null> {
+    const where: Prisma.TranscriptionWhereInput = {
+      provider,
+      trackId,
+      isDeleted: false,
+      accessors: { some: { userId } },
+    };
+    const orderBy: Prisma.TranscriptionOrderByWithRelationInput[] = [
+      { updatedAt: 'desc' },
+      { id: 'desc' },
+    ];
+    return this.execute('findLatestAccessibleForTrack', async () => {
+      const completed = await this.prisma.transcription.findFirst({
+        where: { ...where, status: TranscriptionStatus.COMPLETED },
+        orderBy,
+      });
+      return (
+        completed ??
+        this.prisma.transcription.findFirst({
+          where: { ...where, status: { not: TranscriptionStatus.FAILED } },
+          orderBy,
+        })
+      );
+    });
+  }
   findCompatible(
     provider: MusicProvider,
     trackId: string,

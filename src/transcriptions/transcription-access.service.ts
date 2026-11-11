@@ -3,7 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Transcription, TranscriptionStatus } from '@prisma/client';
+import {
+  MusicProvider,
+  Transcription,
+  TranscriptionStatus,
+} from '@prisma/client';
 import type { TranscriptionEvent } from './entities/transcription.types';
 import {
   toTranscriptionResponse,
@@ -21,16 +25,7 @@ export class TranscriptionAccessService {
   constructor(private readonly repository: TranscriptionsRepository) {}
 
   async get(id: string, userId: string): Promise<TranscriptionResponse> {
-    const item = await this.requireOne(id, userId);
-    const jobId = buildTranscriptionJobId(
-      item.trackId,
-      item.requestedLanguage === 'auto' ? undefined : item.requestedLanguage,
-      item.model,
-      item.engineVersion,
-      item.provider,
-    );
-    const completed = item.status === TranscriptionStatus.COMPLETED;
-    return toTranscriptionResponse(item, completed ? null : jobId, completed);
+    return this.present(await this.requireOne(id, userId));
   }
 
   async list(
@@ -43,24 +38,36 @@ export class TranscriptionAccessService {
       take,
       skip,
     );
-    const nodes = items.map((item) =>
-      toTranscriptionResponse(
-        item,
-        item.status === TranscriptionStatus.COMPLETED
-          ? null
-          : buildTranscriptionJobId(
-              item.trackId,
-              item.requestedLanguage === 'auto'
-                ? undefined
-                : item.requestedLanguage,
-              item.model,
-              item.engineVersion,
-              item.provider,
-            ),
-        item.status === TranscriptionStatus.COMPLETED,
-      ),
+    return { nodes: items.map((item) => this.present(item)), totalCount };
+  }
+
+  async findForTrack(
+    userId: string,
+    provider: MusicProvider,
+    trackId: string,
+  ): Promise<TranscriptionResponse | null> {
+    const item = await this.repository.findLatestAccessibleForTrack(
+      userId,
+      provider,
+      trackId,
     );
-    return { nodes, totalCount };
+    return item ? this.present(item) : null;
+  }
+
+  private present(item: Transcription): TranscriptionResponse {
+    const completed = item.status === TranscriptionStatus.COMPLETED;
+    const jobId = completed
+      ? null
+      : buildTranscriptionJobId(
+          item.trackId,
+          item.requestedLanguage === 'auto'
+            ? undefined
+            : item.requestedLanguage,
+          item.model,
+          item.engineVersion,
+          item.provider,
+        );
+    return toTranscriptionResponse(item, jobId, completed);
   }
 
   async snapshot(id: string, userId: string): Promise<TranscriptionEvent> {

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { MusicProvider } from '@prisma/client';
 import { CreateTranscriptionDto } from './dto/create-transcription.dto';
 import type { TranscriptionEvent } from './entities/transcription.types';
 import { TranscriptionAccessService } from './transcription-access.service';
@@ -33,6 +34,14 @@ export class TranscriptionsService {
     skip = 0,
   ): Promise<{ nodes: TranscriptionResponse[]; totalCount: number }> {
     return this.access.list(userId, take, skip);
+  }
+
+  findForTrack(
+    userId: string,
+    provider: MusicProvider,
+    trackId: string,
+  ): Promise<TranscriptionResponse | null> {
+    return this.access.findForTrack(userId, provider, trackId);
   }
 
   getEventSnapshot(id: string, userId: string): Promise<TranscriptionEvent> {

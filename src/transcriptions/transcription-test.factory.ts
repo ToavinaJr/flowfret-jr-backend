@@ -47,6 +47,7 @@ export function createTranscriptionFixture(
 ) {
   const repository = {
     findCompatible: jest.fn().mockResolvedValue(existing),
+    findLatestAccessibleForTrack: jest.fn().mockResolvedValue(existing),
     create: jest.fn().mockResolvedValue(transcriptionRecord),
     findById: jest.fn().mockResolvedValue(existing ?? transcriptionRecord),
     listForUser: jest.fn().mockResolvedValue({

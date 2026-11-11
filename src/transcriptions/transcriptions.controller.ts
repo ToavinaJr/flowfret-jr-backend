@@ -25,6 +25,7 @@ import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { UpdateTranscriptionLrcDto } from './dto/update-transcription-lrc.dto';
 import { ListTranscriptionsQueryDto } from './dto/list-transcriptions-query.dto';
+import { FindTrackTranscriptionQueryDto } from './dto/find-track-transcription-query.dto';
 import { RateLimits } from '../auth/rate-limit.decorator';
 
 @Controller('api/transcriptions')
@@ -61,6 +62,21 @@ export class TranscriptionsController {
   @Roles(UserRole.ADMIN)
   diagnostics() {
     return this.service.diagnostics();
+  }
+
+  /** Declared before `:id` so "lookup" is not parsed as a transcription id. */
+  @Get('lookup')
+  async findForTrack(
+    @Req() req: { user: { sub: string } },
+    @Query() query: FindTrackTranscriptionQueryDto,
+  ) {
+    return {
+      transcription: await this.service.findForTrack(
+        req.user.sub,
+        query.provider,
+        query.trackId,
+      ),
+    };
   }
 
   @Get(':id/lrc/admin')

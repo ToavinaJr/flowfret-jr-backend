@@ -1,4 +1,4 @@
-import { TranscriptionStatus } from '@prisma/client';
+import { MusicProvider, TranscriptionStatus } from '@prisma/client';
 import {
   createTranscriptionFixture,
   transcriptionRecord,
@@ -13,6 +13,35 @@ describe('TranscriptionAccessService', () => {
     await expect(
       access.get(transcriptionRecord.id, 'another-user'),
     ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('looks up a track transcription read-only and returns null when none exists', async () => {
+    const { access, repository } = createTranscriptionFixture(null);
+
+    await expect(
+      access.findForTrack('user', MusicProvider.YOUTUBE, 'video-42'),
+    ).resolves.toBeNull();
+    expect(repository.findLatestAccessibleForTrack).toHaveBeenCalledWith(
+      'user',
+      MusicProvider.YOUTUBE,
+      'video-42',
+    );
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it('presents the accessible transcription found for a track', async () => {
+    const { access } = createTranscriptionFixture({
+      ...transcriptionRecord,
+      status: TranscriptionStatus.COMPLETED,
+    });
+
+    await expect(
+      access.findForTrack('user', MusicProvider.YOUTUBE, 'video-42'),
+    ).resolves.toMatchObject({
+      transcriptionId: transcriptionRecord.id,
+      status: TranscriptionStatus.COMPLETED,
+      jobId: null,
+    });
   });
 
   it('returns no job id for a completed transcription', async () => {
