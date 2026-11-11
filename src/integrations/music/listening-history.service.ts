@@ -28,23 +28,70 @@ export class ListeningHistoryService {
       durationMs: input.durationMs,
       lastPlayedAt: new Date(),
     };
-    await this.prisma.listeningHistory.upsert({
-      where: {
-        userId_provider_providerTrackId: {
+    await this.prisma.$transaction([
+      this.prisma.listeningHistory.upsert({
+        where: {
+          userId_provider_providerTrackId: {
+            userId,
+            provider: input.provider,
+            providerTrackId,
+          },
+        },
+        update: { ...snapshot, playCount: { increment: 1 } },
+        create: {
           userId,
           provider: input.provider,
           providerTrackId,
+          ...snapshot,
         },
-      },
-      update: { ...snapshot, playCount: { increment: 1 } },
-      create: {
-        userId,
-        provider: input.provider,
-        providerTrackId,
-        ...snapshot,
-      },
-    });
+      }),
+      this.prisma.listeningHistoryEvent.create({
+        data: { userId, provider: input.provider, providerTrackId },
+      }),
+    ]);
     return true;
+  }
+
+  async statistics(userId: string) {
+    const start = new Date();
+    start.setUTCHours(0, 0, 0, 0);
+    start.setUTCDate(start.getUTCDate() - 29);
+    const [aggregate, repeatedTracks, dailyRows] = await Promise.all([
+      this.prisma.listeningHistory.aggregate({
+        where: { userId, playCount: { gt: 0 } },
+        _sum: { playCount: true },
+        _count: { _all: true },
+      }),
+      this.prisma.listeningHistory.count({
+        where: { userId, playCount: { gt: 1 } },
+      }),
+      this.prisma.$queryRaw<Array<{ date: Date; listens: number }>>`
+        SELECT date_trunc('day', played_at) AS date, COUNT(*)::int AS listens
+        FROM listening_history_events
+        WHERE user_id = ${userId}::uuid AND played_at >= ${start}
+        GROUP BY date_trunc('day', played_at)
+        ORDER BY date ASC
+      `,
+    ]);
+    const dailyCounts = new Map(
+      dailyRows.map((row) => [
+        row.date.toISOString().slice(0, 10),
+        row.listens,
+      ]),
+    );
+    const daily = Array.from({ length: 30 }, (_, index) => {
+      const date = new Date(start);
+      date.setUTCDate(start.getUTCDate() + index);
+      const key = date.toISOString().slice(0, 10);
+      return { date: key, listens: dailyCounts.get(key) ?? 0 };
+    });
+    const totalPlays = aggregate._sum.playCount ?? 0;
+    return {
+      totalPlays,
+      repeatedTracks,
+      repeatPlays: Math.max(0, totalPlays - aggregate._count._all),
+      daily,
+    };
   }
 
   async setFavorite(
@@ -155,6 +202,47 @@ export class ListeningHistoryService {
     }));
   }
 
+  async recommendationSeeds(
+    userId: string,
+    take = 30,
+  ): Promise<
+    Array<{
+      provider: string;
+      providerTrackId: string;
+      genre: string | null;
+      artists: string[];
+      isFavorite: boolean;
+    }>
+  > {
+    const rows = await this.prisma.listeningHistory.findMany({
+      where: { userId, OR: [{ isFavorite: true }, { playCount: { gt: 0 } }] },
+      orderBy: [{ isFavorite: 'desc' }, { lastPlayedAt: 'desc' }],
+      take: Math.min(50, Math.max(1, take)),
+      select: {
+        provider: true,
+        providerTrackId: true,
+        genre: true,
+        artists: true,
+        isFavorite: true,
+      },
+    });
+    return rows.map((row) => ({
+      provider: row.provider,
+      providerTrackId: row.providerTrackId,
+      genre: row.genre,
+      artists: this.readArtists(row.artists).map((artist) => artist.name),
+      isFavorite: row.isFavorite,
+    }));
+  }
+
+  async savedOrPlayedTrackKeys(userId: string): Promise<string[]> {
+    const rows = await this.prisma.listeningHistory.findMany({
+      where: { userId, OR: [{ isFavorite: true }, { playCount: { gt: 0 } }] },
+      select: { provider: true, providerTrackId: true },
+    });
+    return rows.map((row) => `${row.provider}:${row.providerTrackId}`);
+  }
+
   async trending(take = 10): Promise<MusicTrack[]> {
     const rankings = await this.prisma.listeningHistory.groupBy({
       by: ['provider', 'providerTrackId'],
@@ -162,7 +250,9 @@ export class ListeningHistoryService {
       orderBy: [{ _sum: { playCount: 'desc' } }, { providerTrackId: 'asc' }],
       take: Math.min(50, Math.max(1, take * 5)),
     });
-    const playedRankings = rankings.filter((ranking) => (ranking._sum.playCount ?? 0) > 0).slice(0, take);
+    const playedRankings = rankings
+      .filter((ranking) => (ranking._sum.playCount ?? 0) > 0)
+      .slice(0, take);
     if (!playedRankings.length) return [];
 
     const rows = await this.prisma.listeningHistory.findMany({

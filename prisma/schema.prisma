@@ -312,6 +312,7 @@ model User {
   playlists               Playlist[]               @relation("UserPlaylists")
   playlistItemsAdded      PlaylistItem[]           @relation("PlaylistItemsAddedByUser")
   listeningHistory        ListeningHistory[]
+  listeningHistoryEvents  ListeningHistoryEvent[]
   teachingLessonReminders TeachingLessonReminder[]
   lyricsReports           LyricsReport[]           @relation("LyricsReportsByReporter")
   lyricsOverrides         LyricsOverride[]
@@ -367,6 +368,20 @@ model ListeningHistory {
   @@index([userId, lastPlayedAt(sort: Desc)])
   @@index([userId, isFavorite, updatedAt(sort: Desc)])
   @@map("listening_history")
+}
+
+model ListeningHistoryEvent {
+  id              String        @id @default(uuid()) @db.Uuid
+  userId          String        @map("user_id") @db.Uuid
+  provider        MusicProvider
+  providerTrackId String        @map("provider_track_id") @db.VarChar(255)
+  playedAt        DateTime      @default(now()) @map("played_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, playedAt])
+  @@index([userId, provider, providerTrackId, playedAt])
+  @@map("listening_history_events")
 }
 
 model CatalogTrack {

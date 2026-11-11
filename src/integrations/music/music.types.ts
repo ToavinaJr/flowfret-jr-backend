@@ -76,3 +76,27 @@ export class MusicSearchResult {
   @Field(() => String, { nullable: true })
   nextCursor: string | null;
 }
+
+@ObjectType()
+export class DailyListeningCount {
+  @Field()
+  date!: string;
+
+  @Field(() => Int)
+  listens!: number;
+}
+
+@ObjectType()
+export class ListeningStats {
+  @Field(() => Int)
+  totalPlays!: number;
+
+  @Field(() => Int)
+  repeatedTracks!: number;
+
+  @Field(() => Int)
+  repeatPlays!: number;
+
+  @Field(() => [DailyListeningCount])
+  daily!: DailyListeningCount[];
+}
