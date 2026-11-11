@@ -54,6 +54,33 @@ export class CatalogTrackModel {
 }
 
 @ObjectType()
+export class PublicPlaylistModel {
+  @Field()
+  id!: string;
+
+  @Field()
+  name!: string;
+
+  @Field(() => String, { nullable: true })
+  description!: string | null;
+
+  @Field(() => String, { nullable: true })
+  coverUrl!: string | null;
+}
+
+@ObjectType()
+export class PublicPlaylistItemModel {
+  @Field()
+  id!: string;
+
+  @Field(() => Int)
+  position!: number;
+
+  @Field(() => CatalogTrackModel)
+  track!: CatalogTrackModel;
+}
+
+@ObjectType()
 export class PlaylistModel {
   @Field()
   id!: string;

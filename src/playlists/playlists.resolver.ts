@@ -1,4 +1,5 @@
 import { Args, Context, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Public } from '../auth/public.decorator';
 import { RateLimits } from '../auth/rate-limit.decorator';
 import {
   AddTrackToPlaylistInput,
@@ -6,7 +7,12 @@ import {
   ReorderPlaylistItemsInput,
   UpdatePlaylistInput,
 } from './dto/playlist.inputs';
-import { PlaylistItemModel, PlaylistModel } from './playlist.types';
+import {
+  PlaylistItemModel,
+  PlaylistModel,
+  PublicPlaylistItemModel,
+  PublicPlaylistModel,
+} from './playlist.types';
 import { PlaylistsService } from './playlists.service';
 
 type RequestContext = { req: { user: { sub: string } } };
@@ -14,6 +20,34 @@ type RequestContext = { req: { user: { sub: string } } };
 @Resolver(() => PlaylistModel)
 export class PlaylistsResolver {
   constructor(private readonly playlists: PlaylistsService) {}
+
+  @Public()
+  @RateLimits({
+    limit: 60,
+    windowSeconds: 60,
+    failClosed: true,
+    identity: 'ip',
+  })
+  @Query(() => PublicPlaylistModel, { name: 'publicPlaylist', nullable: true })
+  publicPlaylist(@Args('id') id: string): Promise<PublicPlaylistModel | null> {
+    return this.playlists.findPublic(id);
+  }
+
+  @Public()
+  @RateLimits({
+    limit: 60,
+    windowSeconds: 60,
+    failClosed: true,
+    identity: 'ip',
+  })
+  @Query(() => [PublicPlaylistItemModel], { name: 'publicPlaylistItems' })
+  publicPlaylistItems(
+    @Args('playlistId') playlistId: string,
+    @Args('take', { type: () => Int, defaultValue: 50 }) take: number,
+    @Args('after', { type: () => String, nullable: true }) after?: string,
+  ): Promise<PublicPlaylistItemModel[]> {
+    return this.playlists.listPublicItems(playlistId, after, take);
+  }
 
   @Query(() => [PlaylistModel], { name: 'myPlaylists' })
   myPlaylists(

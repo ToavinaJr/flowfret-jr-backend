@@ -8,7 +8,12 @@ import {
 import { PlaylistCommandService } from './playlist-command.service';
 import { PlaylistItemsCommandService } from './playlist-items-command.service';
 import { PlaylistQueryService } from './playlist-query.service';
-import { PlaylistItemModel, PlaylistModel } from './playlist.types';
+import {
+  PlaylistItemModel,
+  PlaylistModel,
+  PublicPlaylistItemModel,
+  PublicPlaylistModel,
+} from './playlist.types';
 
 /** Stable application facade used by GraphQL and other modules. */
 @Injectable()
@@ -18,6 +23,18 @@ export class PlaylistsService {
     private readonly commands: PlaylistCommandService,
     private readonly itemCommands: PlaylistItemsCommandService,
   ) {}
+
+  findPublic(id: string): Promise<PublicPlaylistModel | null> {
+    return this.queries.findPublic(id);
+  }
+
+  listPublicItems(
+    playlistId: string,
+    after?: string,
+    take = 50,
+  ): Promise<PublicPlaylistItemModel[]> {
+    return this.queries.listPublicItems(playlistId, after, take);
+  }
 
   list(ownerId: string, after?: string, take = 20): Promise<PlaylistModel[]> {
     return this.queries.list(ownerId, after, take);
