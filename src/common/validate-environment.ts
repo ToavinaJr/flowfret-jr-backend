@@ -52,7 +52,10 @@ export function validateEnvironment(
     requireMediaStorage?: boolean;
   } = {},
 ): Record<string, unknown> {
-  validateOptionalBoolean(environment.CHORD_ANALYSIS_ENABLED, 'CHORD_ANALYSIS_ENABLED');
+  validateOptionalBoolean(
+    environment.CHORD_ANALYSIS_ENABLED,
+    'CHORD_ANALYSIS_ENABLED',
+  );
   validateEnum(environment.AUDIO_STEMS_ENGINE, 'AUDIO_STEMS_ENGINE', [
     'demucs',
     'uvr-demo',
