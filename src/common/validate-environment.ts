@@ -1,4 +1,5 @@
 const POSITIVE_INTEGER_KEYS = [
+  'CHORD_ANALYSIS_TIMEOUT_MS',
   'PORT',
   'DATABASE_POOL_MAX',
   'TRANSCRIPTION_DATABASE_TIMEOUT_MS',
@@ -51,6 +52,7 @@ export function validateEnvironment(
     requireMediaStorage?: boolean;
   } = {},
 ): Record<string, unknown> {
+  validateOptionalBoolean(environment.CHORD_ANALYSIS_ENABLED, 'CHORD_ANALYSIS_ENABLED');
   validateEnum(environment.AUDIO_STEMS_ENGINE, 'AUDIO_STEMS_ENGINE', [
     'demucs',
     'uvr-demo',

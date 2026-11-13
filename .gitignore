@@ -3,6 +3,7 @@
 /dist-dev
 /.python-packages
 /.venv
+/workers/chords/models/
 /youtube-cookies.txt
 /node_modules
 /build
