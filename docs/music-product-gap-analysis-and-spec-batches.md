@@ -148,6 +148,8 @@ Ces documents évoluent; cette consultation est un signal de cadrage, pas une ap
 
 **Dépend de** : Lot 1 recommandé; modèles de favoris/historique/playlists existants.
 
+**État d’implémentation (14 novembre 2026)** : une page Bibliothèque regroupe des aperçus des écoutes récentes, des favoris et des playlists privées/publiques. Chaque section a ses propres états de chargement, d’erreur avec reprise et état vide; les écoutes et favoris utilisent les cartes de lecture existantes, et des liens ouvrent les écrans de gestion complets. L’entrée de navigation « Bibliothèque » regroupe aussi les anciennes routes Favoris et Playlists. La recherche/tri communs, la pagination de bibliothèque et la continuation de file pour historique/favoris ne sont pas encore inclus; albums/artistes restent hors périmètre faute d’entités supportées.
+
 ### Lot 3 — Découverte et catalogue musical adaptés à FlowFret
 
 **Priorité : P1 après stabilisation de la lecture.**
