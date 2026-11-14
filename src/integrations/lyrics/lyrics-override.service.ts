@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { LyricsOverride } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { buildLyricsCacheKey } from './lyrics-cache-key.util';
@@ -34,6 +34,18 @@ export class LyricsOverrideService {
     updatedByUserId: string,
   ): Promise<LyricsOverride> {
     const { provider, trackId, title, artist } = input;
+    if (
+      input.lines.some(
+        (line) =>
+          line.startTimeMs !== null &&
+          line.endTimeMs != null &&
+          line.endTimeMs < line.startTimeMs,
+      )
+    ) {
+      throw new BadRequestException(
+        'A lyric line end must not precede its start',
+      );
+    }
     const lines = input.lines
       .map((line) => ({ ...line, text: line.text.trim() }))
       .filter((line) => line.text.length > 0);

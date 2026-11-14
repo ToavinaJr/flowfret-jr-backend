@@ -10,6 +10,7 @@ export interface TrackMetadata {
 
 export interface LyricLine {
   startTimeMs: number | null;
+  endTimeMs?: number | null;
   text: string;
 }
 

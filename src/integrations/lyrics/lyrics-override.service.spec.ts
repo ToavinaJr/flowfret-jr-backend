@@ -125,4 +125,20 @@ describe('LyricsOverrideService', () => {
     ];
     expect(cacheValue.synced).toBe(true);
   });
+
+  it('rejects a captured line end before its start', async () => {
+    await expect(
+      service.save(
+        {
+          provider: 'YOUTUBE',
+          trackId: 'abc',
+          title: 'Song',
+          artist: 'Artist',
+          lines: [{ startTimeMs: 2000, endTimeMs: 1000, text: 'Line one' }],
+        },
+        'admin-1',
+      ),
+    ).rejects.toThrow('A lyric line end must not precede its start');
+    expect(prisma.lyricsOverride.upsert).not.toHaveBeenCalled();
+  });
 });

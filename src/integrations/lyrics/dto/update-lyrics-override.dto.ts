@@ -1,9 +1,11 @@
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
+  IsNumber,
   IsOptional,
   IsString,
   Length,
+  Min,
   ValidateNested,
 } from 'class-validator';
 
@@ -12,7 +14,14 @@ const trim = ({ value }: { value: unknown }) =>
 
 export class LyricsOverrideLineDto {
   @IsOptional()
+  @IsNumber()
+  @Min(0)
   startTimeMs!: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  endTimeMs?: number | null;
 
   @IsString()
   @Length(0, 2000)

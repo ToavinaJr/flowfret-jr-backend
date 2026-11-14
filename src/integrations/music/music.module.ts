@@ -8,6 +8,7 @@ import { MusicService } from './music.service';
 import { MusicEnrichmentService } from './music-enrichment.service';
 import { ListeningHistoryService } from './listening-history.service';
 import { MusicRecommendationsService } from './music-recommendations.service';
+import { MusicSearchHistoryService } from './music-search-history.service';
 
 @Module({
   // MusicService selects the active provider through MUSIC_PROVIDER.
@@ -17,6 +18,7 @@ import { MusicRecommendationsService } from './music-recommendations.service';
     MusicEnrichmentService,
     ListeningHistoryService,
     MusicRecommendationsService,
+    MusicSearchHistoryService,
     MusicResolver,
   ],
   exports: [MusicService],

@@ -319,6 +319,7 @@ model User {
   createdConversations    Conversation[] @relation("ConversationCreator")
   conversationMemberships ConversationParticipant[]
   sentChatMessages        ChatMessage[]
+  musicSearches           MusicSearch[]
 
   @@index([isDeleted, createdAt(sort: Desc)])
   @@index([isDeleted, status])
@@ -382,6 +383,44 @@ model ListeningHistoryEvent {
   @@index([userId, playedAt])
   @@index([userId, provider, providerTrackId, playedAt])
   @@map("listening_history_events")
+}
+
+model MusicSearch {
+  id          String              @id @default(uuid()) @db.Uuid
+  userId      String              @map("user_id") @db.Uuid
+  query       String              @db.VarChar(500)
+  provider    MusicProvider
+  resultLimit Int                 @map("result_limit")
+  resultCount Int                 @map("result_count")
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  results MusicSearchResult[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([provider, createdAt(sort: Desc)])
+  @@map("music_searches")
+}
+
+model MusicSearchResult {
+  id              String        @id @default(uuid()) @db.Uuid
+  searchId        String        @map("search_id") @db.Uuid
+  position        Int
+  provider        MusicProvider
+  providerTrackId String        @map("provider_track_id") @db.VarChar(255)
+  title           String        @db.VarChar(500)
+  artists         Json          @db.JsonB
+  album           String?       @db.VarChar(500)
+  durationMs      Int           @map("duration_ms")
+  metadata        Json?         @db.JsonB
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  search MusicSearch @relation(fields: [searchId], references: [id], onDelete: Cascade)
+
+  @@unique([searchId, position], map: "music_search_results_search_position_unique")
+  @@index([provider, providerTrackId])
+  @@index([searchId, position])
+  @@map("music_search_results")
 }
 
 model CatalogTrack {

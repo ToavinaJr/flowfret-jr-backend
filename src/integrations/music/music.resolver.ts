@@ -7,6 +7,7 @@ import { ListeningHistoryService } from './listening-history.service';
 import { RecordTrackListenInput } from './listening-history.types';
 import { MusicTrack } from './music.types';
 import { MusicRecommendationsService } from './music-recommendations.service';
+import { MusicSearchHistoryService } from './music-search-history.service';
 
 @Resolver()
 export class MusicResolver {
@@ -14,6 +15,7 @@ export class MusicResolver {
     private readonly musicService: MusicService,
     private readonly listeningHistory: ListeningHistoryService,
     private readonly recommendations: MusicRecommendationsService,
+    private readonly searchHistory: MusicSearchHistoryService,
   ) {}
 
   @Query(() => MusicSearchResult, { name: 'searchMusic' })
@@ -21,8 +23,24 @@ export class MusicResolver {
     { limit: 20, windowSeconds: 60, failClosed: true },
     { limit: 300, windowSeconds: 86_400, failClosed: true },
   )
-  searchMusic(@Args() args: SearchMusicArgs): Promise<MusicSearchResult> {
-    return this.musicService.searchMusic(args.query, args.limit, args.cursor);
+  async searchMusic(
+    @Args() args: SearchMusicArgs,
+    @Context() context: { req: { user: { sub: string } } },
+  ): Promise<MusicSearchResult> {
+    const result = await this.musicService.searchMusic(
+      args.query,
+      args.limit,
+      args.cursor,
+    );
+    if (!args.cursor) {
+      await this.searchHistory.record(
+        context.req.user.sub,
+        args.query,
+        result,
+        args.limit,
+      );
+    }
+    return result;
   }
 
   @Query(() => [MusicTrack], { name: 'trendingMusic' })
