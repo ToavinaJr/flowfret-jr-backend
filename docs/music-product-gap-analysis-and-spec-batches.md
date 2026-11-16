@@ -148,7 +148,7 @@ Ces documents évoluent; cette consultation est un signal de cadrage, pas une ap
 
 **Dépend de** : Lot 1 recommandé; modèles de favoris/historique/playlists existants.
 
-**État d’implémentation (14 novembre 2026)** : une page Bibliothèque regroupe des aperçus des écoutes récentes, des favoris et des playlists privées/publiques. Chaque section a ses propres états de chargement, d’erreur avec reprise et état vide; les écoutes et favoris utilisent les cartes de lecture existantes, et des liens ouvrent les écrans de gestion complets. L’entrée de navigation « Bibliothèque » regroupe aussi les anciennes routes Favoris et Playlists. La recherche/tri communs, la pagination de bibliothèque et la continuation de file pour historique/favoris ne sont pas encore inclus; albums/artistes restent hors périmètre faute d’entités supportées.
+**État d’implémentation (14 novembre 2026)** : une page Bibliothèque regroupe des aperçus des écoutes récentes, des favoris et des playlists privées/publiques. La page met maintenant en avant le dernier morceau écouté avec son visuel de couverture et ses commandes de lecture; les favoris et playlists occupent deux sections distinctes sur grand écran. Chaque section a ses propres états de chargement, d’erreur avec reprise et état vide; des liens ouvrent les écrans de gestion complets. L’entrée de navigation « Bibliothèque » regroupe aussi les anciennes routes Favoris et Playlists. La recherche/tri communs, la pagination de bibliothèque et la continuation de file pour historique/favoris ne sont pas encore inclus; albums/artistes restent hors périmètre faute d’entités supportées.
 
 ### Lot 3 — Découverte et catalogue musical adaptés à FlowFret
 
@@ -162,6 +162,18 @@ Ces documents évoluent; cette consultation est un signal de cadrage, pas une ap
 - Définir une première tranche restreinte : catégories/genres ou vues par artiste/album si l’API le permet; sinon rester sur des résultats de pistes et les recommandations existantes.
 - Définir signaux de recommandation exploitables et contrôlables par l’utilisateur (favoris, historique, masquage éventuel), avec explication simple de la personnalisation.
 - Ajouter des états explicites lorsque le fournisseur renvoie peu de résultats ou ne supporte pas un type de recherche.
+
+**Matrice de capacités vérifiée (16 novembre 2026)**
+
+| Fournisseur | Capacités de l’API vérifiées | Adaptateur FlowFret actuel | Décision pour ce lot |
+| --- | --- | --- | --- |
+| Spotify | La recherche accepte les types track, album et artist, avec pagination par offset. Les catégories Browse et top tracks artiste ne font plus partie de l’API selon le guide de migration 2026. | `SpotifyService.searchTracks` ne requête que les morceaux; le contrat GraphQL `MusicSearchResult` expose une liste de `MusicTrack`. | Garder la recherche de pistes. Les entités album/artiste nécessitent un contrat catalogue provider-aware avant toute page dédiée. |
+| Audius | La documentation de l’API décrit la recherche de tracks, users, playlists et albums. | `AudiusService.searchTracks` ne requête que les morceaux; le mapper transmet leur champ `genre`. | Ajouter des filtres par genres uniquement lorsque les pistes recommandées portent effectivement cette métadonnée. |
+| YouTube | `search.list` identifie des vidéos, chaînes et playlists; le paramètre `type` permet de limiter les types. | `YouTubeService.searchMusic` limite la requête aux vidéos musicales intégrables; `channelTitle` reste le nom de chaîne associé à la vidéo, pas une entité artiste vérifiée. | Rester sur les résultats de vidéos/pistes; ne pas présenter de pages artistes ou albums. |
+
+Sources officielles : [Spotify Search](https://developer.spotify.com/documentation/web-api/reference/search), [Spotify Dev Mode migration guide](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide), [Audius API reference](https://docs.audius.co/api/), [YouTube Search: list](https://developers.google.com/youtube/data/reference/rest/v3/search/list).
+
+**État d’implémentation (16 novembre 2026)** : la première tranche ajoute des filtres de genre à la page Recommandations, construits uniquement depuis `MusicTrack.genre` réellement renvoyé. Les fournisseurs sans genre ne reçoivent pas de catégories inventées; un état le signale et laisse les pistes visibles. La file de lecture suit exactement les pistes filtrées. L’explication précise que les favoris pèsent davantage que l’historique et que les titres déjà enregistrés ou écoutés sont exclus. Les pages album/artiste restent différées jusqu’à la définition d’un contrat catalogue multi-fournisseur. Les tests ciblés couvrent l’extraction/déduplication des genres, le filtrage et la cohérence de la file, les métadonnées absentes et l’état vide. Pour maintenir le support ES2020 configuré, les derniers accès `Array.at` du hook de continuation de file utilisent désormais un index; le typecheck frontend et ESLint passent.
 
 **Critères d’acceptation** : les pages n’affichent que les données réellement reçues; aucun faux album/artiste n’est construit à partir de champs ambigus; démarrer une piste alimente une file continue.
 
