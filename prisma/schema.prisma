@@ -199,6 +199,16 @@ enum PlaylistVisibility {
   PUBLIC
 }
 
+enum PlaylistCollaboratorRole {
+  VIEWER
+  EDITOR
+}
+
+enum PlaylistCollaboratorStatus {
+  PENDING
+  ACCEPTED
+}
+
 model Transcription {
   id                String                @id @default(uuid()) @db.Uuid
   provider          MusicProvider         @default(AUDIUS)
@@ -310,6 +320,8 @@ model User {
   commentMentions         CommentMention[]         @relation("UserCommentMentions")
   transcriptionAccess     TranscriptionAccess[]
   playlists               Playlist[]               @relation("UserPlaylists")
+  playlistCollaborations PlaylistCollaborator[]   @relation("PlaylistCollaboratorUser")
+  playlistCollaborationsGranted PlaylistCollaborator[] @relation("PlaylistCollaboratorGrantor")
   playlistItemsAdded      PlaylistItem[]           @relation("PlaylistItemsAddedByUser")
   listeningHistory        ListeningHistory[]
   listeningHistoryEvents  ListeningHistoryEvent[]
@@ -461,9 +473,29 @@ model Playlist {
 
   user  User           @relation("UserPlaylists", fields: [userId], references: [id], onDelete: Cascade)
   items PlaylistItem[]
+  collaborators PlaylistCollaborator[]
 
   @@index([userId, isDeleted, updatedAt(sort: Desc)])
   @@map("playlists")
+}
+
+model PlaylistCollaborator {
+  playlistId String                   @map("playlist_id") @db.Uuid
+  userId     String                   @map("user_id") @db.Uuid
+  grantedById String                  @map("granted_by_id") @db.Uuid
+  role       PlaylistCollaboratorRole
+  status     PlaylistCollaboratorStatus @default(PENDING)
+  acceptedAt DateTime?                  @map("accepted_at") @db.Timestamptz(6)
+  createdAt  DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  user     User     @relation("PlaylistCollaboratorUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User    @relation("PlaylistCollaboratorGrantor", fields: [grantedById], references: [id], onDelete: Cascade)
+
+  @@id([playlistId, userId])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("playlist_collaborators")
 }
 
 model PlaylistItem {

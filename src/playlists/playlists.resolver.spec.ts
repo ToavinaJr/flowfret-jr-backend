@@ -50,4 +50,49 @@ describe('PlaylistsResolver', () => {
 
     expect(playlists.addTrack).toHaveBeenCalledWith(data, context.req.user.sub);
   });
+
+  it('uses the authenticated actor for collaborator management', async () => {
+    const playlists = {
+      setCollaborator: jest.fn().mockResolvedValue({}),
+      revokeCollaborator: jest.fn().mockResolvedValue(true),
+      listCollaborators: jest.fn().mockResolvedValue([]),
+      listShared: jest.fn().mockResolvedValue([]),
+    };
+    const resolver = new PlaylistsResolver(
+      playlists as unknown as PlaylistsService,
+    );
+    const data = {
+      playlistId: '00000000-0000-4000-8000-000000000002',
+      userId: '00000000-0000-4000-8000-000000000003',
+      role: 'EDITOR' as const,
+    };
+
+    await resolver.setPlaylistCollaborator(data, context);
+    await resolver.revokePlaylistCollaborator(
+      data.playlistId,
+      data.userId,
+      context,
+    );
+    await resolver.playlistCollaborators(data.playlistId, context);
+    await resolver.sharedPlaylists(context, 20);
+
+    expect(playlists.setCollaborator).toHaveBeenCalledWith(
+      data,
+      context.req.user.sub,
+    );
+    expect(playlists.revokeCollaborator).toHaveBeenCalledWith(
+      data.playlistId,
+      data.userId,
+      context.req.user.sub,
+    );
+    expect(playlists.listCollaborators).toHaveBeenCalledWith(
+      data.playlistId,
+      context.req.user.sub,
+    );
+    expect(playlists.listShared).toHaveBeenCalledWith(
+      context.req.user.sub,
+      undefined,
+      20,
+    );
+  });
 });

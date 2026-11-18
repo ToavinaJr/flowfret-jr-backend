@@ -6,12 +6,15 @@ import {
   CreatePlaylistInput,
   ReorderPlaylistItemsInput,
   UpdatePlaylistInput,
+  SetPlaylistCollaboratorInput,
 } from './dto/playlist.inputs';
 import {
   PlaylistItemModel,
   PlaylistModel,
   PublicPlaylistItemModel,
   PublicPlaylistModel,
+  PlaylistCollaboratorModel,
+  PlaylistInvitationModel,
 } from './playlist.types';
 import { PlaylistsService } from './playlists.service';
 
@@ -56,6 +59,15 @@ export class PlaylistsResolver {
     @Args('after', { type: () => String, nullable: true }) after?: string,
   ): Promise<PlaylistModel[]> {
     return this.playlists.list(context.req.user.sub, after, take);
+  }
+
+  @Query(() => [PlaylistModel], { name: 'sharedPlaylists' })
+  sharedPlaylists(
+    @Context() context: RequestContext,
+    @Args('take', { type: () => Int, defaultValue: 20 }) take: number,
+    @Args('after', { type: () => String, nullable: true }) after?: string,
+  ): Promise<PlaylistModel[]> {
+    return this.playlists.listShared(context.req.user.sub, after, take);
   }
 
   @Query(() => PlaylistModel, { name: 'playlist', nullable: true })
@@ -107,6 +119,62 @@ export class PlaylistsResolver {
     @Context() context: RequestContext,
   ): Promise<boolean> {
     return this.playlists.delete(id, context.req.user.sub);
+  }
+
+  @Query(() => [PlaylistCollaboratorModel], { name: 'playlistCollaborators' })
+  playlistCollaborators(
+    @Args('playlistId') playlistId: string,
+    @Context() context: RequestContext,
+  ): Promise<PlaylistCollaboratorModel[]> {
+    return this.playlists.listCollaborators(playlistId, context.req.user.sub);
+  }
+
+  @Query(() => [PlaylistInvitationModel], { name: 'myPlaylistInvitations' })
+  myPlaylistInvitations(
+    @Context() context: RequestContext,
+  ): Promise<PlaylistInvitationModel[]> {
+    return this.playlists.listInvitations(context.req.user.sub);
+  }
+
+  @Mutation(() => Boolean)
+  @RateLimits({ limit: 30, windowSeconds: 60, failClosed: true })
+  acceptPlaylistInvitation(
+    @Args('playlistId') playlistId: string,
+    @Context() context: RequestContext,
+  ): Promise<boolean> {
+    return this.playlists.acceptInvitation(playlistId, context.req.user.sub);
+  }
+
+  @Mutation(() => Boolean)
+  @RateLimits({ limit: 30, windowSeconds: 60, failClosed: true })
+  declinePlaylistInvitation(
+    @Args('playlistId') playlistId: string,
+    @Context() context: RequestContext,
+  ): Promise<boolean> {
+    return this.playlists.declineInvitation(playlistId, context.req.user.sub);
+  }
+
+  @Mutation(() => PlaylistCollaboratorModel)
+  @RateLimits({ limit: 30, windowSeconds: 60, failClosed: true })
+  setPlaylistCollaborator(
+    @Args('data') data: SetPlaylistCollaboratorInput,
+    @Context() context: RequestContext,
+  ): Promise<PlaylistCollaboratorModel> {
+    return this.playlists.setCollaborator(data, context.req.user.sub);
+  }
+
+  @Mutation(() => Boolean)
+  @RateLimits({ limit: 30, windowSeconds: 60, failClosed: true })
+  revokePlaylistCollaborator(
+    @Args('playlistId') playlistId: string,
+    @Args('userId') userId: string,
+    @Context() context: RequestContext,
+  ): Promise<boolean> {
+    return this.playlists.revokeCollaborator(
+      playlistId,
+      userId,
+      context.req.user.sub,
+    );
   }
 
   @Mutation(() => PlaylistItemModel)

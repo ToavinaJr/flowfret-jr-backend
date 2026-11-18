@@ -1,5 +1,10 @@
 import { Field, GraphQLISODateTime, Int, ObjectType } from '@nestjs/graphql';
-import { MusicProvider, PlaylistVisibility } from '@prisma/client';
+import {
+  MusicProvider,
+  PlaylistCollaboratorRole,
+  PlaylistCollaboratorStatus,
+  PlaylistVisibility,
+} from '@prisma/client';
 import '../graphql/types/enums';
 
 @ObjectType()
@@ -135,4 +140,31 @@ export class PlaylistItemModel {
 
   @Field(() => CatalogTrackModel)
   track!: CatalogTrackModel;
+}
+
+@ObjectType()
+export class PlaylistCollaboratorModel {
+  @Field()
+  playlistId!: string;
+
+  @Field()
+  userId!: string;
+
+  @Field(() => PlaylistCollaboratorRole)
+  role!: PlaylistCollaboratorRole;
+
+  @Field(() => PlaylistCollaboratorStatus)
+  status!: PlaylistCollaboratorStatus;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt!: Date;
+}
+
+@ObjectType()
+export class PlaylistInvitationModel extends PlaylistCollaboratorModel {
+  @Field()
+  playlistName!: string;
+
+  @Field()
+  ownerUsername!: string;
 }

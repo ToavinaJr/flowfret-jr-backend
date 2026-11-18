@@ -171,6 +171,20 @@ export class FriendshipsCommandService {
           deletedAt: new Date(),
         },
       });
+      await tx.playlistCollaborator.deleteMany({
+        where: {
+          OR: [
+            {
+              userId: row.requesterId,
+              playlist: { is: { userId: row.receiverId } },
+            },
+            {
+              userId: row.receiverId,
+              playlist: { is: { userId: row.requesterId } },
+            },
+          ],
+        },
+      });
       await tx.auditLog.create({
         data: {
           actorId,

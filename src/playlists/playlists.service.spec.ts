@@ -3,7 +3,11 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { MusicProvider, PlaylistVisibility } from '@prisma/client';
+import {
+  MusicProvider,
+  PlaylistCollaboratorRole,
+  PlaylistVisibility,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlaylistAccessService } from './playlist-access.service';
 import { PlaylistCommandService } from './playlist-command.service';
@@ -134,6 +138,56 @@ describe('PlaylistsService', () => {
     await expect(service.delete(playlistId, ownerId)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('grants a role only to an accepted friend and records the owner as grantor', async () => {
+    const collaborator = {
+      playlistId,
+      userId: itemId,
+      grantedById: ownerId,
+      role: PlaylistCollaboratorRole.EDITOR,
+      status: 'PENDING',
+      acceptedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const tx = {
+      playlist: { findFirst: jest.fn().mockResolvedValue(playlist) },
+      friendship: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'friendship' }),
+      },
+      playlistCollaborator: {
+        upsert: jest.fn().mockResolvedValue(collaborator),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const service = serviceWith(transactional(tx));
+
+    await expect(
+      service.setCollaborator(
+        { playlistId, userId: itemId, role: PlaylistCollaboratorRole.EDITOR },
+        ownerId,
+      ),
+    ).resolves.toEqual(collaborator);
+    expect(tx.friendship.findFirst).toHaveBeenCalledTimes(1);
+    expect(tx.playlistCollaborator.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not grant playlist access when the target is not an active friend', async () => {
+    const tx = {
+      playlist: { findFirst: jest.fn().mockResolvedValue(playlist) },
+      friendship: { findFirst: jest.fn().mockResolvedValue(null) },
+      playlistCollaborator: { upsert: jest.fn() },
+    };
+    const service = serviceWith(transactional(tx));
+
+    await expect(
+      service.setCollaborator(
+        { playlistId, userId: itemId, role: PlaylistCollaboratorRole.VIEWER },
+        ownerId,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.playlistCollaborator.upsert).not.toHaveBeenCalled();
   });
 
   it('adds a provider-scoped catalog track at an atomically allocated position', async () => {

@@ -1,5 +1,9 @@
 import { Field, InputType, Int, PartialType } from '@nestjs/graphql';
-import { MusicProvider, PlaylistVisibility } from '@prisma/client';
+import {
+  MusicProvider,
+  PlaylistCollaboratorRole,
+  PlaylistVisibility,
+} from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -48,6 +52,21 @@ export class CreatePlaylistInput {
 
 @InputType()
 export class UpdatePlaylistInput extends PartialType(CreatePlaylistInput) {}
+
+@InputType()
+export class SetPlaylistCollaboratorInput {
+  @Field()
+  @IsUUID()
+  playlistId!: string;
+
+  @Field()
+  @IsUUID()
+  userId!: string;
+
+  @Field(() => PlaylistCollaboratorRole)
+  @IsEnum(PlaylistCollaboratorRole)
+  role!: PlaylistCollaboratorRole;
+}
 
 @InputType()
 export class PlaylistArtistInput {

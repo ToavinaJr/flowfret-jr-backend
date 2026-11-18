@@ -6,6 +6,8 @@ import {
   MusicProvider,
   NotificationType,
   PlaylistVisibility,
+  PlaylistCollaboratorRole,
+  PlaylistCollaboratorStatus,
   PostStatus,
   PostVisibility,
   ProfileVisibility,
@@ -34,6 +36,12 @@ registerEnumType(CommentStatus, { name: 'CommentStatus' });
 registerEnumType(FriendshipStatus, { name: 'FriendshipStatus' });
 registerEnumType(MusicProvider, { name: 'MusicProvider' });
 registerEnumType(PlaylistVisibility, { name: 'PlaylistVisibility' });
+registerEnumType(PlaylistCollaboratorRole, {
+  name: 'PlaylistCollaboratorRole',
+});
+registerEnumType(PlaylistCollaboratorStatus, {
+  name: 'PlaylistCollaboratorStatus',
+});
 registerEnumType(UploadStatus, { name: 'UploadStatus' });
 registerEnumType(UploadSourceType, { name: 'UploadSourceType' });
 registerEnumType(NotificationType, { name: 'NotificationType' });

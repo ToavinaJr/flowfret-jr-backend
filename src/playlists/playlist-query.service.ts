@@ -1,5 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PlaylistVisibility } from '@prisma/client';
+import {
+  FriendshipStatus,
+  PlaylistCollaboratorStatus,
+  PlaylistVisibility,
+  UserStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlaylistAccessService } from './playlist-access.service';
 import { toCatalogTrackModel, toPlaylistItemModel } from './playlist.mapper';
@@ -62,9 +67,57 @@ export class PlaylistQueryService {
     });
   }
 
-  find(id: string, ownerId: string): Promise<PlaylistModel | null> {
-    return this.prisma.playlist.findFirst({
-      where: { id, userId: ownerId, isDeleted: false },
+  async find(id: string, actorId: string): Promise<PlaylistModel | null> {
+    const playlist = await this.prisma.playlist.findFirst({
+      where: { id, isDeleted: false },
+    });
+    if (!playlist) return null;
+    try {
+      await this.access.requireCanRead(this.prisma, id, actorId);
+      return playlist;
+    } catch (error) {
+      if (error instanceof NotFoundException) return null;
+      throw error;
+    }
+  }
+
+  async listShared(
+    actorId: string,
+    after?: string,
+    take = 20,
+  ): Promise<PlaylistModel[]> {
+    const friendships = await this.prisma.friendship.findMany({
+      where: {
+        status: FriendshipStatus.ACCEPTED,
+        isDeleted: false,
+        OR: [
+          {
+            requesterId: actorId,
+            receiver: { isDeleted: false, status: UserStatus.ACTIVE },
+          },
+          {
+            receiverId: actorId,
+            requester: { isDeleted: false, status: UserStatus.ACTIVE },
+          },
+        ],
+      },
+      select: { requesterId: true, receiverId: true },
+    });
+    const friendIds = friendships.map(({ requesterId, receiverId }) =>
+      requesterId === actorId ? receiverId : requesterId,
+    );
+    if (friendIds.length === 0) return [];
+    return this.prisma.playlist.findMany({
+      where: {
+        userId: { in: friendIds },
+        isDeleted: false,
+        collaborators: {
+          some: { userId: actorId, status: PlaylistCollaboratorStatus.ACCEPTED },
+        },
+      },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      take: Math.min(50, Math.max(1, take)),
+      ...(after ? { cursor: { id: after }, skip: 1 } : {}),
     });
   }
 
@@ -74,7 +127,7 @@ export class PlaylistQueryService {
     after?: string,
     take = 50,
   ): Promise<PlaylistItemModel[]> {
-    await this.access.requireOwned(this.prisma, playlistId, ownerId);
+    await this.access.requireCanRead(this.prisma, playlistId, ownerId);
     const items = await this.prisma.playlistItem.findMany({
       where: { playlistId },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],

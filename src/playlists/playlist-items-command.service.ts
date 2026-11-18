@@ -31,7 +31,7 @@ export class PlaylistItemsCommandService {
     this.input.assertExternalTrackUrl(data.track);
     try {
       const item = await this.prisma.$transaction(async (tx) => {
-        await this.access.requireOwned(tx, data.playlistId, ownerId);
+        await this.access.requireCanEdit(tx, data.playlistId, ownerId);
         const track = await tx.catalogTrack.upsert({
           where: {
             provider_providerTrackId: {
@@ -88,7 +88,7 @@ export class PlaylistItemsCommandService {
     ownerId: string,
   ): Promise<boolean> {
     return this.prisma.$transaction(async (tx) => {
-      await this.access.requireOwned(tx, playlistId, ownerId);
+      await this.access.requireCanEdit(tx, playlistId, ownerId);
       const item = await tx.playlistItem.findFirst({
         where: { id: itemId, playlistId },
       });
@@ -117,11 +117,10 @@ export class PlaylistItemsCommandService {
     ownerId: string,
   ): Promise<PlaylistModel> {
     return this.prisma.$transaction(async (tx) => {
-      await this.access.requireOwned(tx, data.playlistId, ownerId);
+      await this.access.requireCanEdit(tx, data.playlistId, ownerId);
       const claimed = await tx.playlist.updateMany({
         where: {
           id: data.playlistId,
-          userId: ownerId,
           isDeleted: false,
           version: data.expectedVersion,
         },
