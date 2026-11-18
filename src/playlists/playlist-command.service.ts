@@ -168,7 +168,7 @@ export class PlaylistCommandService {
       await tx.auditLog.create({
         data: {
           actorId: ownerId,
-          action: AUDIT_ACTION.PLAYLIST_COLLABORATOR_GRANTED,
+          action: AUDIT_ACTION.PLAYLIST_COLLABORATOR_INVITED,
           entityType: AUDIT_ENTITY.PLAYLIST,
           entityId: data.playlistId,
           metadata: { userId: data.userId, role: data.role },
@@ -215,27 +215,31 @@ export class PlaylistCommandService {
   }
 
   listInvitations(userId: string): Promise<PlaylistInvitationModel[]> {
-    return this.prisma.playlistCollaborator.findMany({
-      where: {
-        userId,
-        status: PlaylistCollaboratorStatus.PENDING,
-        playlist: { isDeleted: false },
-      },
-      include: {
-        playlist: {
-          select: { name: true, user: { select: { username: true } } },
+    return this.prisma.playlistCollaborator
+      .findMany({
+        where: {
+          userId,
+          status: PlaylistCollaboratorStatus.PENDING,
+          playlist: { isDeleted: false },
         },
-      },
-      orderBy: [{ createdAt: 'desc' }, { playlistId: 'asc' }],
-    }).then((rows) => rows.map((row) => ({
-      playlistId: row.playlistId,
-      userId: row.userId,
-      role: row.role,
-      status: row.status,
-      createdAt: row.createdAt,
-      playlistName: row.playlist.name,
-      ownerUsername: row.playlist.user.username,
-    })));
+        include: {
+          playlist: {
+            select: { name: true, user: { select: { username: true } } },
+          },
+        },
+        orderBy: [{ createdAt: 'desc' }, { playlistId: 'asc' }],
+      })
+      .then((rows) =>
+        rows.map((row) => ({
+          playlistId: row.playlistId,
+          userId: row.userId,
+          role: row.role,
+          status: row.status,
+          createdAt: row.createdAt,
+          playlistName: row.playlist.name,
+          ownerUsername: row.playlist.user.username,
+        })),
+      );
   }
 
   async acceptInvitation(playlistId: string, userId: string): Promise<boolean> {
@@ -277,7 +281,10 @@ export class PlaylistCommandService {
     });
   }
 
-  async declineInvitation(playlistId: string, userId: string): Promise<boolean> {
+  async declineInvitation(
+    playlistId: string,
+    userId: string,
+  ): Promise<boolean> {
     const deleted = await this.prisma.playlistCollaborator.deleteMany({
       where: {
         playlistId,

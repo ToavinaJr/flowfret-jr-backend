@@ -18,9 +18,9 @@ describe('PlaylistAccessService', () => {
     const client = {
       playlist: { findFirst: jest.fn().mockResolvedValue(playlist) },
       playlistCollaborator: {
-        findUnique: jest.fn().mockResolvedValue(
-          role ? { role, status: 'ACCEPTED' } : null,
-        ),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(role ? { role, status: 'ACCEPTED' } : null),
       },
       friendship: {
         findFirst: jest
@@ -61,6 +61,18 @@ describe('PlaylistAccessService', () => {
 
     await expect(
       service.requireCanEdit(client as never, playlistId, editorId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('does not expose a pending invitation before acceptance', async () => {
+    const { service, client } = setup('EDITOR');
+    client.playlistCollaborator.findUnique.mockResolvedValue({
+      role: 'EDITOR',
+      status: 'PENDING',
+    });
+
+    await expect(
+      service.requireCanRead(client as never, playlistId, editorId),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 

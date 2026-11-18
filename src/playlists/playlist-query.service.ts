@@ -112,7 +112,10 @@ export class PlaylistQueryService {
         userId: { in: friendIds },
         isDeleted: false,
         collaborators: {
-          some: { userId: actorId, status: PlaylistCollaboratorStatus.ACCEPTED },
+          some: {
+            userId: actorId,
+            status: PlaylistCollaboratorStatus.ACCEPTED,
+          },
         },
       },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],

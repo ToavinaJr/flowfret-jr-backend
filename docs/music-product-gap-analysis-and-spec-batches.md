@@ -200,6 +200,8 @@ Sources officielles : [Spotify Search](https://developer.spotify.com/documentati
 
 **Dépend de** : Lot 0 pour partage de contenu fournisseur; modèles playlist et amitié existants.
 
+**État d’implémentation (16 novembre 2026)** : une première tranche backend ajoute les invitations nominatives aux amis existants avec rôles lecteur/éditeur, acceptation ou refus par le destinataire, liste des invitations et playlists partagées, et révocation par le propriétaire. Les playlists privées ne sont lisibles qu’après acceptation; chaque accès vérifie encore l’amitié active. Les éditeurs peuvent ajouter, retirer et réordonner les morceaux, avec contrôle de version conservé; les opérations de métadonnées et suppression restent réservées au propriétaire. Le retrait d’un ami supprime ses accès collaboratifs. Deux migrations locales ajoutent les rôles et l’état d’invitation. L’interface de gestion/acceptation, les notifications, le signalement/blocage, et les tests E2E multi-comptes restent à faire; cette tranche ne clôt donc pas le lot.
+
 ### Lot 5 — Paramètres d’écoute et confidentialité
 
 **Priorité : P2.**

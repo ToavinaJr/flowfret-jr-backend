@@ -140,7 +140,7 @@ describe('PlaylistsService', () => {
     );
   });
 
-  it('grants a role only to an accepted friend and records the owner as grantor', async () => {
+  it('creates a pending role invitation only for an accepted friend', async () => {
     const collaborator = {
       playlistId,
       userId: itemId,
@@ -188,6 +188,47 @@ describe('PlaylistsService', () => {
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(tx.playlistCollaborator.upsert).not.toHaveBeenCalled();
+  });
+
+  it('accepts a pending invitation only while the owner is still a friend', async () => {
+    const tx = {
+      playlistCollaborator: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ playlist: { userId: ownerId } }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      friendship: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'friendship' }),
+      },
+    };
+    const service = serviceWith(transactional(tx));
+
+    await expect(service.acceptInvitation(playlistId, itemId)).resolves.toBe(
+      true,
+    );
+    expect(tx.playlistCollaborator.updateMany).toHaveBeenCalledWith({
+      where: { playlistId, userId: itemId, status: 'PENDING' },
+      data: { status: 'ACCEPTED', acceptedAt: expect.any(Date) as Date },
+    });
+  });
+
+  it('rejects a pending invitation when friendship has ended', async () => {
+    const tx = {
+      playlistCollaborator: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ playlist: { userId: ownerId } }),
+        updateMany: jest.fn(),
+      },
+      friendship: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
+    const service = serviceWith(transactional(tx));
+
+    await expect(
+      service.acceptInvitation(playlistId, itemId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.playlistCollaborator.updateMany).not.toHaveBeenCalled();
   });
 
   it('adds a provider-scoped catalog track at an atomically allocated position', async () => {

@@ -57,6 +57,9 @@ describe('PlaylistsResolver', () => {
       revokeCollaborator: jest.fn().mockResolvedValue(true),
       listCollaborators: jest.fn().mockResolvedValue([]),
       listShared: jest.fn().mockResolvedValue([]),
+      listInvitations: jest.fn().mockResolvedValue([]),
+      acceptInvitation: jest.fn().mockResolvedValue(true),
+      declineInvitation: jest.fn().mockResolvedValue(true),
     };
     const resolver = new PlaylistsResolver(
       playlists as unknown as PlaylistsService,
@@ -75,6 +78,9 @@ describe('PlaylistsResolver', () => {
     );
     await resolver.playlistCollaborators(data.playlistId, context);
     await resolver.sharedPlaylists(context, 20);
+    await resolver.myPlaylistInvitations(context);
+    await resolver.acceptPlaylistInvitation(data.playlistId, context);
+    await resolver.declinePlaylistInvitation(data.playlistId, context);
 
     expect(playlists.setCollaborator).toHaveBeenCalledWith(
       data,
@@ -93,6 +99,17 @@ describe('PlaylistsResolver', () => {
       context.req.user.sub,
       undefined,
       20,
+    );
+    expect(playlists.listInvitations).toHaveBeenCalledWith(
+      context.req.user.sub,
+    );
+    expect(playlists.acceptInvitation).toHaveBeenCalledWith(
+      data.playlistId,
+      context.req.user.sub,
+    );
+    expect(playlists.declineInvitation).toHaveBeenCalledWith(
+      data.playlistId,
+      context.req.user.sub,
     );
   });
 });
