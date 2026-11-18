@@ -44,6 +44,7 @@ import { HttpStatus } from '@nestjs/common';
 import type { Response } from 'express';
 import { pipeline } from 'node:stream/promises';
 import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { assertUserStorageQuota } from './user-storage-quota';
 
 export class UploadTeachingMaterialBody {
   @IsUUID('4')
@@ -121,6 +122,12 @@ export class UploadsController {
     }
     try {
       return await this.prisma.$transaction(async (tx) => {
+        await assertUserStorageQuota(
+          tx,
+          req.user.sub,
+          incomingBytes,
+          this.storageQuotaBytes(),
+        );
         const result: Array<{ id: string }> = [];
         for (let index = 0; index < files.length; index += 1) {
           const file = files[index];
@@ -266,6 +273,12 @@ export class UploadsController {
     }
     try {
       const uploads = await this.prisma.$transaction(async (tx) => {
+        await assertUserStorageQuota(
+          tx,
+          req.user.sub,
+          incomingBytes,
+          this.storageQuotaBytes(),
+        );
         const records: Array<{ id: string; storagePath: string }> = [];
         // Interactive transactions share one PostgreSQL connection. Keep
         // each query awaited before issuing the next one on that connection.
@@ -388,6 +401,12 @@ export class UploadsController {
     try {
       const result = await this.prisma.$transaction(
         async (tx) => {
+          await assertUserStorageQuota(
+            tx,
+            req.user.sub,
+            file.size,
+            this.storageQuotaBytes(),
+          );
           const currentUsage = await tx.upload.aggregate({
             where: {
               isDeleted: false,

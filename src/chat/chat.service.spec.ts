@@ -12,12 +12,19 @@ describe('ChatService', () => {
   const userA = '00000000-0000-4000-8000-000000000001';
   const userB = '00000000-0000-4000-8000-000000000002';
   const prisma = {
+    $transaction: jest.fn(),
     user: { count: jest.fn() },
     friendship: { findFirst: jest.fn() },
-    conversation: { findUnique: jest.fn(), create: jest.fn() },
+    conversation: {
+      findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      create: jest.fn(),
+    },
     conversationParticipant: {
       findFirst: jest.fn(),
       count: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
       updateMany: jest.fn(),
       update: jest.fn(),
     },
@@ -71,6 +78,49 @@ describe('ChatService', () => {
     expect(prisma.conversation.create).not.toHaveBeenCalled();
   });
 
+  it('rechecks group capacity under a conversation lock before adding members', async () => {
+    const conversationId = '00000000-0000-4000-8000-000000000003';
+    const tx = {
+      $queryRaw: jest.fn(),
+      conversationParticipant: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'admin' }),
+        count: jest.fn().mockResolvedValue(50),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+    };
+    prisma.$transaction.mockImplementation((operation: unknown) =>
+      Array.isArray(operation)
+        ? Promise.all(operation)
+        : (operation as (client: typeof tx) => unknown)(tx),
+    );
+    prisma.conversationParticipant.findFirst.mockResolvedValue({ id: 'admin' });
+    prisma.conversationParticipant.count.mockResolvedValue(0);
+    prisma.conversationParticipant.findMany.mockResolvedValue([]);
+    prisma.conversationParticipant.create.mockResolvedValue({});
+    prisma.conversation.findUniqueOrThrow.mockResolvedValue({
+      id: conversationId,
+      type: ConversationType.GROUP,
+      name: 'Jam',
+      updatedAt: new Date(),
+      participants: [],
+      messages: [],
+    });
+    prisma.user.count.mockResolvedValue(2);
+    prisma.friendship.findFirst.mockResolvedValue({ id: 'friendship' });
+
+    await expect(
+      service.addGroupMembers(userA, conversationId, [userB]),
+    ).rejects.toThrow('A group is limited to 50 members.');
+
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.conversationParticipant.count).toHaveBeenCalledWith({
+      where: { conversationId, isDeleted: false },
+    });
+    expect(tx.conversationParticipant.create).not.toHaveBeenCalled();
+  });
+
   it('does not reveal a conversation to a non-participant', async () => {
     prisma.conversationParticipant.findFirst.mockResolvedValue(null);
     await expect(
@@ -117,10 +167,20 @@ describe('ChatService', () => {
   });
 
   it('prevents the only group administrator from demoting themselves', async () => {
-    prisma.conversationParticipant.findFirst
-      .mockResolvedValueOnce({ id: 'admin-membership' })
-      .mockResolvedValueOnce({ id: 'admin-membership' });
-    prisma.conversationParticipant.count.mockResolvedValue(1);
+    const tx = {
+      $queryRaw: jest.fn(),
+      conversationParticipant: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce({ id: 'admin-membership' })
+          .mockResolvedValueOnce({ id: 'admin-membership' }),
+        count: jest.fn().mockResolvedValue(1),
+        updateMany: jest.fn(),
+      },
+    };
+    prisma.$transaction.mockImplementation((operation: unknown) =>
+      (operation as (client: typeof tx) => unknown)(tx),
+    );
 
     await expect(
       service.setGroupRole(
@@ -130,6 +190,6 @@ describe('ChatService', () => {
         ConversationParticipantRole.MEMBER,
       ),
     ).rejects.toThrow('A group must keep at least one administrator.');
-    expect(prisma.conversationParticipant.updateMany).not.toHaveBeenCalled();
+    expect(tx.conversationParticipant.updateMany).not.toHaveBeenCalled();
   });
 });

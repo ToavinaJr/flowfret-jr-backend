@@ -13,13 +13,13 @@ NestJS GraphQL API for FlowFret (auth, social CRUD, music search).
 ```bash
 cp .env.example .env.development.local
 # fill DATABASE_URL, JWT_SECRET, AUDIUS_*, GENIUS_ACCESS_TOKEN
-npm install
-npm run infra:up
-npm run prisma:deploy
-npm run start:dev
+bun install --frozen-lockfile
+bun run infra:up
+bun run prisma:deploy
+bun run start:dev
 ```
 
-Package manager in use: **npm** (`package-lock.json`).
+Package manager in use: **Bun 1.4.4** (`bun.lock`).
 
 ## Environment
 
@@ -95,9 +95,9 @@ Variables:
 ### Tests
 
 ```bash
-npm test -- audius.service.spec spotify.service.spec youtube.service.spec genius.service.spec music.service.spec
-npm run lint
-npm run build
+bun run test audius.service.spec spotify.service.spec youtube.service.spec genius.service.spec music.service.spec
+bun run lint
+bun run build
 ```
 
 ## Known limitations
@@ -116,7 +116,7 @@ The initial player waits for `TRANSCRIPTION_INITIAL_BUFFER_SECONDS` (or the whol
 
 ### Prerequisites
 
-- Node.js 22 and npm
+- Bun 1.4.4
 - PostgreSQL 16
 - Redis 7
 - Python 3.11+
@@ -137,33 +137,33 @@ migrations, builds/starts the containerized transcription worker, then launches
 the backend and sibling frontend together:
 
 ```bash
-npm run dev:all
+bun run dev:all
 ```
 
 Docker Desktop must be running. The first worker build installs FFmpeg and
 `faster-whisper`; the first transcription also downloads the configured Whisper
 model into the persistent `whisper_models` volume, so it can take several
-minutes before progress moves beyond zero. Use `npm run worker:logs` in another
+minutes before progress moves beyond zero. Use `bun run worker:logs` in another
 terminal to follow model loading and transcription. Stop the foreground apps
-with `Ctrl+C`; use `npm run infra:down` when you also want to stop the worker,
+with `Ctrl+C`; use `bun run infra:down` when you also want to stop the worker,
 PostgreSQL, and Redis.
 
 The worker downloads the source audio from Audius. Create an Audius developer
 application, then put its backend Bearer Token in
-`AUDIUS_ACCESS_TOKEN` inside `.env.development.local`. `npm run dev:all` fails
+`AUDIUS_ACCESS_TOKEN` inside `.env.development.local`. `bun run dev:all` fails
 early with a clear error when this required secret is missing. Never expose the
 Bearer Token through a `VITE_*` frontend variable.
 
 The equivalent manual launch is:
 
 ```bash
-npm run infra:up
-npm install
-npm run prisma:generate
-npm run prisma:deploy
-npm run build
-npm run worker:up
-npm run start:dev
+bun run infra:up
+bun install --frozen-lockfile
+bun run prisma:generate
+bun run prisma:deploy
+bun run build
+bun run worker:up
+bun run start:dev
 ```
 
 In another terminal, launch the frontend:
@@ -172,7 +172,7 @@ In another terminal, launch the frontend:
 bun --cwd r run dev
 ```
 
-Do not also run `npm run start:worker` on Windows when the Docker worker is
+Do not also run `bun run start:worker` on Windows when the Docker worker is
 active. Two BullMQ workers would compete for the same jobs, and the host worker
 would require its own compatible Python, FFmpeg, and `faster-whisper` setup.
 
@@ -186,10 +186,10 @@ The API and worker are separate services; restarting the worker does not stop HT
 
 ### Render deployment
 
-For a native Node Render service, use `npm ci && npm run build:render` as the
+For a native Render service, use `bun install --frozen-lockfile && bun run build:render` as the
 **Build Command**. Besides compiling Nest, this installs the pinned `yt-dlp`
 module into `.python-packages`; the API adds that directory to `PYTHONPATH`
-when extracting authorized YouTube audio. A plain `npm run build` does not
+when extracting authorized YouTube audio. A plain `bun run build` does not
 install Python dependencies and makes chord analysis fail with
 `No module named yt_dlp`.
 
@@ -214,7 +214,7 @@ rejections, but does not guarantee that YouTube will allow extraction.
 Render/Neon database left in Prisma state `P3009` to recover without an
 interactive shell. Unknown failed migrations are never resolved automatically.
 
-`start:render` starts only the HTTP API. Configure Render's **Pre-Deploy Command** as `npx prisma migrate deploy` so migrations run once before the new web instance starts. The start command must remain `npm run start:render` (or `node dist/main.js`). The API cannot process transcription jobs by itself. Create the background worker from `render.yaml` (Render Dashboard **Blueprints > New Blueprint Instance**) or create a Background Worker manually with `Dockerfile.worker`.
+`start:render` starts only the HTTP API. Configure Render's **Pre-Deploy Command** as `bun run prisma:deploy:prod` so migrations run once before the new web instance starts. The start command must remain `bun run start:render`. The API cannot process transcription jobs by itself. Create the background worker from `render.yaml` (Render Dashboard **Blueprints > New Blueprint Instance**) or create a Background Worker manually with `Dockerfile.worker`.
 
 Set a randomly generated `JWT_SECRET` of at least 32 characters in Render for the web service and worker. Copy the exact same `DATABASE_URL`, `JWT_SECRET`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS`, and Audius variables from the web service to the worker. The API and worker must point to the same PostgreSQL database and Redis instance. A worker is a paid Render service; keep at least the `standard` plan for the `small` Whisper model. After deployment, its logs must contain `TranscriptionsWorkerModule dependencies initialized` and the BullMQ worker must remain running.
 
@@ -247,7 +247,7 @@ The deployment compose file keeps PostgreSQL, Redis, and the raw HTTP API privat
 
 ```bash
 docker compose up -d db redis
-docker compose run --rm backend npx prisma migrate deploy
+docker compose run --rm backend bun run prisma:deploy:prod
 docker compose up -d --build backend transcription-worker
 docker compose logs -f transcription-worker
 ```
@@ -258,7 +258,7 @@ For a VPS using a hosted PostgreSQL database, Nginx on `127.0.0.1:3100`, and a h
 
 ```bash
 POSTGRES_PASSWORD=compose-validation-only docker compose -f docker-compose.yml -f docker-compose.vps.yml config --quiet
-POSTGRES_PASSWORD=compose-validation-only docker compose -f docker-compose.yml -f docker-compose.vps.yml run --rm --no-deps backend npx prisma migrate deploy
+POSTGRES_PASSWORD=compose-validation-only docker compose -f docker-compose.yml -f docker-compose.vps.yml run --rm --no-deps backend bun run prisma:deploy:prod
 POSTGRES_PASSWORD=compose-validation-only docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --no-deps --build backend transcription-worker
 ```
 
@@ -267,7 +267,7 @@ The temporary `POSTGRES_PASSWORD` assignment only satisfies interpolation of the
 When a release adds a Prisma migration (for example the private chat tables), apply it on the VPS with the real `.env` before using the feature. Do not prefix this command with `POSTGRES_PASSWORD`: the database password must come from `.env`. Without this step the API fails with Prisma `P2021` errors (`table ... does not exist`) and the frontend shows a generic error.
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.vps.yml run --rm --no-deps backend npx prisma migrate deploy
+docker compose -f docker-compose.yml -f docker-compose.vps.yml run --rm --no-deps backend bun run prisma:deploy:prod
 ```
 
 The frontend receives the canonical `https://api.audius.co/v1/tracks/:id/stream` URL. It retries that endpoint when an Audius storage node is temporarily unreachable; signed storage-node URLs are never persisted or returned as the durable player URL.
@@ -342,9 +342,9 @@ Second playback: select the same track and model/language, press Play, verify im
 ### Tests
 
 ```bash
-npm test -- --runInBand
+bun run test --runInBand
 python -m unittest discover -s workers/transcription/tests -v
-npm run build
+bun run build
 ```
 
-The frontend is tested and launched from `../frontend` with `npm test` and `npm run dev`.
+The frontend is tested and launched from `../frontend` with `bun run test` and `bun run dev`.

@@ -20,6 +20,6 @@ process.env.REDIS_PORT ??= '6379';
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
-    'E2E DATABASE_URL is missing. Start local infrastructure with `npm run infra:up` or provide a CI database.',
+    'E2E DATABASE_URL is missing. Start local infrastructure with `bun run infra:up` or provide a CI database.',
   );
 }

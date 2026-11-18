@@ -1,5 +1,12 @@
 node_modules
+.venv
+**/.venv
+.python-packages
+**/__pycache__
+**/.pytest_cache
+*.py[cod]
 dist
+dist-dev
 .env*
 coverage
 .git

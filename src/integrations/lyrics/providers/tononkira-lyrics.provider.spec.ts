@@ -1,7 +1,10 @@
 import { HttpService } from '@nestjs/axios';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { of, throwError } from 'rxjs';
-import { TononkiraLyricsProvider } from './tononkira-lyrics.provider';
+import {
+  isPublicInternetAddress,
+  TononkiraLyricsProvider,
+} from './tononkira-lyrics.provider';
 
 describe('TononkiraLyricsProvider', () => {
   const http = { get: jest.fn() };
@@ -10,6 +13,17 @@ describe('TononkiraLyricsProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     provider = new TononkiraLyricsProvider(http as unknown as HttpService);
+    jest
+      .spyOn(
+        provider as unknown as {
+          resolvePublicAddress: () => Promise<{
+            address: string;
+            family: number;
+          }>;
+        },
+        'resolvePublicAddress',
+      )
+      .mockResolvedValue({ address: '1.1.1.1', family: 4 });
   });
 
   it('requests a URL built from slugified artist/title', async () => {
@@ -172,6 +186,34 @@ describe('TononkiraLyricsProvider', () => {
       expect(http.get).not.toHaveBeenCalled();
     });
 
+    it.each([
+      'http://tononkira.serasera.org/hira/a/b',
+      'https://sub.tononkira.serasera.org/hira/a/b',
+      'https://user:password@tononkira.serasera.org/hira/a/b',
+      'https://tononkira.serasera.org:8443/hira/a/b',
+      'https://tononkira.serasera.org/not-hira/a/b',
+    ])('rejects unsafe Tononkira URL %s', async (url) => {
+      await expect(provider.fetchFromUrl(url)).resolves.toBeNull();
+      expect(http.get).not.toHaveBeenCalled();
+    });
+
+    it('disables redirects and caps the downloaded page size', async () => {
+      http.get.mockReturnValue(
+        of({ data: '<html><body>Not found</body></html>' }),
+      );
+      await provider.fetchFromUrl(
+        'https://tononkira.serasera.org/hira/dadazily/ny-ainga',
+      );
+      expect(http.get).toHaveBeenCalledWith(
+        'https://tononkira.serasera.org/hira/dadazily/ny-ainga',
+        expect.objectContaining({
+          maxRedirects: 0,
+          maxContentLength: 1_000_000,
+          maxBodyLength: 1_000_000,
+        }),
+      );
+    });
+
     it('rejects malformed URLs', async () => {
       await expect(provider.fetchFromUrl('not a url')).resolves.toBeNull();
       expect(http.get).not.toHaveBeenCalled();
@@ -188,4 +230,23 @@ describe('TononkiraLyricsProvider', () => {
       ).resolves.toBeNull();
     });
   });
+});
+
+describe('isPublicInternetAddress', () => {
+  it.each([
+    '127.0.0.1',
+    '10.0.0.2',
+    '169.254.169.254',
+    '192.168.1.4',
+    '::1',
+    'fc00::1',
+    'fe80::1',
+  ])('rejects non-public address %s', (address) =>
+    expect(isPublicInternetAddress(address)).toBe(false),
+  );
+
+  it.each(['1.1.1.1', '2606:4700:4700::1111'])(
+    'allows public address %s',
+    (address) => expect(isPublicInternetAddress(address)).toBe(true),
+  );
 });

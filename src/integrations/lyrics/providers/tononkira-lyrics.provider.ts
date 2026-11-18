@@ -1,6 +1,9 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { AxiosError } from 'axios';
+import { lookup } from 'node:dns/promises';
+import { Agent as HttpsAgent } from 'node:https';
+import { BlockList, isIP } from 'node:net';
 import * as cheerio from 'cheerio';
 import { firstValueFrom } from 'rxjs';
 import { estimateLyricsTiming } from '../estimate-lyrics-timing.util';
@@ -12,6 +15,44 @@ import type { LyricsProvider } from '../interfaces/lyrics-provider.interface';
 import type { Lyrics, TrackMetadata } from '../interfaces/lyrics.interface';
 
 const TONONKIRA_BASE_URL = 'https://tononkira.serasera.org';
+const TONONKIRA_HOST = 'tononkira.serasera.org';
+const MAX_TONONKIRA_PAGE_BYTES = 1_000_000;
+const blockedIpv4Addresses = new BlockList();
+[
+  ['0.0.0.0', 8],
+  ['10.0.0.0', 8],
+  ['100.64.0.0', 10],
+  ['127.0.0.0', 8],
+  ['169.254.0.0', 16],
+  ['172.16.0.0', 12],
+  ['192.0.0.0', 24],
+  ['192.0.2.0', 24],
+  ['192.88.99.0', 24],
+  ['192.168.0.0', 16],
+  ['198.18.0.0', 15],
+  ['198.51.100.0', 24],
+  ['203.0.113.0', 24],
+  ['224.0.0.0', 4],
+  ['240.0.0.0', 4],
+].forEach(([address, prefix]) =>
+  blockedIpv4Addresses.addSubnet(address as string, prefix as number, 'ipv4'),
+);
+const blockedIpv6Addresses = new BlockList();
+[
+  ['::', 128],
+  ['::1', 128],
+  ['::ffff:0:0', 96],
+  ['64:ff9b::', 96],
+  ['100::', 64],
+  ['2001::', 23],
+  ['2001:db8::', 32],
+  ['2002::', 16],
+  ['fc00::', 7],
+  ['fe80::', 10],
+  ['ff00::', 8],
+].forEach(([address, prefix]) =>
+  blockedIpv6Addresses.addSubnet(address as string, prefix as number, 'ipv6'),
+);
 const TONONKIRA_SOURCE =
   /(?:\s*(?:nalaina\s+tao\s+amin['’]ny|from|via|source:?\s*)\s*)?tononkira\.serasera\.org/giu;
 const SECTION_HEADING =
@@ -77,9 +118,14 @@ export class TononkiraLyricsProvider implements LyricsProvider {
     try {
       const parsed = new URL(url);
       return (
-        (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
-        (parsed.hostname === 'tononkira.serasera.org' ||
-          parsed.hostname.endsWith('.tononkira.serasera.org'))
+        parsed.protocol === 'https:' &&
+        parsed.hostname === TONONKIRA_HOST &&
+        parsed.port === '' &&
+        !parsed.username &&
+        !parsed.password &&
+        !parsed.search &&
+        !parsed.hash &&
+        /^\/hira\/[a-z0-9-]+\/[a-z0-9-]+\/?$/u.test(parsed.pathname)
       );
     } catch {
       return false;
@@ -88,11 +134,21 @@ export class TononkiraLyricsProvider implements LyricsProvider {
 
   private async fetchLines(url: string): Promise<string[] | null> {
     try {
+      const address = await this.resolvePublicAddress();
+      const httpsAgent = new HttpsAgent({
+        lookup: (_hostname, _options, callback) =>
+          callback(null, address.address, address.family),
+      });
       const response = await firstValueFrom(
         this.http.get<string>(url, {
           headers: { 'User-Agent': LYRICS_WEB_USER_AGENT },
           timeout: LYRICS_WEB_PAGE_TIMEOUT_MS,
           responseType: 'text',
+          maxRedirects: 0,
+          maxContentLength: MAX_TONONKIRA_PAGE_BYTES,
+          maxBodyLength: MAX_TONONKIRA_PAGE_BYTES,
+          httpsAgent,
+          proxy: false,
         }),
       );
       const lines = this.extractLines(response.data);
@@ -109,6 +165,22 @@ export class TononkiraLyricsProvider implements LyricsProvider {
       }
       return null;
     }
+  }
+
+  private async resolvePublicAddress() {
+    const addresses = await lookup(TONONKIRA_HOST, {
+      all: true,
+      verbatim: true,
+    });
+    if (
+      addresses.length === 0 ||
+      addresses.some(({ address }) => !isPublicInternetAddress(address))
+    ) {
+      throw new Error('Tononkira resolved to a non-public address');
+    }
+    // Pin the validated result into the HTTPS agent so a second DNS lookup
+    // cannot rebind the connection to a private or reserved address.
+    return addresses.find(({ family }) => family === 4) ?? addresses[0];
   }
 
   private extractLines(html: string): string[] {
@@ -139,4 +211,11 @@ export class TononkiraLyricsProvider implements LyricsProvider {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
   }
+}
+
+export function isPublicInternetAddress(address: string): boolean {
+  const family = isIP(address);
+  if (family === 4) return !blockedIpv4Addresses.check(address, 'ipv4');
+  if (family === 6) return !blockedIpv6Addresses.check(address, 'ipv6');
+  return false;
 }

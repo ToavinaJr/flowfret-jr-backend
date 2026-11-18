@@ -357,42 +357,62 @@ export class ChatService {
       new Set(memberIds).size !== memberIds.length
     )
       throw new BadRequestException('Invalid group members.');
-    await this.assertGroupAdmin(conversationId, userId);
-    const activeCount = await this.prisma.conversationParticipant.count({
-      where: { conversationId, isDeleted: false },
-    });
-    if (activeCount + memberIds.length > 50)
-      throw new BadRequestException('A group is limited to 50 members.');
     for (const memberId of memberIds) await this.assertFriend(userId, memberId);
-    const existing = await this.prisma.conversationParticipant.findMany({
-      where: { conversationId, userId: { in: memberIds } },
-      select: { userId: true, isDeleted: true },
-    });
-    const existingById = new Map(existing.map((item) => [item.userId, item]));
-    await this.prisma.$transaction(
-      memberIds.map((memberId) => {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${conversationId}))`;
+      const administrator = await tx.conversationParticipant.findFirst({
+        where: {
+          conversationId,
+          userId,
+          isDeleted: false,
+          role: ConversationParticipantRole.ADMIN,
+          conversation: { type: ConversationType.GROUP, isDeleted: false },
+        },
+        select: { id: true },
+      });
+      if (!administrator)
+        throw new ForbiddenException(
+          'Only group administrators can perform this action.',
+        );
+      const activeCount = await tx.conversationParticipant.count({
+        where: { conversationId, isDeleted: false },
+      });
+      const existing = await tx.conversationParticipant.findMany({
+        where: { conversationId, userId: { in: memberIds } },
+        select: { userId: true, isDeleted: true },
+      });
+      const existingById = new Map(existing.map((item) => [item.userId, item]));
+      const additions = memberIds.filter((memberId) => {
         const previous = existingById.get(memberId);
-        return previous
-          ? this.prisma.conversationParticipant.update({
-              where: {
-                conversationId_userId: { conversationId, userId: memberId },
-              },
-              data: {
-                isDeleted: false,
-                deletedAt: null,
-                joinedAt: new Date(),
-                role: ConversationParticipantRole.MEMBER,
-              },
-            })
-          : this.prisma.conversationParticipant.create({
-              data: {
-                conversationId,
-                userId: memberId,
-                role: ConversationParticipantRole.MEMBER,
-              },
-            });
-      }),
-    );
+        return !previous || previous.isDeleted;
+      }).length;
+      if (activeCount + additions > 50)
+        throw new BadRequestException('A group is limited to 50 members.');
+      for (const memberId of memberIds) {
+        const previous = existingById.get(memberId);
+        if (previous && !previous.isDeleted) continue;
+        if (previous)
+          await tx.conversationParticipant.update({
+            where: {
+              conversationId_userId: { conversationId, userId: memberId },
+            },
+            data: {
+              isDeleted: false,
+              deletedAt: null,
+              joinedAt: new Date(),
+              role: ConversationParticipantRole.MEMBER,
+            },
+          });
+        else
+          await tx.conversationParticipant.create({
+            data: {
+              conversationId,
+              userId: memberId,
+              role: ConversationParticipantRole.MEMBER,
+            },
+          });
+      }
+    });
     return this.prisma.conversation
       .findUniqueOrThrow({
         where: { id: conversationId },
@@ -408,46 +428,62 @@ export class ChatService {
   ) {
     if (!isUuid(conversationId) || !isUuid(memberId))
       throw new BadRequestException('Invalid group or member id.');
-    const conversation = await this.prisma.conversation.findFirst({
-      where: {
-        id: conversationId,
-        type: ConversationType.GROUP,
-        isDeleted: false,
-      },
-      select: { id: true },
-    });
-    if (!conversation) throw new NotFoundException('Group not found.');
-    if (memberId !== userId)
-      await this.assertGroupAdmin(conversationId, userId);
-    const target = await this.prisma.conversationParticipant.findFirst({
-      where: { conversationId, userId: memberId, isDeleted: false },
-    });
-    if (!target) throw new NotFoundException('Group member not found.');
-    await this.prisma.conversationParticipant.update({
-      where: { conversationId_userId: { conversationId, userId: memberId } },
-      data: { isDeleted: true, deletedAt: new Date() },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${conversationId}))`;
+      const conversation = await tx.conversation.findFirst({
+        where: {
+          id: conversationId,
+          type: ConversationType.GROUP,
+          isDeleted: false,
+        },
+        select: { id: true },
+      });
+      if (!conversation) throw new NotFoundException('Group not found.');
+      if (memberId !== userId) {
+        const administrator = await tx.conversationParticipant.findFirst({
+          where: {
+            conversationId,
+            userId,
+            isDeleted: false,
+            role: ConversationParticipantRole.ADMIN,
+          },
+          select: { id: true },
+        });
+        if (!administrator)
+          throw new ForbiddenException(
+            'Only group administrators can perform this action.',
+          );
+      }
+      const target = await tx.conversationParticipant.findFirst({
+        where: { conversationId, userId: memberId, isDeleted: false },
+      });
+      if (!target) throw new NotFoundException('Group member not found.');
+      await tx.conversationParticipant.update({
+        where: { conversationId_userId: { conversationId, userId: memberId } },
+        data: { isDeleted: true, deletedAt: new Date() },
+      });
+      if (target.role === ConversationParticipantRole.ADMIN) {
+        const anotherAdmin = await tx.conversationParticipant.findFirst({
+          where: {
+            conversationId,
+            isDeleted: false,
+            role: ConversationParticipantRole.ADMIN,
+          },
+        });
+        if (!anotherAdmin) {
+          const nextAdmin = await tx.conversationParticipant.findFirst({
+            where: { conversationId, isDeleted: false },
+            orderBy: { joinedAt: 'asc' },
+          });
+          if (nextAdmin)
+            await tx.conversationParticipant.update({
+              where: { id: nextAdmin.id },
+              data: { role: ConversationParticipantRole.ADMIN },
+            });
+        }
+      }
     });
     this.realtime.revokeParticipant(conversationId, memberId);
-    if (target.role === ConversationParticipantRole.ADMIN) {
-      const anotherAdmin = await this.prisma.conversationParticipant.findFirst({
-        where: {
-          conversationId,
-          isDeleted: false,
-          role: ConversationParticipantRole.ADMIN,
-        },
-      });
-      if (!anotherAdmin) {
-        const nextAdmin = await this.prisma.conversationParticipant.findFirst({
-          where: { conversationId, isDeleted: false },
-          orderBy: { joinedAt: 'asc' },
-        });
-        if (nextAdmin)
-          await this.prisma.conversationParticipant.update({
-            where: { id: nextAdmin.id },
-            data: { role: ConversationParticipantRole.ADMIN },
-          });
-      }
-    }
     return true;
   }
 
@@ -459,34 +495,51 @@ export class ChatService {
   ) {
     if (!isUuid(conversationId) || !isUuid(memberId))
       throw new BadRequestException('Invalid group or member id.');
-    await this.assertGroupAdmin(conversationId, userId);
-    if (role === ConversationParticipantRole.MEMBER) {
-      const adminCount = await this.prisma.conversationParticipant.count({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${conversationId}))`;
+      const administrator = await tx.conversationParticipant.findFirst({
         where: {
           conversationId,
+          userId,
           isDeleted: false,
           role: ConversationParticipantRole.ADMIN,
-        },
-      });
-      const target = await this.prisma.conversationParticipant.findFirst({
-        where: {
-          conversationId,
-          userId: memberId,
-          isDeleted: false,
-          role: ConversationParticipantRole.ADMIN,
+          conversation: { type: ConversationType.GROUP, isDeleted: false },
         },
         select: { id: true },
       });
-      if (target && adminCount < 2)
-        throw new BadRequestException(
-          'A group must keep at least one administrator.',
+      if (!administrator)
+        throw new ForbiddenException(
+          'Only group administrators can perform this action.',
         );
-    }
-    const updated = await this.prisma.conversationParticipant.updateMany({
-      where: { conversationId, userId: memberId, isDeleted: false },
-      data: { role },
+      if (role === ConversationParticipantRole.MEMBER) {
+        const adminCount = await tx.conversationParticipant.count({
+          where: {
+            conversationId,
+            isDeleted: false,
+            role: ConversationParticipantRole.ADMIN,
+          },
+        });
+        const target = await tx.conversationParticipant.findFirst({
+          where: {
+            conversationId,
+            userId: memberId,
+            isDeleted: false,
+            role: ConversationParticipantRole.ADMIN,
+          },
+          select: { id: true },
+        });
+        if (target && adminCount < 2)
+          throw new BadRequestException(
+            'A group must keep at least one administrator.',
+          );
+      }
+      const updated = await tx.conversationParticipant.updateMany({
+        where: { conversationId, userId: memberId, isDeleted: false },
+        data: { role },
+      });
+      if (!updated.count)
+        throw new NotFoundException('Group member not found.');
     });
-    if (!updated.count) throw new NotFoundException('Group member not found.');
     return true;
   }
 

@@ -2,10 +2,10 @@
 
 ## Portes automatiques
 
-- [ ] Backend : `npm run validate` (lint, types, build et tests unitaires).
-- [ ] Backend : `npm run test:e2e -- --runInBand` avec une base et un Redis de test configurés.
+- [ ] Backend : `bun run validate` (lint, types, build et tests unitaires).
+- [ ] Backend : `bun run test:e2e --runInBand` avec une base et un Redis de test configurés.
 - [ ] Frontend : `bun run validate` (types, lint, tests et build).
-- [ ] Base : `npx prisma migrate status` confirme que les migrations sont appliquées sur l’environnement cible.
+- [ ] Base : `bunx prisma migrate status` confirme que les migrations sont appliquées sur l’environnement cible.
 - [ ] Configuration de production validée au démarrage; aucune variable secrète n’est livrée au frontend.
 
 ## Parcours à vérifier sur un environnement de préproduction
