@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AudiusModule } from '../integrations/audius/audius.module';
+import { SpotifyModule } from '../integrations/spotify/spotify.module';
 import { YouTubeModule } from '../integrations/youtube/youtube.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { TRANSCRIPTION_QUEUE } from './transcriptions.constants';
@@ -29,6 +30,7 @@ import { getEnvironmentFilePaths } from '../common/environment';
     }),
     PrismaModule,
     AudiusModule,
+    SpotifyModule,
     YouTubeModule,
     BullModule.forRootAsync({
       inject: [ConfigService],

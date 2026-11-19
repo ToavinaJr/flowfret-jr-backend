@@ -75,6 +75,34 @@ describe('SpotifyService', () => {
     expect(httpService.get).toHaveBeenCalledTimes(2);
   });
 
+  it('loads a track by its exact Spotify ID', async () => {
+    mockToken();
+    httpService.get.mockReturnValue(
+      of({
+        data: {
+          id: 'track-1',
+          name: 'Song',
+          duration_ms: 1000,
+          preview_url: 'https://p.scdn.co/mp3-preview/track-1.mp3',
+          external_urls: { spotify: 'https://open.spotify.com/track/track-1' },
+          artists: [],
+          album: { id: 'album-1', name: 'Album', images: [] },
+        },
+      }),
+    );
+
+    await expect(service.getTrack('track-1')).resolves.toMatchObject({
+      id: 'track-1',
+      preview_url: 'https://p.scdn.co/mp3-preview/track-1.mp3',
+    });
+    expect(httpService.get).toHaveBeenCalledWith(
+      'https://api.spotify.com/v1/tracks/track-1',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer token-1' },
+      }),
+    );
+  });
+
   it('refreshes expired token', async () => {
     mockToken(0);
     httpService.get.mockReturnValue(

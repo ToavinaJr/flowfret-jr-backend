@@ -2,6 +2,7 @@ export const SPOTIFY_ACCOUNTS_URL = 'https://accounts.spotify.com';
 export const SPOTIFY_API_URL = 'https://api.spotify.com/v1';
 export const SPOTIFY_TOKEN_PATH = '/api/token';
 export const SPOTIFY_SEARCH_PATH = '/search';
+export const SPOTIFY_TRACKS_PATH = '/tracks';
 
 /** Renew token this many ms before Spotify expiry. */
 export const SPOTIFY_TOKEN_EXPIRY_SKEW_MS = 60_000;

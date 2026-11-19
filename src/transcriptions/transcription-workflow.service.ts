@@ -24,6 +24,7 @@ import { TranscriptionQueueService } from './transcription-queue.service';
 import { TranscriptionQueueDiagnosticsService } from './transcription-queue-diagnostics.service';
 import { TranscriptionCapacityService } from './transcription-capacity.service';
 import { TranscriptionsRepository } from './transcriptions.repository';
+import { TranscriptionAudioSourceService } from './transcription-audio-source.service';
 
 @Injectable()
 export class TranscriptionWorkflowService {
@@ -38,6 +39,7 @@ export class TranscriptionWorkflowService {
     private readonly queueDiagnostics: TranscriptionQueueDiagnosticsService,
     private readonly capacity: TranscriptionCapacityService,
     private readonly access: TranscriptionAccessService,
+    private readonly audioSources: TranscriptionAudioSourceService,
   ) {
     this.engineVersion =
       this.config.get<string>('WHISPER_ENGINE_VERSION') ??
@@ -129,7 +131,16 @@ export class TranscriptionWorkflowService {
       return toTranscriptionResponse(item, null, true);
     }
     this.assertLyricsTranscriptionEnabled();
-    const jobId = await this.queue.enqueue(item, dto, this.engineVersion);
+    const resolvedAudioUrl = await this.audioSources.resolve(
+      provider,
+      dto.trackId,
+      dto.audioUrl,
+    );
+    const jobId = await this.queue.enqueue(
+      item,
+      { ...dto, audioUrl: resolvedAudioUrl },
+      this.engineVersion,
+    );
     await this.queueDiagnostics.log(item.id);
     if (created)
       this.events.emit({
@@ -158,6 +169,11 @@ export class TranscriptionWorkflowService {
         code: TRANSCRIPTION_ERROR_CODE.FAILED,
         message: 'Retry limit reached',
       });
+    const resolvedAudioUrl = await this.audioSources.resolve(
+      item.provider,
+      item.trackId,
+      audioUrl,
+    );
     const reset = await this.repository.update(id, {
       status: TranscriptionStatus.PENDING,
       progress: 0,
@@ -168,7 +184,7 @@ export class TranscriptionWorkflowService {
       errorCode: null,
       errorMessage: null,
     });
-    const jobId = await this.queue.enqueueRetry(item, audioUrl);
+    const jobId = await this.queue.enqueueRetry(item, resolvedAudioUrl);
     this.logger.log(
       JSON.stringify({
         event: 'transcription.retry_enqueued',
@@ -194,7 +210,10 @@ export class TranscriptionWorkflowService {
   }
 
   private assertLyricsTranscriptionEnabled(): void {
-    if (this.config.get<string>('LYRICS_TRANSCRIPTION')?.trim().toLowerCase() === 'false') {
+    if (
+      this.config.get<string>('LYRICS_TRANSCRIPTION')?.trim().toLowerCase() ===
+      'false'
+    ) {
       throw new ServiceUnavailableException({
         code: 'LYRICS_TRANSCRIPTION_DISABLED',
         message: 'Lyrics transcription is disabled by configuration.',

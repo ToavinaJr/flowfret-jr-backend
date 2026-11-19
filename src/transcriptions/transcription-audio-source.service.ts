@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { MusicProvider } from '@prisma/client';
 import { AudiusService } from '../integrations/audius/audius.service';
+import { SpotifyService } from '../integrations/spotify/spotify.service';
 import { YouTubeAudioService } from '../integrations/youtube/youtube-audio.service';
 
 export interface ExtractedYouTubeAudio {
@@ -23,6 +24,7 @@ const DIRECT_AUDIO_HOSTS = new Set([
 export class TranscriptionAudioSourceService {
   constructor(
     private readonly audius: AudiusService,
+    private readonly spotify: SpotifyService,
     private readonly youtubeAudio: YouTubeAudioService,
   ) {}
 
@@ -35,7 +37,21 @@ export class TranscriptionAudioSourceService {
       return this.audius.getFreshStreamUrl(providerTrackId, suppliedUrl);
     }
     if (provider === MusicProvider.SPOTIFY) {
-      const parsed = this.safeUrl(suppliedUrl);
+      const track = await this.spotify.getTrack(providerTrackId);
+      if (track.id !== providerTrackId) {
+        throw new BadRequestException({
+          code: 'TRANSCRIPTION_TRACK_MISMATCH',
+          message:
+            'The Spotify track does not match the transcription request.',
+        });
+      }
+      if (!track.preview_url) {
+        throw new BadRequestException({
+          code: 'TRANSCRIPTION_AUDIO_SOURCE_UNAVAILABLE',
+          message: 'Spotify does not provide a preview for this track.',
+        });
+      }
+      const parsed = this.safeUrl(track.preview_url);
       if (!DIRECT_AUDIO_HOSTS.has(parsed.hostname.toLowerCase())) {
         throw new BadRequestException({
           code: 'TRANSCRIPTION_AUDIO_SOURCE_UNSUPPORTED',

@@ -20,6 +20,7 @@ import {
   SPOTIFY_HTTP_TIMEOUT_MS,
   SPOTIFY_SEARCH_DEFAULT_LIMIT,
   SPOTIFY_SEARCH_PATH,
+  SPOTIFY_TRACKS_PATH,
   SPOTIFY_TOKEN_EXPIRY_SKEW_MS,
   SPOTIFY_TOKEN_PATH,
 } from './spotify.constants';
@@ -27,6 +28,7 @@ import type {
   CachedSpotifyToken,
   SpotifySearchResult,
   SpotifySearchTracksResponse,
+  SpotifyTrack,
   SpotifyTokenResponse,
 } from './spotify.types';
 import {
@@ -60,6 +62,20 @@ export class SpotifyService {
         this.cachedToken = null;
         const refreshedToken = await this.getAccessToken(true);
         return this.executeSearch(query, clampedLimit, offset, refreshedToken);
+      }
+      throw error;
+    }
+  }
+
+  async getTrack(trackId: string): Promise<SpotifyTrack> {
+    const accessToken = await this.getAccessToken();
+
+    try {
+      return await this.executeGetTrack(trackId, accessToken);
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        this.cachedToken = null;
+        return this.executeGetTrack(trackId, await this.getAccessToken(true));
       }
       throw error;
     }
@@ -160,6 +176,29 @@ export class SpotifyService {
       };
     } catch (error) {
       throw this.mapHttpError(error, 'Spotify search failed');
+    }
+  }
+
+  private async executeGetTrack(
+    trackId: string,
+    accessToken: string,
+  ): Promise<SpotifyTrack> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.get<SpotifyTrack>(
+          `${SPOTIFY_API_URL}${SPOTIFY_TRACKS_PATH}/${encodeURIComponent(trackId)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+            timeout: SPOTIFY_HTTP_TIMEOUT_MS,
+          },
+        ),
+      );
+
+      return response.data;
+    } catch (error) {
+      throw this.mapHttpError(error, 'Spotify track lookup failed');
     }
   }
 

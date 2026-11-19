@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getRedisOptions } from '../common/redis-config';
 import { AudiusModule } from '../integrations/audius/audius.module';
+import { SpotifyModule } from '../integrations/spotify/spotify.module';
 import { YouTubeModule } from '../integrations/youtube/youtube.module';
 import { TRANSCRIPTION_QUEUE } from './transcriptions.constants';
 import { TranscriptionsController } from './transcriptions.controller';
@@ -20,6 +21,7 @@ import { PendingTranscriptionTimeoutService } from './pending-transcription-time
 @Module({
   imports: [
     AudiusModule,
+    SpotifyModule,
     YouTubeModule,
     BullModule.forRootAsync({
       inject: [ConfigService],

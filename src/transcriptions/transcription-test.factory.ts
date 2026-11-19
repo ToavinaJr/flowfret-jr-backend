@@ -9,6 +9,7 @@ import { TranscriptionEvents } from './transcriptions.events';
 import { TranscriptionQueueDiagnosticsService } from './transcription-queue-diagnostics.service';
 import { TranscriptionQueueService } from './transcription-queue.service';
 import { TranscriptionWorkflowService } from './transcription-workflow.service';
+import type { TranscriptionAudioSourceService } from './transcription-audio-source.service';
 import { TranscriptionsRepository } from './transcriptions.repository';
 import { TranscriptionsService } from './transcriptions.service';
 
@@ -66,6 +67,11 @@ export function createTranscriptionFixture(
     ...queueOverrides,
   };
   const events = { emit: jest.fn() };
+  const audioSources = {
+    resolve: jest.fn((_provider: string, _trackId: string, url: string) =>
+      Promise.resolve(url),
+    ),
+  };
   const config = {
     get: jest.fn((key: string) => {
       if (key === 'WHISPER_ENGINE_VERSION') return '1';
@@ -92,6 +98,7 @@ export function createTranscriptionFixture(
     diagnostics,
     capacity,
     access,
+    audioSources as unknown as TranscriptionAudioSourceService,
   );
   const service = new TranscriptionsService(workflow, access, diagnostics);
   return {
@@ -104,5 +111,6 @@ export function createTranscriptionFixture(
     repository,
     queue,
     events,
+    audioSources,
   };
 }

@@ -27,6 +27,37 @@ describe('TranscriptionWorkflowService', () => {
     );
   });
 
+  it('resolves Spotify audio from the server-side track ID before enqueueing', async () => {
+    const { workflow, queue, audioSources } = createTranscriptionFixture();
+    const canonicalUrl = 'https://p.scdn.co/mp3-preview/track-1.mp3';
+    audioSources.resolve.mockResolvedValue(canonicalUrl);
+
+    await workflow.createOrGet(
+      {
+        ...request,
+        provider: 'SPOTIFY',
+        trackId: 'track-1',
+        audioUrl: 'https://p.scdn.co/mp3-preview/attacker-track.mp3',
+      },
+      'user-id',
+    );
+
+    expect(audioSources.resolve).toHaveBeenCalledWith(
+      'SPOTIFY',
+      'track-1',
+      'https://p.scdn.co/mp3-preview/attacker-track.mp3',
+    );
+    const queueCalls = queue.add.mock.calls as unknown as Array<
+      [unknown, Record<string, unknown>]
+    >;
+    const queuedData = queueCalls[0]?.[1];
+    expect(queuedData).toMatchObject({
+      trackId: 'track-1',
+      provider: 'SPOTIFY',
+      audioUrl: canonicalUrl,
+    });
+  });
+
   it('returns a completed cache entry without creating a job', async () => {
     const completed = {
       ...transcriptionRecord,
@@ -45,6 +76,8 @@ describe('TranscriptionWorkflowService', () => {
   it('returns a failed cache entry for an explicit manual retry', async () => {
     const failed = {
       ...transcriptionRecord,
+      provider: 'SPOTIFY' as const,
+      trackId: 'track-1',
       status: TranscriptionStatus.FAILED,
       errorCode: 'AUDIO_DOWNLOAD_FAILED',
     };
@@ -95,12 +128,18 @@ describe('TranscriptionWorkflowService', () => {
   it('resets and enqueues a failed transcription for manual retry', async () => {
     const failed = {
       ...transcriptionRecord,
+      provider: 'SPOTIFY' as const,
+      trackId: 'track-1',
       status: TranscriptionStatus.FAILED,
       attempts: 3,
       errorCode: 'AUDIO_DOWNLOAD_FAILED',
       errorMessage: 'temporary failure',
     };
-    const { workflow, repository, queue } = createTranscriptionFixture(failed);
+    const { workflow, repository, queue, audioSources } =
+      createTranscriptionFixture(failed);
+    audioSources.resolve.mockResolvedValue(
+      'https://p.scdn.co/mp3-preview/track-1.mp3',
+    );
     repository.update.mockResolvedValue({
       ...failed,
       status: TranscriptionStatus.PENDING,
@@ -119,6 +158,9 @@ describe('TranscriptionWorkflowService', () => {
       { jobId: string },
     ];
     expect(addCall[2].jobId).toContain('-retry-1');
+    expect(addCall[1]).toMatchObject({
+      audioUrl: 'https://p.scdn.co/mp3-preview/track-1.mp3',
+    });
   });
 
   it('rejects retries for running work and exhausted manual retries', async () => {
