@@ -49,9 +49,8 @@ describe('GeniusLyricsProvider', () => {
       provider: 'genius',
       synced: false,
       instrumental: false,
-      plainLyrics: '[Chorus]\nHello world\nIt is me\nSecond verse',
+      plainLyrics: 'Hello world\nIt is me\nSecond verse',
       lines: [
-        { startTimeMs: null, text: '[Chorus]' },
         { startTimeMs: null, text: 'Hello world' },
         { startTimeMs: null, text: 'It is me' },
         { startTimeMs: null, text: 'Second verse' },

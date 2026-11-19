@@ -26,6 +26,8 @@ describe('ListeningHistoryService', () => {
           return Promise.resolve({});
         }),
       },
+      listeningHistoryEvent: { create: jest.fn().mockResolvedValue({}) },
+      $transaction: jest.fn().mockResolvedValue([{}, {}]),
     };
     const service = new ListeningHistoryService(
       prisma as unknown as PrismaService,

@@ -59,9 +59,15 @@ describe('TeachingResolver workspace queries', () => {
     };
     const resolver = new TeachingResolver(prisma as never, {} as never);
 
-    await expect(resolver.publishedTeachingCourses()).resolves.toEqual([
-      { id: 'course-1', title: 'Group guitar', reservedSeats: 3 },
+    const courses = await resolver.publishedTeachingCourses();
+    expect(courses).toEqual([
+      expect.objectContaining({
+        id: 'course-1',
+        title: 'Group guitar',
+        reservedSeats: 3,
+      }),
     ]);
+    expect(courses[0]).not.toHaveProperty('_count');
   });
 
   it('notifies the instructor when a student declines an invitation', async () => {
