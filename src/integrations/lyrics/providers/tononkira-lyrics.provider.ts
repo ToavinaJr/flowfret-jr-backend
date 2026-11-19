@@ -6,8 +6,8 @@ import { Agent as HttpsAgent } from 'node:https';
 import { BlockList, isIP } from 'node:net';
 import * as cheerio from 'cheerio';
 import { firstValueFrom } from 'rxjs';
-import { estimateLyricsTiming } from '../estimate-lyrics-timing.util';
 import {
+  LYRICS_PROVIDER_TONONKIRA,
   LYRICS_WEB_PAGE_TIMEOUT_MS,
   LYRICS_WEB_USER_AGENT,
 } from '../lyrics.constants';
@@ -89,15 +89,12 @@ export class TononkiraLyricsProvider implements LyricsProvider {
     this.logger.log(
       `Tononkira lyrics found for ${track.artist} - ${track.title}`,
     );
-    const synced = typeof track.duration === 'number' && track.duration > 0;
     return {
-      provider: 'tononkira',
-      synced,
+      provider: LYRICS_PROVIDER_TONONKIRA,
+      synced: false,
       instrumental: false,
       plainLyrics: lines.join('\n'),
-      lines: synced
-        ? estimateLyricsTiming(lines, track.duration as number)
-        : lines.map((text) => ({ startTimeMs: null, text })),
+      lines: lines.map((text) => ({ startTimeMs: null, text })),
     };
   }
 

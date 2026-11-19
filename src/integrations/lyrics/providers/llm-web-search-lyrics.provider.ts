@@ -8,6 +8,7 @@ import { AZURE_OPENAI_MAX_PAGE_TEXT_LENGTH } from '../../azure-openai/azure-open
 import { BingSearchService } from '../../web-search/bing-search.service';
 import {
   LYRICS_GROUNDING_MIN_OVERLAP_RATIO,
+  LYRICS_PROVIDER_LLM_WEB_SEARCH,
   LYRICS_WEB_MAX_PAGE_BYTES,
   LYRICS_WEB_PAGE_TIMEOUT_MS,
   LYRICS_WEB_SEARCH_RESULT_COUNT,
@@ -63,7 +64,7 @@ export class LlmWebSearchLyricsProvider implements LyricsProvider {
         `Grounded web-search lyrics found for ${track.artist} - ${track.title}`,
       );
       return {
-        provider: 'llm-web-search',
+        provider: LYRICS_PROVIDER_LLM_WEB_SEARCH,
         synced: false,
         instrumental: false,
         plainLyrics: lines.join('\n'),

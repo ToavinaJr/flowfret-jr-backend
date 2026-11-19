@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   LYRICS_CACHE_TTL_SECONDS,
   LYRICS_NOT_FOUND_TTL_SECONDS,
+  LYRICS_PROVIDER_LLM_WEB_SEARCH,
+  LYRICS_PROVIDER_TONONKIRA,
 } from './lyrics.constants';
 import { LyricsCacheService } from './lyrics-cache.service';
 import { buildLyricsCacheKey } from './lyrics-cache-key.util';
