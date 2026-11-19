@@ -26,6 +26,7 @@ import {
 } from './teaching.types';
 import { TeachingAccessPolicy } from './teaching-access.policy';
 import { normalizeOptionalText } from './teaching.utils';
+import { RateLimits } from '../auth/rate-limit.decorator';
 
 type TeachingContext = { req: { user: { sub: string; role?: string } } };
 const activeEnrollmentStatuses: TeachingEnrollmentStatus[] = [
@@ -92,6 +93,7 @@ function presentCourseWithSeats<
 }
 
 @Resolver()
+@RateLimits({ limit: 120, windowSeconds: 60, failClosed: true })
 export class TeachingResolver {
   constructor(
     private readonly prisma: PrismaService,

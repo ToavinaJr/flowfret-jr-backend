@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { UserStatus } from '@prisma/client';
@@ -6,6 +6,7 @@ import { AuthPayload, UserModel } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { DEFAULT_REFRESH_TOKEN_TTL_DAYS } from './auth.constants';
 import { generateOpaqueToken, hashOpaqueToken } from './auth.utils';
+import { randomUUID } from 'node:crypto';
 
 export interface AuthSessionPayload extends AuthPayload {
   refreshToken: string;
@@ -13,6 +14,8 @@ export interface AuthSessionPayload extends AuthPayload {
 
 @Injectable()
 export class AuthSessionService {
+  private readonly logger = new Logger(AuthSessionService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -33,6 +36,7 @@ export class AuthSessionService {
       await this.prisma.refreshToken.create({
         data: {
           userId: user.id,
+          familyId: randomUUID(),
           tokenHash: hashOpaqueToken(refreshToken),
           expiresAt: this.expiresAt(),
         },
@@ -46,9 +50,15 @@ export class AuthSessionService {
       where: { tokenHash: hashOpaqueToken(refreshToken) },
       include: { user: true },
     });
+    if (!existing) throw new UnauthorizedException('Invalid or expired refresh token.');
+
+    if (existing.revokedAt) {
+      if (existing.rotatedAt && !existing.isDeleted) {
+        await this.revokeFamily(existing.familyId, existing.userId);
+      }
+      throw new UnauthorizedException('Invalid or expired refresh token.');
+    }
     if (
-      !existing ||
-      existing.revokedAt ||
       existing.isDeleted ||
       existing.expiresAt.getTime() <= Date.now() ||
       existing.user.isDeleted ||
@@ -58,21 +68,36 @@ export class AuthSessionService {
 
     const nextToken = generateOpaqueToken();
     const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
+    const rotated = await this.prisma.$transaction(async (tx) => {
       const revoked = await tx.refreshToken.updateMany({
         where: { id: existing.id, revokedAt: null, isDeleted: false },
-        data: { revokedAt: now },
+        data: { revokedAt: now, rotatedAt: now },
       });
-      if (revoked.count !== 1)
-        throw new UnauthorizedException('Refresh token has already been used.');
+      if (revoked.count !== 1) {
+        await tx.refreshToken.updateMany({
+          where: {
+            familyId: existing.familyId,
+            revokedAt: null,
+            isDeleted: false,
+          },
+          data: { revokedAt: now },
+        });
+        return false;
+      }
       await tx.refreshToken.create({
         data: {
           userId: existing.userId,
+          familyId: existing.familyId,
           tokenHash: hashOpaqueToken(nextToken),
           expiresAt: this.expiresAt(),
         },
       });
+      return true;
     });
+    if (!rotated) {
+      this.logReuse(existing.familyId, existing.userId);
+      throw new UnauthorizedException('Refresh token has already been used.');
+    }
     return this.create(existing.user, nextToken);
   }
 
@@ -97,5 +122,19 @@ export class AuthSessionService {
         ? configured
         : DEFAULT_REFRESH_TOKEN_TTL_DAYS;
     return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  }
+
+  private async revokeFamily(familyId: string, userId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: { familyId, revokedAt: null, isDeleted: false },
+      data: { revokedAt: new Date() },
+    });
+    this.logReuse(familyId, userId);
+  }
+
+  private logReuse(familyId: string, userId: string): void {
+    this.logger.warn(
+      JSON.stringify({ event: 'auth.refresh_token_reuse_detected', familyId, userId }),
+    );
   }
 }

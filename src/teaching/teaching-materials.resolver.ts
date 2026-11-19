@@ -3,10 +3,12 @@ import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { TeachingEnrollmentStatus, UploadStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeachingMaterialModel } from './teaching-material.types';
+import { RateLimits } from '../auth/rate-limit.decorator';
 
 type TeachingMaterialContext = { req: { user: { sub: string } } };
 
 @Resolver(() => TeachingMaterialModel)
+@RateLimits({ limit: 120, windowSeconds: 60, failClosed: true })
 export class TeachingMaterialsResolver {
   constructor(private readonly prisma: PrismaService) {}
 

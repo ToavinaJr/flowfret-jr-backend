@@ -9,6 +9,7 @@ import {
   UpdatePostReportInput,
 } from '../graphql/graphql.types';
 import { Roles } from '../auth/roles.decorator';
+import { RateLimits } from '../auth/rate-limit.decorator';
 import { PostInteractionsQueryService } from './post-interactions-query.service';
 import { PostLikesService } from './post-likes.service';
 import { PostModerationService } from './post-moderation.service';
@@ -16,6 +17,7 @@ import { PostModerationService } from './post-moderation.service';
 type RequestContext = { req: { user: { sub: string; username?: string } } };
 
 @Resolver(() => PostLikeModel)
+@RateLimits({ limit: 120, windowSeconds: 60, failClosed: true })
 export class PostInteractionsResolver {
   constructor(
     private readonly queries: PostInteractionsQueryService,

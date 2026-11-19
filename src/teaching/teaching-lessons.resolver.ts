@@ -25,6 +25,7 @@ import {
 } from '@prisma/client';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 import { PrismaService } from '../prisma/prisma.service';
+import { RateLimits } from '../auth/rate-limit.decorator';
 import {
   LessonAttendanceInput,
   TeachingLessonInput,
@@ -44,6 +45,7 @@ const lessonInclude = {
 } satisfies Prisma.TeachingLessonInclude;
 
 @Resolver()
+@RateLimits({ limit: 120, windowSeconds: 60, failClosed: true })
 export class TeachingLessonsResolver {
   constructor(private readonly prisma: PrismaService) {}
 

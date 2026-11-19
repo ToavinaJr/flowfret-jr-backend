@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../common/domain.constants';
 import { AuditLogModel } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { RateLimit } from '../auth/rate-limit.decorator';
 
 /** Audit records are append-only: clients can read their own history, never edit it. */
 @Resolver(() => AuditLogModel)
@@ -23,6 +24,7 @@ export class AuditLogsResolver {
 
   /** Records non-mutating product activity such as starting playback. */
   @Mutation(() => AuditLogModel)
+  @RateLimit(30, 60, true)
   async recordActivity(
     @Args('action') action: string,
     @Args('entityType') entityType: string,

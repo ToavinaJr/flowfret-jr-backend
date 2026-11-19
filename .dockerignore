@@ -8,6 +8,8 @@ node_modules
 dist
 dist-dev
 .env*
+youtube-cookies.txt
+**/youtube-cookies.txt
 coverage
 .git
 transcription-tmp

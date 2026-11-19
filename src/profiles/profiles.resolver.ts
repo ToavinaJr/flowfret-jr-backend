@@ -9,8 +9,10 @@ import {
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { profilePolicy } from '../policies/profile.policy';
+import { RateLimits } from '../auth/rate-limit.decorator';
 
 @Resolver(() => ProfileModel)
+@RateLimits({ limit: 120, windowSeconds: 60, failClosed: true })
 export class ProfilesResolver {
   constructor(private readonly prisma: PrismaService) {}
 

@@ -2,11 +2,15 @@
 import argparse
 from pathlib import Path
 from urllib.request import urlopen
+from model_integrity import MODEL_SHA256, verify_model
 
 BTC_REVISION = "2682317be668032e6e4b269ded36adaa2ad57df0"
 BTC_FILES = (
     "LICENSE", "btc_model.py", "utils/transformer_modules.py", "utils/hparams.py",
     "test/btc_model_large_voca.pt",
+)
+BEAT_THIS_SMALL0_URL = (
+    "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/small0.ckpt"
 )
 
 
@@ -17,6 +21,10 @@ def install_btc(destination: Path) -> None:
         url = f"https://raw.githubusercontent.com/jayg996/BTC-ISMIR19/{BTC_REVISION}/{relative}"
         with urlopen(url, timeout=120) as response:
             target.write_bytes(response.read())
+    verify_model(
+        destination / "btc/test/btc_model_large_voca.pt",
+        MODEL_SHA256["btc/test/btc_model_large_voca.pt"],
+    )
     # Upstream predates numpy 2; this alias has the same float64 semantics.
     module = destination / "btc/utils/transformer_modules.py"
     module.write_text(module.read_text().replace("np.float)", "float)"), encoding="utf-8")
@@ -30,12 +38,10 @@ def main() -> None:
     args.models.mkdir(parents=True, exist_ok=True)
     install_btc(args.models)
     if not args.btc_only:
-        import torch
-        from beat_this.inference import load_checkpoint
-
-        torch.hub.set_dir(str(args.models / "torch-cache"))
-        checkpoint = load_checkpoint("small0", device="cpu")
-        torch.save(checkpoint, args.models / "beat-small0.ckpt")
+        target = args.models / "beat-small0.ckpt"
+        with urlopen(BEAT_THIS_SMALL0_URL, timeout=120) as response:
+            target.write_bytes(response.read())
+        verify_model(target, MODEL_SHA256["beat-small0.ckpt"])
 
 
 if __name__ == "__main__":

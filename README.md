@@ -182,7 +182,14 @@ Or launch the complete backend infrastructure:
 docker compose up --build
 ```
 
-The API and worker are separate services; restarting the worker does not stop HTTP traffic.
+The API and workers are separate services; restarting a worker does not stop HTTP
+traffic. Compose loads backend settings from `BACKEND_ENV_FILE` (default `.env`),
+transcription-worker settings from `TRANSCRIPTION_WORKER_ENV_FILE` (default
+`.env.transcription-worker`), and stems-worker settings from
+`STEMS_WORKER_ENV_FILE` (default `.env.stems-worker`). Worker files are optional;
+put only worker-specific settings there, such as YouTube proxy options or the
+Cloudinary credentials required by the stems worker. Do not point worker files
+at the backend's full environment file.
 
 ### Render deployment
 

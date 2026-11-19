@@ -18,6 +18,7 @@ import {
 } from '../graphql/graphql.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { RateLimits } from '../auth/rate-limit.decorator';
 
 function actorIdFromNotification(
   notification: NotificationModel,
@@ -31,6 +32,7 @@ function actorIdFromNotification(
 }
 
 @Resolver(() => NotificationModel)
+@RateLimits({ limit: 120, windowSeconds: 60, failClosed: true })
 export class NotificationsResolver {
   constructor(
     private readonly prisma: PrismaService,

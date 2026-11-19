@@ -10,10 +10,12 @@ import {
 } from './teaching.types';
 import { TeachingAccessPolicy } from './teaching-access.policy';
 import { normalizeList, normalizeOptionalText } from './teaching.utils';
+import { RateLimits } from '../auth/rate-limit.decorator';
 
 type TeachingContext = { req: { user: { sub: string } } };
 
 @Resolver()
+@RateLimits({ limit: 120, windowSeconds: 60, failClosed: true })
 export class TeachingProfilesResolver {
   constructor(
     private readonly prisma: PrismaService,

@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from timeline import align_timeline, chord_label
+from model_integrity import MODEL_SHA256, verify_model
 
 
 def analyze(audio_path: Path, models: Path) -> dict:
@@ -15,6 +16,14 @@ def analyze(audio_path: Path, models: Path) -> dict:
     import numpy as np
     import torch
     from beat_this.inference import Audio2Beats
+
+    verify_model(
+        models / "btc/test/btc_model_large_voca.pt",
+        MODEL_SHA256["btc/test/btc_model_large_voca.pt"],
+    )
+    verify_model(
+        models / "beat-small0.ckpt", MODEL_SHA256["beat-small0.ckpt"]
+    )
 
     torch.set_num_threads(2)
     sys.path.insert(0, str(models / "btc"))

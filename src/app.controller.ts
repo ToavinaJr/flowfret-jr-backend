@@ -18,10 +18,8 @@ export class AppController {
   } {
     return {
       chordTranscription:
-        this.config
-          .get<string>('CHORD_TRANSCRIPTION')
-          ?.trim()
-          .toLowerCase() === 'true',
+        this.config.get<string>('CHORD_TRANSCRIPTION')?.trim().toLowerCase() ===
+        'true',
       equalizerTranscription:
         this.config
           .get<string>('EQUALIZER_TRANSCRIPTION')
