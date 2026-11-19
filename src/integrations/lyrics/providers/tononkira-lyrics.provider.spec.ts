@@ -100,7 +100,7 @@ describe('TononkiraLyricsProvider', () => {
     ).resolves.toEqual(['First line', 'Actual chorus line', 'Last line']);
   });
 
-  it('estimates per-line timing and marks the result synced when a duration is known', async () => {
+  it('stays unsynced even when a duration is known', async () => {
     http.get.mockReturnValue(
       of({
         data: `<html><body>
@@ -117,11 +117,15 @@ describe('TononkiraLyricsProvider', () => {
       artist: 'Artist',
       duration: 60,
     });
-    expect(result?.synced).toBe(true);
-    expect(result?.lines[0]).toEqual({ startTimeMs: 0, text: 'First line' });
-    expect(result?.lines[1].text).toBe('Second line');
-    expect(result?.lines[1].startTimeMs).toBeGreaterThan(0);
-    expect(result?.lines[1].startTimeMs).toBeLessThan(60_000);
+    expect(result?.synced).toBe(false);
+    expect(result?.lines[0]).toEqual({
+      startTimeMs: null,
+      text: 'First line',
+    });
+    expect(result?.lines[1]).toEqual({
+      startTimeMs: null,
+      text: 'Second line',
+    });
   });
 
   it('returns null when the page has no lyrics container', async () => {

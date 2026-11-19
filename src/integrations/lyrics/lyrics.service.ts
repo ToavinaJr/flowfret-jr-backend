@@ -75,19 +75,27 @@ export class LyricsService {
   }
 
   /**
-   * Genius, a plain-text-only LRCLIB submission and the LLM web-search
-   * fallback never carry real per-line timing - only Tononkira estimates
-   * it today, when a duration is known. Applying the same duration-weighted
-   * estimate here, for any unsynced result, keeps playback consistent
-   * (line-by-line highlighting) regardless of which provider answered,
-   * instead of some tracks showing a single static block of text. It's
-   * still an approximation, not true synchronization.
+   * Genius and a plain-text-only LRCLIB submission never carry real
+   * per-line timing. Applying a duration-weighted estimate for those keeps
+   * playback consistent (line-by-line highlighting) instead of some tracks
+   * showing a single static block of text. It's still an approximation,
+   * not true synchronization - which is exactly why Tononkira and the LLM
+   * web-search fallback are excluded: their text is itself a guess (a
+   * scrape or an LLM extraction), so stacking a timing guess on top of it
+   * would present two layers of approximation as if it were synced lyrics.
+   * Those two stay as a static block.
    */
   private estimateTimingIfUnsynced(
     result: Lyrics,
     track: TrackMetadata,
   ): Lyrics {
-    if (result.synced || result.instrumental || !track.duration) {
+    if (
+      result.synced ||
+      result.instrumental ||
+      !track.duration ||
+      result.provider === LYRICS_PROVIDER_TONONKIRA ||
+      result.provider === LYRICS_PROVIDER_LLM_WEB_SEARCH
+    ) {
       return result;
     }
     const texts =

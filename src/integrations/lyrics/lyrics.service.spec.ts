@@ -109,6 +109,48 @@ describe('LyricsService', () => {
     expect(cachedValue.synced).toBe(true);
   });
 
+  it('leaves tononkira and llm-web-search results unsynced even when the duration is known', async () => {
+    cache.get.mockResolvedValue(undefined);
+    const tononkiraLyrics = {
+      provider: 'tononkira',
+      synced: false,
+      instrumental: false,
+      plainLyrics: 'First line',
+      lines: [{ startTimeMs: null, text: 'First line' }],
+    };
+    provider.findLyrics.mockResolvedValue(null);
+    geniusProvider.findLyrics.mockResolvedValue(null);
+    tononkiraProvider.findLyrics.mockResolvedValue(tononkiraLyrics);
+    const result = await service.findLyrics({
+      title: 'Song',
+      artist: 'Artist',
+      duration: 60,
+    });
+    expect(result).toBe(tononkiraLyrics);
+    expect(result?.synced).toBe(false);
+
+    jest.clearAllMocks();
+    cache.get.mockResolvedValue(undefined);
+    const webSearchLyrics = {
+      provider: 'llm-web-search',
+      synced: false,
+      instrumental: false,
+      plainLyrics: 'First line',
+      lines: [{ startTimeMs: null, text: 'First line' }],
+    };
+    provider.findLyrics.mockResolvedValue(null);
+    geniusProvider.findLyrics.mockResolvedValue(null);
+    tononkiraProvider.findLyrics.mockResolvedValue(null);
+    llmWebSearchProvider.findLyrics.mockResolvedValue(webSearchLyrics);
+    const webSearchResult = await service.findLyrics({
+      title: 'Song',
+      artist: 'Artist',
+      duration: 60,
+    });
+    expect(webSearchResult).toBe(webSearchLyrics);
+    expect(webSearchResult?.synced).toBe(false);
+  });
+
   it('leaves an unsynced result untouched when the duration is unknown', async () => {
     cache.get.mockResolvedValue(undefined);
     const lyrics = {
