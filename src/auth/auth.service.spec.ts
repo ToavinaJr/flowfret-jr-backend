@@ -114,7 +114,7 @@ describe('AuthService security contracts', () => {
     expect(mail.sendOtpVerificationEmail).not.toHaveBeenCalled();
   });
 
-  it('activates new accounts and creates a session without sending an OTP', async () => {
+  it('keeps new accounts pending and sends a verification OTP without creating a session', async () => {
     const { service, prisma, mail, jwt } = setup();
     prisma.user.findFirst.mockResolvedValue(null);
     let createdStatus: UserStatus | undefined;
@@ -131,16 +131,20 @@ describe('AuthService security contracts', () => {
       password: 'password-123',
     });
 
-    expect(createdStatus).toBe(UserStatus.ACTIVE);
-    expect(prisma.emailVerificationToken.create).not.toHaveBeenCalled();
-    expect(mail.sendOtpVerificationEmail).not.toHaveBeenCalled();
-    expect(jwt.sign).toHaveBeenCalledWith(
-      expect.objectContaining({ sub: activeUser.id }),
+    expect(createdStatus).toBe(UserStatus.PENDING);
+    expect(prisma.emailVerificationToken.create).toHaveBeenCalledTimes(1);
+    expect(mail.sendOtpVerificationEmail).toHaveBeenCalledTimes(1);
+    expect(jwt.sign).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        email: activeUser.email,
+        verificationToken: expect.any(String),
+        expiresAt: expect.any(Date),
+      }),
     );
-    expect(result.user.id).toBe(activeUser.id);
   });
 
-  it('activates an existing pending account when its owner retries registration', async () => {
+  it('resends verification for an existing pending account without activating it', async () => {
     const { service, prisma, mail } = setup();
     const passwordHash = await bcrypt.hash('password-123', 4);
     prisma.user.findFirst.mockResolvedValue({
@@ -158,12 +162,16 @@ describe('AuthService security contracts', () => {
     });
 
     expect(prisma.user.create).not.toHaveBeenCalled();
-    expect(prisma.user.update).toHaveBeenCalledWith({
-      where: { id: activeUser.id },
-      data: { status: UserStatus.ACTIVE },
-    });
-    expect(mail.sendOtpVerificationEmail).not.toHaveBeenCalled();
-    expect(result.user.id).toBe(activeUser.id);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.emailVerificationToken.create).toHaveBeenCalledTimes(1);
+    expect(mail.sendOtpVerificationEmail).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(
+      expect.objectContaining({
+        email: activeUser.email,
+        verificationToken: expect.any(String),
+        expiresAt: expect.any(Date),
+      }),
+    );
   });
 
   it('creates a session only for an active password account', async () => {

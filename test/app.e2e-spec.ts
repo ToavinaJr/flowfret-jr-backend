@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import * as bcrypt from 'bcrypt';
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './../src/app.module';
 import { GraphQLSchemaHost } from '@nestjs/graphql';
 import { PrismaService } from './../src/prisma/prisma.service';
-import { AuthService } from './../src/auth/auth.service';
+import { AuthSessionService } from './../src/auth/auth-session.service';
+import { MailService } from './../src/mail/mail.service';
 import { assertUserStorageQuota } from './../src/uploads/user-storage-quota';
 import {
   ConversationParticipantRole,
@@ -112,6 +114,22 @@ describe('AppController (e2e)', () => {
     prisma = app.get(PrismaService);
   });
 
+  async function createActiveSession(
+    email: string,
+    username: string,
+    password: string,
+  ) {
+    const user = await prisma.user.create({
+      data: {
+        email,
+        username,
+        passwordHash: await bcrypt.hash(password, 4),
+        status: UserStatus.ACTIVE,
+      },
+    });
+    return app.get(AuthSessionService).create(user);
+  }
+
   it('/ (GET)', () => {
     return request(app.getHttpServer())
       .get('/')
@@ -181,17 +199,61 @@ describe('AppController (e2e)', () => {
     );
   });
 
+  it('keeps password registrations pending until the email OTP is verified', async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const email = `verify-${suffix}@example.test`;
+    const username = `verify_${suffix}`;
+    const password = 'E2e-password-123!';
+    jest
+      .spyOn(app.get(MailService), 'sendOtpVerificationEmail')
+      .mockResolvedValue(undefined);
+
+    try {
+      const response = await request(app.getHttpServer())
+        .post('/graphql')
+        .send({
+          query: `mutation Register($data: RegisterInput!) { register(data: $data) { email verificationToken expiresAt message } }`,
+          variables: { data: { email, username, password } },
+        });
+      const body = response.body as GraphQLBody<{
+        register: { email: string; verificationToken: string };
+      }>;
+
+      expect(body.errors).toBeUndefined();
+      expect(body.data?.register).toMatchObject({
+        email,
+        verificationToken: expect.any(String),
+      });
+      expect(cookiePair(response.headers)).toBeUndefined();
+      const user = await prisma.user.findUnique({ where: { email } });
+      expect(user?.status).toBe(UserStatus.PENDING);
+      expect(
+        await prisma.refreshToken.count({ where: { userId: user?.id } }),
+      ).toBe(0);
+
+      const login = await request(app.getHttpServer())
+        .post('/graphql')
+        .send({
+          query: `mutation Login($data: LoginInput!) { login(data: $data) { accessToken user { id } } }`,
+          variables: { data: { email, password } },
+        })
+        .expect(200);
+      const loginBody = login.body as GraphQLBody<unknown>;
+      expect(loginBody.errors?.[0]).toMatchObject({
+        extensions: { code: 'UNAUTHENTICATED' },
+      });
+    } finally {
+      await prisma.user.deleteMany({ where: { email } });
+    }
+  });
+
   it('rotates, clears, and revokes the refresh session cookie', async () => {
     const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const email = `e2e-${suffix}@example.test`;
     const password = 'E2e-password-123!';
     const username = `e2e_${suffix}`;
     try {
-      const session = await app.get(AuthService).register({
-        email,
-        password,
-        username,
-      });
+      const session = await createActiveSession(email, username, password);
       let refreshCookie = `fretflow_refresh=${session.refreshToken}`;
 
       const refreshResponse = await request(app.getHttpServer())
@@ -285,9 +347,7 @@ describe('AppController (e2e)', () => {
         .send({})
         .expect(401);
 
-      const session = await app
-        .get(AuthService)
-        .register({ email, password, username });
+      const session = await createActiveSession(email, username, password);
       const accessToken = session.accessToken;
 
       const adminResponse = await request(app.getHttpServer())
@@ -328,17 +388,12 @@ describe('AppController (e2e)', () => {
     const secondUsername = `idor_b_${suffix}`;
 
     try {
-      const authService = app.get(AuthService);
-      const first = await authService.register({
-        email: firstEmail,
+      const first = await createActiveSession(firstEmail, firstUsername, password);
+      const second = await createActiveSession(
+        secondEmail,
+        secondUsername,
         password,
-        username: firstUsername,
-      });
-      const second = await authService.register({
-        email: secondEmail,
-        password,
-        username: secondUsername,
-      });
+      );
       expect(first.accessToken).toEqual(expect.any(String));
       expect(second.user.id).toEqual(expect.any(String));
 
@@ -396,11 +451,11 @@ describe('AppController (e2e)', () => {
   it('serializes concurrent upload quota reservations against PostgreSQL', async () => {
     const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const email = `quota-${suffix}@example.test`;
-    const user = await app.get(AuthService).register({
+    const user = await createActiveSession(
       email,
-      password: 'E2e-password-123!',
-      username: `quota_${suffix}`,
-    });
+      `quota_${suffix}`,
+      'E2e-password-123!',
+    );
 
     try {
       const reserve = (name: string) =>

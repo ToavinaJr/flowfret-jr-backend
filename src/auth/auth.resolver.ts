@@ -35,16 +35,11 @@ export class AuthResolver {
     { limit: 5, windowSeconds: 60, failClosed: true },
     { limit: 20, windowSeconds: 3600, failClosed: true },
   )
-  @Mutation(() => AuthPayload)
+  @Mutation(() => RegisterPendingPayload)
   async register(
     @Args('data') data: RegisterInput,
-    @Context('res') response: Response,
-  ): Promise<AuthPayload> {
-    return writeSessionCookie(
-      response,
-      this.configService,
-      await this.authService.register(data),
-    );
+  ): Promise<RegisterPendingPayload> {
+    return this.authService.register(data);
   }
 
   @Public()

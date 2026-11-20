@@ -38,7 +38,7 @@ export class AuthService {
     private readonly googleAuth: GoogleAuthService,
   ) {}
 
-  async register(input: RegisterInput): Promise<AuthSessionPayload> {
+  async register(input: RegisterInput): Promise<RegisterPendingPayload> {
     const email = normalizeEmail(input.email);
     const existing = await this.prisma.user.findFirst({
       where: {
@@ -51,16 +51,12 @@ export class AuthService {
     if (existing) {
       if (
         existing.status === UserStatus.PENDING &&
-        existing.email.toLowerCase() === email &&
+        normalizeEmail(existing.email) === email &&
         existing.username === input.username &&
         existing.passwordHash &&
         (await bcrypt.compare(input.password, existing.passwordHash))
       ) {
-        const activatedUser = await this.prisma.user.update({
-          where: { id: existing.id },
-          data: { status: UserStatus.ACTIVE },
-        });
-        return this.sessions.create(activatedUser);
+        return this.verification.createPendingPayload(existing);
       }
       this.logger.warn(
         JSON.stringify({
@@ -77,7 +73,7 @@ export class AuthService {
           email,
           username: input.username,
           passwordHash: await bcrypt.hash(input.password, 10),
-          status: UserStatus.ACTIVE,
+          status: UserStatus.PENDING,
         },
       });
     } catch (error) {
@@ -85,7 +81,7 @@ export class AuthService {
         throw new ConflictException(GENERIC_REGISTRATION_ERROR);
       throw error;
     }
-    return this.sessions.create(user);
+    return this.verification.createPendingPayload(user);
   }
 
   async login(input: LoginInput): Promise<AuthSessionPayload> {

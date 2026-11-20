@@ -7,6 +7,8 @@ export const GENERIC_CREDENTIALS_ERROR =
   'Identifiants invalides ou compte indisponible.';
 export const GENERIC_REGISTRATION_ERROR =
   'Impossible de créer le compte avec les informations fournies.';
+export const VERIFICATION_PENDING_MESSAGE =
+  'A verification code was sent to your email.';
 export const GENERIC_GOOGLE_ERROR =
   'Impossible de continuer avec Google. Vérifiez le parcours choisi et réessayez.';
 export const GENERIC_TOKEN_ERROR = 'Demande invalide ou expirée.';

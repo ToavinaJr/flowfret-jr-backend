@@ -5,7 +5,7 @@ Mis à jour le 20 novembre 2026. La feuille de route de référence est [REMEDIA
 ## Terminés et vérifiés localement
 
 - P0-1 à P0-6.
-- P1-2 à P1-8. Le scan d'historique a classé les empreintes restantes comme faux positifs; aucune valeur sensible n'a été ajoutée à ce document.
+- P1-1 à P1-8. L'inscription par mot de passe crée un compte `PENDING` et envoie un code OTP; aucune session n'est ouverte avant vérification. Les comptes en attente peuvent demander un nouveau code. Les tests service, GraphQL E2E et fournisseur frontend couvrent ce parcours; le flux Google reste indépendant.
 - P2-1, P2-2, P2-4, P2-5 et P2-9.
 - P3-1, P3-2, P3-7, P3-8 et P3-9.
 
@@ -17,7 +17,6 @@ Mis à jour le 20 novembre 2026. La feuille de route de référence est [REMEDIA
 
 ## En attente d'une décision produit
 
-- P1-1 : imposer la vérification d'adresse e-mail ou supprimer le flux inactif. Le parcours actuel autorise encore l'activation sans OTP.
 - P2-8 : livrer l'interface de collaboration de playlists ou retirer les opérations backend inutilisées. La question a été adressée à l'utilisateur.
 
 ## Restants à implémenter
@@ -29,6 +28,6 @@ Mis à jour le 20 novembre 2026. La feuille de route de référence est [REMEDIA
 
 ## Dernières validations locales
 
-- Backend : 94 suites, 434 tests passés; `typecheck` passé; `bun audit --audit-level=high` passé après correction de la dépendance transitive `effect`.
-- Frontend : lint sans erreur (deux avertissements déjà présents), test i18n 2/2, typecheck passé, build passé avec 1,81 Mio de JavaScript/CSS et un chunk maximal de 375,3 Kio; test axe WCAG A/AA de la page publique passé.
+- Backend : 94 suites, 434 tests passés; 13 E2E passés; `typecheck` passé après l'ajustement du décorateur GraphQL; `bun audit --audit-level=high` passé après correction de la dépendance transitive `effect`.
+- Frontend : le test ciblé `AuthProvider` passe (3/3); `typecheck`, `lint` et `build` repassent après le changement d'inscription. Le lint signale deux avertissements préexistants. La suite complète passe 223/225 tests; deux échecs restent dans `PersistentMediaPlayer.test.tsx` (contrôle des paroles) et `ChatPage.test.tsx` (sélection de conversation). Le build est à 1,81 Mio de JavaScript/CSS avec un chunk maximal de 375,3 Kio; le test axe WCAG A/AA de la page publique passe.
 - Le résultat de la CI distante n'est pas disponible depuis cet environnement.

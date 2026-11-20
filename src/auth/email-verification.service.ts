@@ -19,6 +19,7 @@ import {
   GENERIC_TOKEN_ERROR,
   OTP_LENGTH,
   OTP_TTL_MINUTES,
+  VERIFICATION_PENDING_MESSAGE,
 } from './auth.constants';
 import { generateOpaqueToken } from './auth.utils';
 
@@ -112,12 +113,18 @@ export class EmailVerificationService {
     });
     if (!existing || existing.user.status === UserStatus.ACTIVE)
       throw new BadRequestException(GENERIC_TOKEN_ERROR);
-    const verification = await this.createAndSend(existing.user);
+    return this.createPendingPayload(existing.user);
+  }
+
+  async createPendingPayload(
+    user: Pick<User, 'id' | 'email' | 'username'>,
+  ): Promise<RegisterPendingPayload> {
+    const verification = await this.createAndSend(user);
     return {
-      email: existing.user.email,
+      email: user.email,
       verificationToken: verification.token,
       expiresAt: verification.expiresAt,
-      message: 'Un nouveau code OTP a été envoyé par e-mail.',
+      message: VERIFICATION_PENDING_MESSAGE,
     };
   }
 }
