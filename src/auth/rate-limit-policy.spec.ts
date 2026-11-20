@@ -5,6 +5,7 @@ import { NotificationsResolver } from '../notifications/notifications.resolver';
 import { PostInteractionsResolver } from '../post-interactions/post-interactions.resolver';
 import { ProfilesResolver } from '../profiles/profiles.resolver';
 import { TeachingResolver } from '../teaching/teaching.resolver';
+import { TeachingEnrollmentsResolver } from '../teaching/teaching-enrollments.resolver';
 import { TeachingLessonsResolver } from '../teaching/teaching-lessons.resolver';
 import { TeachingMaterialsResolver } from '../teaching/teaching-materials.resolver';
 import { TeachingProfilesResolver } from '../teaching/teaching-profiles.resolver';
@@ -14,6 +15,7 @@ const guardedResolvers = [
   ProfilesResolver,
   NotificationsResolver,
   TeachingResolver,
+  TeachingEnrollmentsResolver,
   TeachingProfilesResolver,
   TeachingMaterialsResolver,
   TeachingLessonsResolver,
@@ -22,27 +24,34 @@ const guardedResolvers = [
 describe('default mutation rate-limit policies', () => {
   const reflector = new Reflector();
 
-  it.each(guardedResolvers)('%s limits every resolver operation', (resolver) => {
-    const methodNames = Object.getOwnPropertyNames(resolver.prototype).filter(
-      (name) => name !== 'constructor',
-    );
-
-    for (const methodName of methodNames) {
-      const handler = resolver.prototype[methodName] as (...args: never[]) => unknown;
-      const policies = reflector.getAllAndOverride<RateLimitOptions[]>(
-        RATE_LIMIT_KEY,
-        [handler, resolver],
+  it.each(guardedResolvers)(
+    '%s limits every resolver operation',
+    (resolver) => {
+      const methodNames = Object.getOwnPropertyNames(resolver.prototype).filter(
+        (name) => name !== 'constructor',
       );
 
-      expect(policies).toEqual([
-        { limit: 120, windowSeconds: 60, failClosed: true },
-      ]);
-    }
-  });
+      for (const methodName of methodNames) {
+        const handler = resolver.prototype[methodName] as (
+          ...args: never[]
+        ) => unknown;
+        const policies = reflector.getAllAndOverride<RateLimitOptions[]>(
+          RATE_LIMIT_KEY,
+          [handler, resolver],
+        );
+
+        expect(policies).toEqual([
+          { limit: 120, windowSeconds: 60, failClosed: true },
+        ]);
+      }
+    },
+  );
 
   it('applies a stricter limit to recordActivity', () => {
+    // This method is inspected for metadata and is never detached for invocation.
     const policy = reflector.get<RateLimitOptions[]>(
       RATE_LIMIT_KEY,
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       AuditLogsResolver.prototype.recordActivity,
     );
 

@@ -1,4 +1,6 @@
 import { TeachingResolver } from './teaching.resolver';
+import { TeachingEnrollmentsResolver } from './teaching-enrollments.resolver';
+import { TeachingEnrollmentSupport } from './teaching-enrollment-support';
 
 describe('TeachingResolver workspace queries', () => {
   it('returns enrollment requests for every course owned by the instructor', async () => {
@@ -16,7 +18,11 @@ describe('TeachingResolver workspace queries', () => {
         ]),
       },
     };
-    const resolver = new TeachingResolver(prisma as never, {} as never);
+    const resolver = new TeachingEnrollmentsResolver(
+      prisma as never,
+      {} as never,
+      {} as never,
+    );
 
     await expect(
       resolver.myTeachingCourseEnrollments({
@@ -103,7 +109,11 @@ describe('TeachingResolver workspace queries', () => {
           callback(tx),
       ),
     };
-    const resolver = new TeachingResolver(prisma as never, {} as never);
+    const resolver = new TeachingEnrollmentsResolver(
+      prisma as never,
+      {} as never,
+      new TeachingEnrollmentSupport(prisma as never),
+    );
 
     await resolver.respondToTeachingCourseInvitation('enrollment-1', false, {
       req: { user: { sub: 'student-1' } },
