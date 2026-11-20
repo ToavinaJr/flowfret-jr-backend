@@ -26,8 +26,8 @@ import {
   MAX_IMAGE_BYTES,
   MAX_POST_IMAGES,
   MAX_TEACHING_FILE_BYTES,
-  UploadedImage,
 } from './cloudinary.service';
+import type { UploadedImage } from './cloudinary.service';
 import { RateLimits } from '../auth/rate-limit.decorator';
 import { ConcurrentUploadsInterceptor } from './concurrent-uploads.interceptor';
 import { ConfigService } from '@nestjs/config';

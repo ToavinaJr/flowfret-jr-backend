@@ -1,0 +1,1523 @@
+input AddTrackToPlaylistInput {
+  playlistId: String!
+  track: TrackSnapshotInput!
+}
+
+input AdminAuditInput {
+  action: String
+  actorId: String
+  after: String
+  direction: AdminSortDirection! = DESC
+  entityType: String
+  first: Int! = 25
+  from: String
+  includeDeleted: Boolean! = false
+  search: String
+  to: String
+}
+
+type AdminAuditLog {
+  action: String!
+  actorId: String!
+  actorUsername: String!
+  createdAt: DateTime!
+  entityId: String
+  entityType: String!
+  id: String!
+  metadata: JSON!
+}
+
+type AdminAuditLogConnection {
+  nodes: [AdminAuditLog!]!
+  pageInfo: AdminPageInfo!
+  totalCount: Int!
+}
+
+type AdminBackendStatus {
+  databaseReachable: Boolean!
+  serverTime: DateTime!
+}
+
+type AdminCatalogTrack {
+  album: String
+  artists: JSON!
+  createdAt: DateTime!
+  durationMs: Int!
+  genre: String
+  id: String!
+  playlistCount: Int!
+  provider: MusicProvider!
+  providerTrackId: String!
+  title: String!
+  updatedAt: DateTime!
+}
+
+type AdminCatalogTrackConnection {
+  nodes: [AdminCatalogTrack!]!
+  pageInfo: AdminPageInfo!
+  totalCount: Int!
+}
+
+type AdminCategoryStatistic {
+  count: Float!
+  key: String!
+}
+
+type AdminChordTranscription {
+  artist: String
+  createdAt: DateTime!
+  cueCount: Int!
+  duration: Float!
+  engineVersion: String!
+  id: String!
+  provider: MusicProvider!
+  providerTrackId: String!
+  title: String
+  updatedAt: DateTime!
+}
+
+type AdminChordTranscriptionConnection {
+  nodes: [AdminChordTranscription!]!
+  pageInfo: AdminPageInfo!
+  totalCount: Int!
+}
+
+type AdminComment {
+  authorId: String!
+  authorUsername: String!
+  content: String!
+  createdAt: DateTime!
+  deletedAt: DateTime
+  id: String!
+  isDeleted: Boolean!
+  postId: String!
+  status: CommentStatus!
+  updatedAt: DateTime!
+}
+
+type AdminCommentConnection {
+  nodes: [AdminComment!]!
+  pageInfo: AdminPageInfo!
+  totalCount: Int!
+}
+
+input AdminContentInput {
+  after: String
+  commentStatus: CommentStatus
+  direction: AdminSortDirection! = DESC
+  first: Int! = 25
+  from: String
+  includeDeleted: Boolean! = false
+  postStatus: PostStatus
+  reportStatus: ReportStatus
+  search: String
+  to: String
+}
+
+type AdminDailyStatistic {
+  comments: Int!
+  date: String!
+  posts: Int!
+  reports: Int!
+  trackPlays: Int!
+  users: Int!
+}
+
+type AdminDashboardPeriodTotals {
+  newComments: Int!
+  newPosts: Int!
+  newTranscriptions: Int!
+  newUploads: Int!
+  newUsers: Int!
+  reportsCreated: Int!
+  trackPlays: Int!
+}
+
+type AdminDashboardStatistics {
+  daily: [AdminDailyStatistic!]!
+  days: Int!
+  generatedAt: DateTime!
+  period: AdminDashboardPeriodTotals!
+  periodEnd: DateTime!
+  periodStart: DateTime!
+  playsByProvider: [AdminCategoryStatistic!]!
+  totals: AdminDashboardTotals!
+  transcriptionsByStatus: [AdminCategoryStatistic!]!
+  usersByStatus: [AdminCategoryStatistic!]!
+}
+
+type AdminDashboardTotals {
+  activeUsers: Int!
+  catalogTracks: Int!
+  chordTranscriptions: Int!
+  comments: Int!
+  openReports: Int!
+  playlists: Int!
+  posts: Int!
+  trackPlays: Float!
+  transcriptions: Int!
+  uploads: Int!
+  users: Int!
+}
+
+type AdminListeningHistory {
+  artists: JSON!
+  createdAt: DateTime!
+  id: String!
+  lastPlayedAt: DateTime!
+  playCount: Int!
+  provider: MusicProvider!
+  providerTrackId: String!
+  title: String!
+  userId: String!
+  username: String!
+}
+
+type AdminListeningHistoryConnection {
+  nodes: [AdminListeningHistory!]!
+  pageInfo: AdminPageInfo!
+  totalCount: Int!
+}
+
+enum AdminManagedEntity {
+  CATALOG_TRACK
+  CHORD_TRANSCRIPTION
+  COMMENT
+  COMMENT_MENTION
+  FRIENDSHIP
+  LISTENING_HISTORY
+  NOTIFICATION
+  NOTIFICATION_PREFERENCE
+  PLAYLIST
+  PLAYLIST_ITEM
+  POST
+  POST_ATTACHMENT
+  POST_LIKE
+  POST_MENTION
+  POST_REPORT
+  PROFILE
+  TRANSCRIPTION
+  TRANSCRIPTION_ACCESS
+  UPLOAD
+  USER
+}
+
+type AdminManagedEntityConnection {
+  nodes: [JSON!]!
+  totalCount: Int!
+}
+
+input AdminManagedEntityListInput {
+  entity: AdminManagedEntity!
+  first: Int! = 50
+  from: String
+  includeDeleted: Boolean! = false
+  skip: Int! = 0
+  to: String
+}
+
+input AdminManagedEntityMutationInput {
+  data: JSON
+  entity: AdminManagedEntity!
+  reason: String!
+  recordId: String
+}
+
+input AdminMediaInput {
+  after: String
+  direction: AdminSortDirection! = DESC
+  first: Int! = 25
+  from: String
+  includeDeleted: Boolean! = false
+  provider: MusicProvider
+  search: String
+  to: String
+  transcriptionStatus: TranscriptionStatus
+  uploadStatus: UploadStatus
+}
+
+input AdminModerateReportInput {
+  reason: String!
+  reportId: String!
+  status: ReportStatus!
+}
+
+input AdminMusicInput {
+  after: String
+  direction: AdminSortDirection! = DESC
+  first: Int! = 25
+  from: String
+  includeDeleted: Boolean! = false
+  provider: MusicProvider
+  search: String
+  to: String
+  userId: String
+}
+
+type AdminPageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+}
+
+type AdminPlaylist {
+  createdAt: DateTime!
+  description: String
+  id: String!
+  isDeleted: Boolean!
+  itemCount: Int!
+  name: String!
+  updatedAt: DateTime!
+  userId: String!
+  username: String!
+  visibility: PlaylistVisibility!
+}
+
+type AdminPlaylistConnection {
+  nodes: [AdminPlaylist!]!
+  pageInfo: AdminPageInfo!
+  totalCount: Int!
+}
+
+type AdminPost {
+  authorId: String!
+  authorUsername: String!
+  commentCount: Int!
+  content: String
+  createdAt: DateTime!
+  deletedAt: DateTime
+  id: String!
+  isDeleted: Boolean!
+  likeCount: Int!
+  status: PostStatus!
+  updatedAt: DateTime!
+  visibility: PostVisibility!
+}
+
+type AdminPostConnection {
+  nodes: [AdminPost!]!
+  pageInfo: AdminPageInfo!
+  totalCount: Int!
+}
+
+type AdminPostReport {
+  createdAt: DateTime!
+  id: String!
+  isDeleted: Boolean!
+  postAuthorUsername: String!
+  postContent: String
+  postId: String!
+  postIsDeleted: Boolean!
+  postStatus: PostStatus!
+  postVisibility: PostVisibility!
+  reason: String!
+  reporterId: String!
+  reporterUsername: String!
+  reviewedAt: DateTime
+  status: ReportStatus!
+}
+
+type AdminPostReportConnection {
+  nodes: [AdminPostReport!]!
+  pageInfo: AdminPageInfo!
+  totalCount: Int!
+}
+
+input AdminSetUserRoleInput {
+  reason: String!
+  role: UserRole!
+  userId: String!
+}
+
+input AdminSetUserStatusInput {
+  reason: String!
+  status: UserStatus!
+  userId: String!
+}
+
+enum AdminSortDirection {
+  ASC
+  DESC
+}
+
+input AdminStatisticsInput {
+  days: Int! = 30
+}
+
+type AdminTranscription {
+  artist: String
+  attempts: Int!
+  createdAt: DateTime!
+  errorCode: String
+  errorMessage: String
+  id: String!
+  isDeleted: Boolean!
+  progress: Int!
+  provider: MusicProvider!
+  status: TranscriptionStatus!
+  title: String
+  trackId: String!
+  updatedAt: DateTime!
+}
+
+type AdminTranscriptionConnection {
+  nodes: [AdminTranscription!]!
+  pageInfo: AdminPageInfo!
+  totalCount: Int!
+}
+
+type AdminUpload {
+  cleanupPending: Boolean!
+  createdAt: DateTime!
+  fileName: String!
+  fileSize: String!
+  fileType: String!
+  id: String!
+  isDeleted: Boolean!
+  sourceType: UploadSourceType!
+  status: UploadStatus!
+  updatedAt: DateTime!
+  userId: String!
+  username: String!
+}
+
+type AdminUploadConnection {
+  nodes: [AdminUpload!]!
+  pageInfo: AdminPageInfo!
+  totalCount: Int!
+}
+
+type AdminUser {
+  activity: AdminUserActivity
+  createdAt: DateTime!
+  deletedAt: DateTime
+  displayName: String
+  email: String!
+  id: String!
+  isDeleted: Boolean!
+  lastLoginAt: DateTime
+  role: UserRole!
+  status: UserStatus!
+  updatedAt: DateTime!
+  username: String!
+}
+
+input AdminUserActionInput {
+  reason: String!
+  userId: String!
+}
+
+type AdminUserActivity {
+  comments: Int!
+  playlists: Int!
+  posts: Int!
+  uploads: Int!
+}
+
+type AdminUserConnection {
+  nodes: [AdminUser!]!
+  pageInfo: AdminPageInfo!
+  totalCount: Int!
+}
+
+type AdminUserSecurityResult {
+  auditLogId: String!
+  revokedSessionCount: Int!
+  user: AdminUser!
+}
+
+enum AdminUserSortField {
+  CREATED_AT
+  EMAIL
+  LAST_LOGIN_AT
+  UPDATED_AT
+  USERNAME
+}
+
+input AdminUsersInput {
+  after: String
+  direction: AdminSortDirection! = DESC
+  first: Int! = 25
+  from: String
+  includeDeleted: Boolean! = false
+  role: UserRole
+  search: String
+  sortBy: AdminUserSortField! = CREATED_AT
+  status: UserStatus
+  to: String
+}
+
+enum AttachmentKind {
+  AUDIO
+  IMAGE
+  OTHER
+}
+
+type AuditLogModel {
+  action: String!
+  actor: UserModel!
+  actorId: String!
+  createdAt: DateTime!
+  entityId: String
+  entityType: String!
+  id: String!
+  metadata: JSON!
+}
+
+type AuthPayload {
+  accessToken: String!
+  user: UserModel!
+}
+
+type AuthSessionModel {
+  createdAt: DateTime!
+  current: Boolean!
+  expiresAt: DateTime!
+  id: String!
+}
+
+type CatalogTrackModel {
+  album: String
+  artists: [PlaylistArtistModel!]!
+  createdAt: DateTime!
+  durationMs: Int!
+  externalUrl: String!
+  genre: String
+  id: String!
+  imageUrl: String
+  isrc: String
+  provider: MusicProvider!
+  providerTrackId: String!
+  title: String!
+  updatedAt: DateTime!
+}
+
+input ChangePasswordInput {
+  currentPassword: String!
+  newPassword: String!
+}
+
+type ChatAttachment {
+  contentUrl: String!
+  id: ID!
+  position: Int!
+  uploadId: ID!
+}
+
+type ChatConversationView {
+  id: ID!
+  lastMessage: ChatMessageView
+  name: String
+  participants: [ChatParticipant!]!
+  type: ConversationType!
+  unreadCount: Int!
+  updatedAt: DateTime!
+}
+
+type ChatMessageView {
+  attachments: [ChatAttachment!]!
+  body: String
+  conversationId: ID!
+  createdAt: DateTime!
+  id: ID!
+  senderId: ID!
+  senderUsername: String!
+}
+
+type ChatParticipant {
+  avatarUrl: String
+  id: ID!
+  lastReadAt: DateTime
+  nickname: String
+  role: ConversationParticipantRole!
+  userId: ID!
+  username: String!
+}
+
+input ChordCueInput {
+  chord: String!
+  end: Float!
+  start: Float!
+}
+
+type ChordCueModel {
+  chord: String!
+  end: Float!
+  start: Float!
+}
+
+type ChordTranscriptionModel {
+  artist: String
+  cues: [ChordCueModel!]!
+  duration: Float!
+  engineVersion: String!
+  id: String!
+  provider: MusicProvider!
+  providerTrackId: String!
+  title: String
+}
+
+type CommentModel {
+  author: UserModel!
+  authorId: String!
+  content: String!
+  createdAt: DateTime!
+  deletedAt: DateTime
+  id: String!
+  mentionedUsers: [UserModel!]!
+  post: PostModel!
+  postId: String!
+  status: CommentStatus!
+  updatedAt: DateTime!
+}
+
+enum CommentStatus {
+  ACTIVE
+  DELETED
+  HIDDEN
+}
+
+enum ConversationParticipantRole {
+  ADMIN
+  MEMBER
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+input CreateCommentInput {
+  content: String!
+  postId: String!
+  status: CommentStatus
+}
+
+input CreatePlaylistInput {
+  coverUrl: String
+  description: String
+  name: String!
+  visibility: PlaylistVisibility
+}
+
+input CreatePostAttachmentInput {
+  kind: AttachmentKind!
+  position: Int
+  postId: String!
+  uploadId: String!
+}
+
+input CreatePostInput {
+  audioUrl: String
+  content: String
+  coverImageUrl: String
+  imageUploadIds: [String!]
+  status: PostStatus
+  visibility: PostVisibility
+}
+
+input CreateProfileInput {
+  avatarUrl: String
+  bio: String
+  displayName: String!
+  level: String
+  location: String
+  visibility: ProfileVisibility
+  websiteUrl: String
+}
+
+input CreateTeachingCourseInput {
+  description: String
+  durationMinutes: Int!
+  format: TeachingCourseFormat
+  level: String
+  maxStudents: Int
+  priceAmount: Int!
+  priceCurrency: String!
+  priceUnit: TeachingPriceUnit
+  status: TeachingCourseStatus
+  teachingMode: TeachingMode
+  title: String!
+}
+
+input CreateUploadInput {
+  duration: Float
+  fileName: String!
+  fileSize: String!
+  fileType: String!
+  sourceType: UploadSourceType
+  status: UploadStatus
+  storagePath: String!
+  userId: String!
+}
+
+type DailyListeningCount {
+  date: String!
+  listens: Int!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+input DeleteAccountInput {
+  confirmation: String!
+  currentPassword: String
+}
+
+type FriendshipModel {
+  createdAt: DateTime!
+  id: String!
+  receiver: UserModel!
+  receiverId: String!
+  requester: UserModel!
+  requesterId: String!
+  status: FriendshipStatus!
+  updatedAt: DateTime!
+}
+
+enum FriendshipStatus {
+  ACCEPTED
+  BLOCKED
+  CANCELED
+  PENDING
+  REJECTED
+}
+
+input GoogleAuthInput {
+  accessToken: String!
+}
+
+type InstructorProfileModel {
+  biography: String
+  createdAt: DateTime!
+  experienceYears: Int
+  headline: String
+  id: String!
+  languages: [String!]!
+  specialties: [String!]!
+  status: InstructorStatus!
+  storageQuotaBytes: String!
+  updatedAt: DateTime!
+  userId: String!
+}
+
+enum InstructorStatus {
+  APPROVED
+  PENDING
+  REJECTED
+  SUSPENDED
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
+
+input LessonAttendanceInput {
+  note: String
+  status: LessonAttendanceStatus!
+}
+
+type LessonAttendanceModel {
+  enrollmentId: String!
+  id: String!
+  lessonId: String!
+  markedAt: DateTime
+  note: String
+  status: LessonAttendanceStatus!
+  studentUsername: String
+}
+
+enum LessonAttendanceStatus {
+  ABSENT
+  EXCUSED
+  EXPECTED
+  PRESENT
+}
+
+input ListeningArtistInput {
+  id: String!
+  name: String!
+}
+
+type ListeningStats {
+  daily: [DailyListeningCount!]!
+  repeatPlays: Int!
+  repeatedTracks: Int!
+  totalPlays: Int!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+type MusicArtist {
+  id: ID!
+  name: String!
+}
+
+enum MusicProvider {
+  AUDIUS
+  SPOTIFY
+  YOUTUBE
+}
+
+type MusicSearchResult {
+  nextCursor: String
+  provider: String!
+  total: Int!
+  tracks: [MusicTrack!]!
+}
+
+type MusicTrack {
+  album: String
+  artists: [MusicArtist!]!
+  audiusId: ID! @deprecated(reason: "Use providerTrackId together with provider.")
+  audiusUrl: String!
+  durationMs: Int!
+  externalUrl: String!
+  geniusMatchScore: Float
+  geniusUrl: String
+  genre: String
+  id: ID!
+  imageUrl: String
+  isrc: String
+  provider: String!
+  providerTrackId: ID!
+  streamUrl: String!
+  title: String!
+}
+
+type Mutation {
+  acceptPlaylistInvitation(playlistId: String!): Boolean!
+  addChatGroupMembers(conversationId: String!, memberIds: [String!]!): ChatConversationView!
+  addTrackToPlaylist(data: AddTrackToPlaylistInput!): PlaylistItemModel!
+  adminCreateManagedEntity(input: AdminManagedEntityMutationInput!): JSON!
+  adminDeleteManagedEntity(input: AdminManagedEntityMutationInput!): JSON!
+  adminDeleteUser(input: AdminUserActionInput!): AdminUserSecurityResult!
+  adminModeratePostReport(input: AdminModerateReportInput!): ReportStatus!
+  adminRestoreManagedEntity(input: AdminManagedEntityMutationInput!): JSON!
+  adminRevokeUserSessions(input: AdminUserActionInput!): AdminUserSecurityResult!
+  adminSetUserRole(input: AdminSetUserRoleInput!): AdminUserSecurityResult!
+  adminSetUserStatus(input: AdminSetUserStatusInput!): AdminUserSecurityResult!
+  adminUpdateManagedEntity(input: AdminManagedEntityMutationInput!): JSON!
+  archiveTeachingCourse(id: String!): TeachingCourseModel!
+  cancelTeachingLesson(id: String!, note: String): TeachingLessonModel!
+  changePassword(data: ChangePasswordInput!): Boolean!
+  completeTeachingLesson(id: String!): TeachingLessonModel!
+  createComment(data: CreateCommentInput!): CommentModel!
+  createDirectConversation(friendId: String!): ChatConversationView!
+  createGroupConversation(memberIds: [String!]!, name: String!): ChatConversationView!
+  createPlaylist(data: CreatePlaylistInput!): PlaylistModel!
+  createPost(data: CreatePostInput!): PostModel!
+  createPostAttachment(data: CreatePostAttachmentInput!): PostAttachmentModel!
+  createProfile(data: CreateProfileInput!): ProfileModel!
+  createTeachingCourse(data: CreateTeachingCourseInput!): TeachingCourseModel!
+  createUpload(data: CreateUploadInput!): UploadModel!
+  declinePlaylistInvitation(playlistId: String!): Boolean!
+  deleteComment(id: String!): CommentModel!
+  deleteMyAccount(data: DeleteAccountInput!): Boolean!
+  deletePlaylist(id: String!): Boolean!
+  deletePost(id: String!): PostModel!
+  deletePostAttachment(id: String!): PostAttachmentModel!
+  deletePostReport(id: String!): PostReportModel!
+  deleteProfile(id: String!): ProfileModel!
+  deleteTeachingMaterial(id: String!): Boolean!
+  deleteUpload(id: String!): UploadModel!
+  inviteStudentToTeachingCourse(courseId: String!, studentId: String!): TeachingEnrollmentModel!
+  likePost(postId: String!): PostLikeModel!
+  login(data: LoginInput!): AuthPayload!
+  loginWithGoogle(data: GoogleAuthInput!): AuthPayload!
+  logout: Boolean!
+  markConversationRead(conversationId: String!): Boolean!
+  markLessonAttendance(data: LessonAttendanceInput!, enrollmentId: String!, lessonId: String!): TeachingLessonModel!
+  markNotificationRead(id: String!): NotificationModel!
+  recordActivity(action: String!, entityId: String, entityType: String!): AuditLogModel!
+  recordTrackListen(track: RecordTrackListenInput!): Boolean!
+  refreshSession: AuthPayload!
+  register(data: RegisterInput!): RegisterPendingPayload!
+  registerWithGoogle(data: GoogleAuthInput!): AuthPayload!
+  removeChatGroupMember(conversationId: String!, memberId: String!): Boolean!
+  removeFriend(id: String!): FriendshipModel!
+  removeTrackFromPlaylist(itemId: String!, playlistId: String!): Boolean!
+  renameChatGroup(conversationId: String!, name: String!): ChatConversationView!
+  reorderPlaylistItems(data: ReorderPlaylistItemsInput!): PlaylistModel!
+  reportPost(postId: String!, reason: String!): PostReportModel!
+  requestPasswordReset(data: RequestPasswordResetInput!): Boolean!
+  requestTeachingCourseEnrollment(courseId: String!): TeachingEnrollmentModel!
+  rescheduleTeachingLesson(data: TeachingLessonInput!, id: String!): TeachingLessonModel!
+  resendVerificationEmail(token: String!): RegisterPendingPayload!
+  resetPassword(data: ResetPasswordInput!): Boolean!
+  respondFriendRequest(accept: Boolean!, id: String!): FriendshipModel!
+  respondToTeachingCourseInvitation(accept: Boolean!, enrollmentId: String!): TeachingEnrollmentModel!
+  reviewInstructorProfile(id: String!, status: InstructorStatus!): InstructorProfileModel!
+  revokePlaylistCollaborator(playlistId: String!, userId: String!): Boolean!
+  revokeSession(id: String!): Boolean!
+  saveChordTranscription(data: SaveChordTranscriptionInput!): ChordTranscriptionModel!
+  scheduleTeachingLesson(courseId: String!, data: TeachingLessonInput!): TeachingLessonModel!
+  scheduleTeachingLessonSeries(courseId: String!, data: TeachingLessonInput!, occurrences: Int!): [TeachingLessonModel!]!
+  sendChatMessage(body: String, conversationId: String!, uploadIds: [String!]! = []): ChatMessageView!
+  sendFriendRequest(receiverId: String!): FriendshipModel!
+  setChatGroupRole(conversationId: String!, memberId: String!, role: ConversationParticipantRole!): Boolean!
+  setChatNickname(conversationId: String!, nickname: String): Boolean!
+  setInstructorStorageQuota(id: String!, storageQuotaBytes: String!): InstructorProfileModel!
+  setNotificationPreference(enabled: Boolean!, type: NotificationType!): NotificationPreferenceModel!
+  setPlaylistCollaborator(data: SetPlaylistCollaboratorInput!): PlaylistCollaboratorModel!
+  setTrackFavorite(favorite: Boolean!, track: RecordTrackListenInput!): Boolean!
+  unlikePost(postId: String!): PostLikeModel!
+  updateComment(data: UpdateCommentInput!, id: String!): CommentModel!
+  updateMe(data: UpdateMeInput!): UserModel!
+  updatePlaylist(data: UpdatePlaylistInput!, id: String!): PlaylistModel!
+  updatePost(data: UpdatePostInput!, id: String!): PostModel!
+  updatePostAttachment(data: UpdatePostAttachmentInput!, id: String!): PostAttachmentModel!
+  updatePostReport(data: UpdatePostReportInput!, id: String!): PostReportModel!
+  updateProfile(data: UpdateProfileInput!, id: String!): ProfileModel!
+  updateTeachingCourse(data: UpdateTeachingCourseInput!, id: String!): TeachingCourseModel!
+  updateTeachingEnrollment(data: UpdateTeachingEnrollmentInput!, id: String!): TeachingEnrollmentModel!
+  updateUpload(data: UpdateUploadInput!, id: String!): UploadModel!
+  upsertInstructorProfile(data: UpsertInstructorProfileInput!): InstructorProfileModel!
+  verifyEmail(data: VerifyEmailInput!): AuthPayload!
+}
+
+type NotificationModel {
+  actor: UserModel
+  actorAvatarUrl: String
+  createdAt: DateTime!
+  id: String!
+  payload: JSON!
+  readAt: DateTime
+  type: NotificationType!
+  user: UserModel!
+  userId: String!
+}
+
+type NotificationPreferenceModel {
+  enabled: Boolean!
+  id: String!
+  type: NotificationType!
+  updatedAt: DateTime!
+  userId: String!
+}
+
+enum NotificationType {
+  CHAT_MESSAGE
+  COMMENT_CREATED
+  FOLLOWED_POST_ACTIVITY
+  FRIEND_ACCEPTED
+  FRIEND_POST
+  FRIEND_REQUEST
+  POST_COMMENT
+  POST_CREATED
+  POST_LIKE
+  SYSTEM
+  TEACHING_COURSE_INVITATION
+  TEACHING_ENROLLMENT_REQUEST
+  TEACHING_ENROLLMENT_UPDATED
+  TEACHING_LESSON_CANCELLED
+  TEACHING_LESSON_COMPLETED
+  TEACHING_LESSON_REMINDER
+  TEACHING_LESSON_RESCHEDULED
+  TEACHING_LESSON_SCHEDULED
+  UPLOAD_READY
+}
+
+input PlaylistArtistInput {
+  id: String!
+  name: String!
+}
+
+type PlaylistArtistModel {
+  id: String!
+  name: String!
+}
+
+type PlaylistCollaboratorModel {
+  createdAt: DateTime!
+  playlistId: String!
+  role: PlaylistCollaboratorRole!
+  status: PlaylistCollaboratorStatus!
+  userId: String!
+}
+
+enum PlaylistCollaboratorRole {
+  EDITOR
+  VIEWER
+}
+
+enum PlaylistCollaboratorStatus {
+  ACCEPTED
+  PENDING
+}
+
+type PlaylistInvitationModel {
+  createdAt: DateTime!
+  ownerUsername: String!
+  playlistId: String!
+  playlistName: String!
+  role: PlaylistCollaboratorRole!
+  status: PlaylistCollaboratorStatus!
+  userId: String!
+}
+
+type PlaylistItemModel {
+  addedById: String!
+  createdAt: DateTime!
+  id: String!
+  playlistId: String!
+  position: Int!
+  track: CatalogTrackModel!
+  trackId: String!
+  updatedAt: DateTime!
+}
+
+type PlaylistModel {
+  coverUrl: String
+  createdAt: DateTime!
+  description: String
+  id: String!
+  name: String!
+  updatedAt: DateTime!
+  userId: String!
+  version: Int!
+  visibility: PlaylistVisibility!
+}
+
+enum PlaylistVisibility {
+  FRIENDS
+  PRIVATE
+  PUBLIC
+}
+
+type PostAttachmentModel {
+  createdAt: DateTime!
+  id: String!
+  kind: AttachmentKind!
+  position: Int!
+  post: PostModel!
+  postId: String!
+  upload: UploadModel!
+  uploadId: String!
+}
+
+type PostLikeModel {
+  createdAt: DateTime!
+  id: String!
+  post: PostModel!
+  postId: String!
+  user: UserModel
+  userId: String!
+}
+
+type PostModel {
+  attachments: [PostAttachmentModel!]!
+  audioUrl: String
+  author: UserModel!
+  authorId: String!
+  commentCount: Int!
+  comments: [CommentModel!]!
+  content: String
+  coverImageUrl: String
+  createdAt: DateTime!
+  deletedAt: DateTime
+  id: String!
+  likeCount: Int!
+  likes: [PostLikeModel!]!
+  mentionedUsers: [UserModel!]!
+  reports: [PostReportModel!]!
+  status: PostStatus!
+  updatedAt: DateTime!
+  viewerHasLiked: Boolean!
+  viewerLikeId: String
+  visibility: PostVisibility!
+}
+
+type PostReportModel {
+  createdAt: DateTime!
+  id: String!
+  post: PostModel!
+  postId: String!
+  reason: String!
+  reporter: UserModel!
+  reporterId: String!
+  reviewedAt: DateTime
+  status: ReportStatus!
+}
+
+enum PostStatus {
+  ACTIVE
+  DELETED
+  HIDDEN
+}
+
+enum PostVisibility {
+  FRIENDS
+  PRIVATE
+  PUBLIC
+}
+
+type ProfileModel {
+  avatarUrl: String
+  bio: String
+  createdAt: DateTime!
+  displayName: String!
+  id: String!
+  level: String
+  location: String
+  updatedAt: DateTime!
+  user: UserModel!
+  userId: String!
+  visibility: ProfileVisibility!
+  websiteUrl: String
+}
+
+enum ProfileVisibility {
+  FRIENDS
+  PRIVATE
+  PUBLIC
+}
+
+type PublicPlaylistItemModel {
+  id: String!
+  position: Int!
+  track: CatalogTrackModel!
+}
+
+type PublicPlaylistModel {
+  coverUrl: String
+  description: String
+  id: String!
+  name: String!
+}
+
+type Query {
+  adminAuditLogs(input: AdminAuditInput): AdminAuditLogConnection!
+  adminBackendStatus: AdminBackendStatus!
+  adminCatalogTracks(input: AdminMusicInput): AdminCatalogTrackConnection!
+  adminChordTranscriptions(input: AdminMediaInput): AdminChordTranscriptionConnection!
+  adminComments(input: AdminContentInput): AdminCommentConnection!
+  adminDashboardStatistics(input: AdminStatisticsInput): AdminDashboardStatistics!
+  adminInstructorProfiles(status: InstructorStatus): [InstructorProfileModel!]!
+  adminListeningHistory(input: AdminMusicInput): AdminListeningHistoryConnection!
+  adminManagedEntities(input: AdminManagedEntityListInput!): AdminManagedEntityConnection!
+  adminPlaylists(input: AdminMusicInput): AdminPlaylistConnection!
+  adminPostReports(input: AdminContentInput): AdminPostReportConnection!
+  adminPosts(input: AdminContentInput): AdminPostConnection!
+  adminTranscriptions(input: AdminMediaInput): AdminTranscriptionConnection!
+  adminUploads(input: AdminMediaInput): AdminUploadConnection!
+  adminUser(id: String!): AdminUser
+  adminUsers(input: AdminUsersInput): AdminUserConnection!
+  chordTranscription(provider: MusicProvider!, providerTrackId: String!): ChordTranscriptionModel
+  comment(id: String!): CommentModel
+  comments: [CommentModel!]!
+  commentsByPost(postId: String!, skip: Int! = 0, take: Int! = 20): [CommentModel!]!
+  conversationMessages(before: String, conversationId: String!, take: Int! = 30): [ChatMessageView!]!
+  dbHealth: String!
+  myAuditLogs(take: Int! = 50): [AuditLogModel!]!
+  myConversations: [ChatConversationView!]!
+  myEnrolledTeachingCourses: [TeachingCourseModel!]!
+  myFavoriteMusic(skip: Int! = 0, take: Int! = 50): [MusicTrack!]!
+  myFriendships: [FriendshipModel!]!
+  myInstructorProfile: InstructorProfileModel
+  myListeningHistory(skip: Int! = 0, take: Int! = 20): [MusicTrack!]!
+  myListeningStats: ListeningStats!
+  myMusicRecommendations: [MusicTrack!]!
+  myNotificationPreferences: [NotificationPreferenceModel!]!
+  myNotifications(after: String, take: Int! = 50): [NotificationModel!]!
+  myPlaylistInvitations: [PlaylistInvitationModel!]!
+  myPlaylists(after: String, take: Int! = 20): [PlaylistModel!]!
+  mySessions: [AuthSessionModel!]!
+  myTeachingCourseEnrollments: [TeachingEnrollmentModel!]!
+  myTeachingCourses: [TeachingCourseModel!]!
+  myTeachingEnrollments: [TeachingEnrollmentModel!]!
+  myTeachingLessons(from: DateTime!, to: DateTime!): [TeachingLessonModel!]!
+  playlist(id: String!): PlaylistModel
+  playlistCollaborators(playlistId: String!): [PlaylistCollaboratorModel!]!
+  playlistItems(after: String, playlistId: String!, take: Int! = 50): [PlaylistItemModel!]!
+  post(id: String!): PostModel
+  postAttachment(id: String!): PostAttachmentModel
+  postAttachments: [PostAttachmentModel!]!
+  postLike(id: String!): PostLikeModel
+  postLikes: [PostLikeModel!]!
+  postReport(id: String!): PostReportModel
+  postReports(take: Int! = 50): [PostReportModel!]!
+  posts(after: String, query: String, take: Int! = 20): [PostModel!]!
+  profile(id: String!): ProfileModel
+  profileByUserId(userId: String!): ProfileModel
+  profiles: [ProfileModel!]!
+  publicPlaylist(id: String!): PublicPlaylistModel
+  publicPlaylistItems(after: String, playlistId: String!, take: Int! = 50): [PublicPlaylistItemModel!]!
+  publishedTeachingCourses(after: String, take: Int): [TeachingCourseModel!]!
+  searchMusic(cursor: String, limit: Int = 10, query: String!): MusicSearchResult!
+  searchUsers(query: String!, take: Int! = 20): [UserModel!]!
+  sharedPlaylists(after: String, take: Int! = 20): [PlaylistModel!]!
+  teachingCourseEnrollments(courseId: String!): [TeachingEnrollmentModel!]!
+  teachingCourseMaterials(courseId: String!): [TeachingMaterialModel!]!
+  teachingLessonMaterials(lessonId: String!): [TeachingMaterialModel!]!
+  teachingMaterialsForCourses(courseIds: [String!]!): [TeachingMaterialModel!]!
+  trendingMusic: [MusicTrack!]!
+  unreadNotificationCount: Int!
+  upload(id: String!): UploadModel
+  uploads: [UploadModel!]!
+  user(id: String!): UserModel
+  users: [UserModel!]!
+}
+
+input RecordTrackListenInput {
+  album: String
+  artists: [ListeningArtistInput!]!
+  durationMs: Int!
+  externalUrl: String!
+  genre: String
+  imageUrl: String
+  isrc: String
+  provider: MusicProvider!
+  providerTrackId: String!
+  streamUrl: String!
+  title: String!
+}
+
+input RegisterInput {
+  email: String!
+  password: String!
+  username: String!
+}
+
+type RegisterPendingPayload {
+  email: String!
+  expiresAt: DateTime!
+  message: String!
+  verificationToken: String!
+}
+
+input ReorderPlaylistItemsInput {
+  expectedVersion: Int!
+  orderedItemIds: [String!]!
+  playlistId: String!
+}
+
+enum ReportStatus {
+  DISMISSED
+  OPEN
+  RESOLVED
+  REVIEWED
+}
+
+input RequestPasswordResetInput {
+  email: String!
+}
+
+input ResetPasswordInput {
+  password: String!
+  token: String!
+}
+
+input SaveChordTranscriptionInput {
+  artist: String
+  cues: [ChordCueInput!]!
+  duration: Float!
+  engineVersion: String!
+  provider: MusicProvider!
+  providerTrackId: String!
+  title: String
+}
+
+input SetPlaylistCollaboratorInput {
+  playlistId: String!
+  role: PlaylistCollaboratorRole!
+  userId: String!
+}
+
+enum TeachingCourseFormat {
+  GROUP
+  INDIVIDUAL
+}
+
+type TeachingCourseModel {
+  createdAt: DateTime!
+  description: String
+  durationMinutes: Int!
+  format: TeachingCourseFormat!
+  id: String!
+  instructorAvatarUrl: String
+  instructorDisplayName: String
+  instructorExperienceYears: Int
+  instructorHeadline: String
+  instructorId: String!
+  instructorLanguages: [String!]!
+  instructorSpecialties: [String!]!
+  instructorUsername: String
+  level: String
+  maxStudents: Int!
+  priceAmount: Int!
+  priceCurrency: String!
+  priceUnit: TeachingPriceUnit!
+  reservedSeats: Int!
+  status: TeachingCourseStatus!
+  teachingMode: TeachingMode!
+  title: String!
+  updatedAt: DateTime!
+}
+
+enum TeachingCourseStatus {
+  ARCHIVED
+  DRAFT
+  PUBLISHED
+}
+
+type TeachingEnrollmentModel {
+  acceptedAt: DateTime
+  courseId: String!
+  courseTitle: String
+  createdAt: DateTime!
+  endedAt: DateTime
+  id: String!
+  instructorUsername: String
+  invitedAt: DateTime
+  status: TeachingEnrollmentStatus!
+  studentId: String!
+  studentUsername: String
+  updatedAt: DateTime!
+}
+
+enum TeachingEnrollmentStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+  INVITED
+  PAUSED
+  REQUESTED
+}
+
+input TeachingLessonInput {
+  location: String
+  meetingUrl: String
+  startsAt: DateTime!
+  teachingMode: TeachingMode
+  timeZone: String!
+}
+
+type TeachingLessonModel {
+  attendances: [LessonAttendanceModel!]!
+  cancellationNote: String
+  courseId: String!
+  courseTitle: String!
+  createdById: String!
+  endsAt: DateTime!
+  id: String!
+  location: String
+  meetingUrl: String
+  startsAt: DateTime!
+  status: TeachingLessonStatus!
+  teachingMode: TeachingMode!
+  timeZone: String!
+}
+
+enum TeachingLessonStatus {
+  CANCELLED
+  COMPLETED
+  SCHEDULED
+}
+
+type TeachingMaterialModel {
+  courseId: String!
+  createdAt: DateTime!
+  fileName: String!
+  fileSize: String!
+  fileType: String!
+  id: String!
+  lessonId: String
+  title: String!
+}
+
+enum TeachingMode {
+  HYBRID
+  IN_PERSON
+  ONLINE
+}
+
+enum TeachingPriceUnit {
+  PER_COURSE
+  PER_LESSON
+}
+
+input TrackSnapshotInput {
+  album: String
+  artists: [PlaylistArtistInput!]!
+  durationMs: Int!
+  externalUrl: String!
+  genre: String
+  imageUrl: String
+  isrc: String
+  provider: MusicProvider!
+  providerTrackId: String!
+  title: String!
+}
+
+enum TranscriptionStatus {
+  COMPLETED
+  DOWNLOADING
+  FAILED
+  PENDING
+  PROCESSING
+  READY_TO_PLAY
+}
+
+input UpdateCommentInput {
+  content: String
+  postId: String
+  status: CommentStatus
+}
+
+input UpdateMeInput {
+  username: String!
+}
+
+input UpdatePlaylistInput {
+  coverUrl: String
+  description: String
+  name: String
+  visibility: PlaylistVisibility
+}
+
+input UpdatePostAttachmentInput {
+  kind: AttachmentKind
+  position: Int
+  postId: String
+  uploadId: String
+}
+
+input UpdatePostInput {
+  audioUrl: String
+  content: String
+  coverImageUrl: String
+  imageUploadIds: [String!]
+  status: PostStatus
+  visibility: PostVisibility
+}
+
+input UpdatePostReportInput {
+  reason: String
+  reviewedAt: DateTime
+  status: ReportStatus
+}
+
+input UpdateProfileInput {
+  avatarUrl: String
+  bio: String
+  displayName: String
+  level: String
+  location: String
+  visibility: ProfileVisibility
+  websiteUrl: String
+}
+
+input UpdateTeachingCourseInput {
+  description: String
+  durationMinutes: Int
+  format: TeachingCourseFormat
+  level: String
+  maxStudents: Int
+  priceAmount: Int
+  priceCurrency: String
+  priceUnit: TeachingPriceUnit
+  status: TeachingCourseStatus
+  teachingMode: TeachingMode
+  title: String
+}
+
+input UpdateTeachingEnrollmentInput {
+  status: TeachingEnrollmentStatus!
+}
+
+input UpdateUploadInput {
+  duration: Float
+  fileName: String
+  fileSize: String
+  fileType: String
+  sourceType: UploadSourceType
+  status: UploadStatus
+  storagePath: String
+  userId: String
+}
+
+type UploadModel {
+  attachments: [PostAttachmentModel!]!
+  createdAt: DateTime!
+  deletedAt: DateTime
+  duration: Int
+  fileName: String!
+  fileSize: String!
+  fileType: String!
+  id: String!
+  sourceType: UploadSourceType!
+  status: UploadStatus!
+  storagePath: String!
+  updatedAt: DateTime!
+  user: UserModel!
+  userId: String!
+}
+
+enum UploadSourceType {
+  COURSE_MATERIAL
+  MESSAGE
+  OTHER
+  POST
+  PROFILE
+}
+
+enum UploadStatus {
+  AVAILABLE
+  DELETED
+  FAILED
+  PROCESSING
+  UPLOADED
+}
+
+input UpsertInstructorProfileInput {
+  biography: String
+  experienceYears: Int
+  headline: String
+  languages: [String!]
+  specialties: [String!]
+}
+
+type UserModel {
+  auditLogs: [AuditLogModel!]!
+  authoredPosts: [PostModel!]!
+  avatarUrl: String
+  comments: [CommentModel!]!
+  createdAt: DateTime!
+  email: String!
+  friendshipsReceived: [FriendshipModel!]!
+  friendshipsRequested: [FriendshipModel!]!
+  id: String!
+  likes: [PostLikeModel!]!
+  notifications: [NotificationModel!]!
+  profile: ProfileModel
+  reports: [PostReportModel!]!
+  role: UserRole!
+  status: UserStatus!
+  updatedAt: DateTime!
+  uploads: [UploadModel!]!
+  username: String!
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  DELETED
+  PENDING
+  SUSPENDED
+}
+
+input VerifyEmailInput {
+  code: String!
+  token: String!
+}

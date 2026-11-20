@@ -18,6 +18,7 @@
     "prisma:deploy:prod": "cross-env NODE_ENV=production prisma migrate deploy",
     "prisma:seed": "cross-env NODE_ENV=development ts-node prisma/seed.ts",
     "prisma:studio": "cross-env NODE_ENV=development prisma studio",
+    "graphql:schema": "bun run build && cross-env NODE_ENV=development bun dist/scripts/export-graphql-schema.js",
     "start": "cross-env NODE_ENV=development nest start",
     "prestart:dev": "bun run prisma:generate && bun run prisma:deploy",
     "start:dev": "cross-env NODE_ENV=development nest start --watch --config nest-cli.dev.json --path tsconfig.dev.json",

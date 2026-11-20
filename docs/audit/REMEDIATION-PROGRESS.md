@@ -21,13 +21,13 @@ Mis à jour le 20 novembre 2026. La feuille de route de référence est [REMEDIA
 
 ## Restants à implémenter
 
-- P3-3 : en cours. `teaching.resolver.ts` est ramené à 418 lignes; les opérations d'inscription/invitation sont dans `teaching-enrollments.resolver.ts` (479 lignes), avec le support transactionnel et de notifications isolé. `TeachingPage.tsx` (1 242 lignes) reste à découper.
-- P3-4 : générer les types client à partir du schéma GraphQL.
+- P3-3 : terminé. `teaching.resolver.ts` est ramené à 418 lignes; les opérations d'inscription/invitation sont dans `teaching-enrollments.resolver.ts` (479 lignes), avec le support transactionnel et de notifications isolé. `TeachingPage.tsx` est réduit à 44 lignes; son état est centralisé dans `useTeachingPageController.ts` (448 lignes) et ses vues sont réparties dans quatre panneaux (74 à 360 lignes).
+- P3-4 : terminé. `schema.graphql` est exportable depuis Nest avec `bun run graphql:schema`; le frontend extrait ses opérations des services, génère leurs types dans `src/generated/graphql.ts` et valide les 121 documents contre ce schéma avant `typecheck` et `build`.
 - P3-5 : activer `noImplicitAny` progressivement, module par module.
 - P3-6 : déplacer l'état en mémoire qui doit être partagé entre plusieurs instances.
 
 ## Dernières validations locales
 
 - Backend : 94 suites, 434 tests passés lors de la validation précédente; après le refactoring P3-3, les E2E passent (13/13), les tests ciblés du résolveur et des limites de débit passent (12/12), et `typecheck` ainsi que le lint ciblé passent. `bun audit --audit-level=high` était passé après correction de la dépendance transitive `effect`.
-- Frontend : le test ciblé `AuthProvider` passe (3/3); `typecheck`, `lint` et `build` repassent après le changement d'inscription. Le lint signale deux avertissements préexistants. La suite complète passe 223/225 tests; deux échecs restent dans `PersistentMediaPlayer.test.tsx` (contrôle des paroles) et `ChatPage.test.tsx` (sélection de conversation). Le build est à 1,81 Mio de JavaScript/CSS avec un chunk maximal de 375,3 Kio; le test axe WCAG A/AA de la page publique passe.
+- Frontend : le test ciblé `AuthProvider` passe (3/3); `typecheck`, `lint` et `build` passent après le découpage de `TeachingPage`. Le lint global antérieur signalait deux avertissements préexistants. Aucun test dédié à `TeachingPage` n'existe. La suite complète précédente passe 223/225 tests; deux échecs indépendants restent dans `PersistentMediaPlayer.test.tsx` (contrôle des paroles) et `ChatPage.test.tsx` (sélection de conversation). Le build après découpage est à 1,81 Mio de JavaScript/CSS avec un chunk maximal de 375,3 Kio; le test axe WCAG A/AA de la page publique passe.
 - Le résultat de la CI distante n'est pas disponible depuis cet environnement.

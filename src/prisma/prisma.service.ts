@@ -34,6 +34,7 @@ export class PrismaService
   }
 
   async onModuleInit(): Promise<void> {
+    if (process.env.FLOWFRET_SCHEMA_EXPORT === 'true') return;
     await this.$connect();
   }
 
