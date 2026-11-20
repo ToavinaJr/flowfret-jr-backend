@@ -16,6 +16,17 @@ import { GoogleAuthService } from './google-auth.service';
 import { GoogleProfileService } from './google-profile.service';
 import { PasswordResetService } from './password-reset.service';
 
+// Keeps the real bcrypt behaviour while letting tests count comparisons.
+jest.mock('bcrypt', () => {
+  const actual = jest.requireActual<typeof import('bcrypt')>('bcrypt');
+  return {
+    ...actual,
+    compare: jest.fn((data: string | Buffer, encrypted: string) =>
+      actual.compare(data, encrypted),
+    ),
+  };
+});
+
 const activeUser = {
   id: 'user-id',
   email: 'alice@example.com',
@@ -138,8 +149,8 @@ describe('AuthService security contracts', () => {
     expect(result).toEqual(
       expect.objectContaining({
         email: activeUser.email,
-        verificationToken: expect.any(String),
-        expiresAt: expect.any(Date),
+        verificationToken: expect.any(String) as string,
+        expiresAt: expect.any(Date) as Date,
       }),
     );
   });
@@ -168,8 +179,8 @@ describe('AuthService security contracts', () => {
     expect(result).toEqual(
       expect.objectContaining({
         email: activeUser.email,
-        verificationToken: expect.any(String),
-        expiresAt: expect.any(Date),
+        verificationToken: expect.any(String) as string,
+        expiresAt: expect.any(Date) as Date,
       }),
     );
   });
@@ -212,6 +223,29 @@ describe('AuthService security contracts', () => {
 
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['an unknown account', null],
+    [
+      'a Google-only account without a password',
+      { ...activeUser, passwordHash: null },
+    ],
+  ])(
+    'still runs a bcrypt comparison for %s so timing does not reveal it',
+    async (_label, user) => {
+      const { service, prisma } = setup();
+      prisma.user.findUnique.mockResolvedValue(user);
+      const compare = jest.mocked(bcrypt.compare);
+      compare.mockClear();
+
+      await expect(
+        service.login({ email: 'ghost@example.com', password: 'password-123' }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(compare).toHaveBeenCalledTimes(1);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    },
+  );
 
   it('keeps password-reset requests opaque for unknown accounts', async () => {
     const { service, prisma, mail } = setup();

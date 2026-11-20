@@ -39,7 +39,7 @@ export class MusicSearchHistoryService {
                 isrc: track.isrc,
                 geniusUrl: track.geniusUrl,
                 geniusMatchScore: track.geniusMatchScore,
-              } as Prisma.InputJsonValue,
+              },
             })),
           },
         },

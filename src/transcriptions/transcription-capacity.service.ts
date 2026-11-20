@@ -17,7 +17,7 @@ export class TranscriptionCapacityService {
     if (queued >= this.numberConfig('TRANSCRIPTION_MAX_QUEUE_DEPTH', 50))
       throw new ServiceUnavailableException({
         code: TRANSCRIPTION_ERROR_CODE.QUEUE_SATURATED,
-        message: 'La file de transcription est temporairement saturÃ©e.',
+        message: 'La file de transcription est temporairement saturée.',
       });
   }
 

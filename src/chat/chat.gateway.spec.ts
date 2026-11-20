@@ -1,4 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
+import { WsException } from '@nestjs/websockets';
 import { UserStatus } from '@prisma/client';
 import { ChatGateway } from './chat.gateway';
 
@@ -55,7 +56,11 @@ describe('ChatGateway', () => {
 
   it('does not join a conversation room unless membership is verified', async () => {
     chat.assertParticipant.mockRejectedValue(new ForbiddenException());
-    const socket = { data: { userId: 'user' }, join: jest.fn() };
+    const socket = {
+      id: 'socket-1',
+      data: { userId: 'user' },
+      join: jest.fn(),
+    };
 
     await expect(
       gateway.joinConversation(socket as never, {
@@ -63,5 +68,42 @@ describe('ChatGateway', () => {
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(socket.join).not.toHaveBeenCalled();
+  });
+
+  it('rejects chat events once a socket exceeds its budget, without querying membership', async () => {
+    chat.assertParticipant.mockResolvedValue(undefined);
+    const socket = {
+      id: 'socket-flood',
+      data: { userId: 'user' },
+      join: jest.fn(),
+      leave: jest.fn(),
+    };
+    const join = () =>
+      gateway.joinConversation(socket as never, { conversationId: 'c' });
+
+    for (let attempt = 0; attempt < 30; attempt += 1) await join();
+    await expect(join()).rejects.toBeInstanceOf(WsException);
+    await expect(
+      gateway.leaveConversation(socket as never, { conversationId: 'c' }),
+    ).rejects.toBeInstanceOf(WsException);
+
+    expect(chat.assertParticipant).toHaveBeenCalledTimes(30);
+  });
+
+  it('gives a reconnecting socket a fresh budget after disconnect', async () => {
+    chat.assertParticipant.mockResolvedValue(undefined);
+    const socket = {
+      id: 'socket-reconnect',
+      data: { userId: 'user' },
+      join: jest.fn(),
+    };
+    for (let attempt = 0; attempt < 30; attempt += 1)
+      await gateway.joinConversation(socket as never, { conversationId: 'c' });
+
+    gateway.handleDisconnect(socket as never);
+
+    await expect(
+      gateway.joinConversation(socket as never, { conversationId: 'c' }),
+    ).resolves.toEqual({ ok: true });
   });
 });

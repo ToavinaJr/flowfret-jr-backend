@@ -23,8 +23,8 @@ function setup(existing: Record<string, unknown> | null = null) {
       findUnique: jest.fn().mockResolvedValue(existing),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
-    $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
-      callback(transaction),
+    $transaction: jest.fn((callback: (tx: unknown) => unknown) =>
+      Promise.resolve(callback(transaction)),
     ),
   };
   const jwt = { sign: jest.fn().mockReturnValue('access-token') };
@@ -60,12 +60,14 @@ describe('AuthSessionService refresh token families', () => {
 
     expect(transaction.refreshToken.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ rotatedAt: expect.any(Date) }),
+        data: expect.objectContaining({
+          rotatedAt: expect.any(Date) as Date,
+        }) as object,
       }),
     );
     expect(transaction.refreshToken.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ familyId: 'family-id' }),
+        data: expect.objectContaining({ familyId: 'family-id' }) as object,
       }),
     );
   });

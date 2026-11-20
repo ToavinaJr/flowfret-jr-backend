@@ -76,7 +76,7 @@ export class PlaylistItemsCommandService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException('Ce morceau est dÃ©jÃ  dans la playlist.');
+        throw new ConflictException('Ce morceau est déjà dans la playlist.');
       }
       throw error;
     }
@@ -128,7 +128,7 @@ export class PlaylistItemsCommandService {
       });
       if (claimed.count !== 1) {
         throw new ConflictException(
-          'La playlist a Ã©tÃ© modifiÃ©e. Rechargez-la avant de la rÃ©ordonner.',
+          'La playlist a été modifiée. Rechargez-la avant de la réordonner.',
         );
       }
       const existing = await tx.playlistItem.findMany({

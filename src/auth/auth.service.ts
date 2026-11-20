@@ -26,6 +26,9 @@ import { isUniqueConstraintError, normalizeEmail } from './auth.utils';
 
 export type { AuthSessionPayload } from './auth-session.service';
 
+/** Valid hash (same cost as real ones) compared against when no password hash exists. */
+const TIMING_EQUALIZER_HASH = bcrypt.hashSync('timing-equalizer-password', 10);
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -88,9 +91,12 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email: normalizeEmail(input.email) },
     });
-    if (!user?.passwordHash)
-      throw new UnauthorizedException(GENERIC_CREDENTIALS_ERROR);
-    if (!(await bcrypt.compare(input.password, user.passwordHash)))
+    // Always run one bcrypt comparison so response time does not reveal whether the account exists.
+    const passwordMatches = await bcrypt.compare(
+      input.password,
+      user?.passwordHash ?? TIMING_EQUALIZER_HASH,
+    );
+    if (!user?.passwordHash || !passwordMatches)
       throw new UnauthorizedException(GENERIC_CREDENTIALS_ERROR);
     if (user.status !== UserStatus.ACTIVE) {
       this.logger.warn(

@@ -7,6 +7,11 @@ import { ChordAnalysisService } from './chord-analysis.service';
 
 @Module({
   controllers: [ChordAnalysisController],
-  providers: [ChordTranscriptionsResolver, ChordTranscriptionsService, ChordAnalysisConfigService, ChordAnalysisService],
+  providers: [
+    ChordTranscriptionsResolver,
+    ChordTranscriptionsService,
+    ChordAnalysisConfigService,
+    ChordAnalysisService,
+  ],
 })
 export class ChordTranscriptionsModule {}

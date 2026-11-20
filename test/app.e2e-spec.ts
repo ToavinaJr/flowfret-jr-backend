@@ -222,7 +222,7 @@ describe('AppController (e2e)', () => {
       expect(body.errors).toBeUndefined();
       expect(body.data?.register).toMatchObject({
         email,
-        verificationToken: expect.any(String),
+        verificationToken: expect.any(String) as string,
       });
       expect(cookiePair(response.headers)).toBeUndefined();
       const user = await prisma.user.findUnique({ where: { email } });
@@ -388,7 +388,11 @@ describe('AppController (e2e)', () => {
     const secondUsername = `idor_b_${suffix}`;
 
     try {
-      const first = await createActiveSession(firstEmail, firstUsername, password);
+      const first = await createActiveSession(
+        firstEmail,
+        firstUsername,
+        password,
+      );
       const second = await createActiveSession(
         secondEmail,
         secondUsername,

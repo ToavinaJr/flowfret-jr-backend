@@ -50,7 +50,8 @@ export class AuthSessionService {
       where: { tokenHash: hashOpaqueToken(refreshToken) },
       include: { user: true },
     });
-    if (!existing) throw new UnauthorizedException('Invalid or expired refresh token.');
+    if (!existing)
+      throw new UnauthorizedException('Invalid or expired refresh token.');
 
     if (existing.revokedAt) {
       if (existing.rotatedAt && !existing.isDeleted) {
@@ -134,7 +135,11 @@ export class AuthSessionService {
 
   private logReuse(familyId: string, userId: string): void {
     this.logger.warn(
-      JSON.stringify({ event: 'auth.refresh_token_reuse_detected', familyId, userId }),
+      JSON.stringify({
+        event: 'auth.refresh_token_reuse_detected',
+        familyId,
+        userId,
+      }),
     );
   }
 }

@@ -7,6 +7,7 @@ import {
   SubscribeMessage,
   ConnectedSocket,
   MessageBody,
+  WsException,
 } from '@nestjs/websockets';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -17,6 +18,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChatService } from './chat.service';
 import { ChatRealtimeService } from './chat-realtime.service';
 import { getAllowedOrigins } from '../common/cors-origins';
+import { SocketEventLimiter } from './socket-event-limiter';
+
+const CHAT_EVENT_LIMIT = 30;
+const CHAT_EVENT_WINDOW_MS = 60_000;
 
 type ChatSocket = Omit<Socket, 'data'> & { data: { userId?: string } };
 
@@ -31,6 +36,10 @@ export class ChatGateway
 
   @WebSocketServer() server!: Server;
   private readonly logger = new Logger(ChatGateway.name);
+  private readonly eventLimiter = new SocketEventLimiter(
+    CHAT_EVENT_LIMIT,
+    CHAT_EVENT_WINDOW_MS,
+  );
 
   constructor(
     private readonly jwt: JwtService,
@@ -81,7 +90,9 @@ export class ChatGateway
     }
   }
 
-  handleDisconnect() {}
+  handleDisconnect(client: ChatSocket) {
+    this.eventLimiter.forget(client.id);
+  }
 
   @SubscribeMessage('chat:join')
   async joinConversation(
@@ -91,6 +102,7 @@ export class ChatGateway
     const userId = client.data.userId;
     if (!userId || typeof body?.conversationId !== 'string')
       throw new ForbiddenException();
+    this.assertWithinEventBudget(client);
     await this.chat.assertParticipant(body.conversationId, userId);
     await client.join(`conversation:${body.conversationId}`);
     return { ok: true };
@@ -101,9 +113,16 @@ export class ChatGateway
     @ConnectedSocket() client: ChatSocket,
     @MessageBody() body: { conversationId?: string },
   ) {
+    this.assertWithinEventBudget(client);
     if (typeof body?.conversationId === 'string')
       await client.leave(`conversation:${body.conversationId}`);
     return { ok: true };
+  }
+
+  private assertWithinEventBudget(client: ChatSocket): void {
+    if (this.eventLimiter.allow(client.id)) return;
+    this.logger.warn('Chat socket exceeded its event budget');
+    throw new WsException('Too many chat events. Slow down.');
   }
 }
 
