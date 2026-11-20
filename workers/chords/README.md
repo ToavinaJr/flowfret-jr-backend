@@ -30,9 +30,12 @@ CHORD_ANALYSIS_MODEL_DIR=workers/chords/models
 CHORD_ANALYSIS_TIMEOUT_MS=900000
 ```
 
-An enabled backend fails startup if required assets are absent. Install models
-on each deployment; the web process needs Python, these dependencies, model files,
-and a writable temporary directory. No model download happens during a request.
+Chord analysis currently runs in the backend host process and is not included in
+the Docker images. Keep `CHORD_ANALYSIS_ENABLED=false` when running the backend
+container. To enable it, install Python, these dependencies, and the model files
+on a non-containerized backend host, then configure the variables above. An
+enabled backend fails startup if required assets are absent. No model download
+happens during a request.
 FFmpeg may be required by the decoding stack for codecs unsupported by libsndfile.
 
 ## Behaviour

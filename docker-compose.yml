@@ -76,6 +76,7 @@ services:
       dockerfile: Dockerfile.worker
     restart: unless-stopped
     init: true
+    read_only: true
     security_opt: ['no-new-privileges:true']
     cap_drop: ['ALL']
     # Placeholder safety net, not a tuned value: no Demucs benchmark has been
@@ -101,6 +102,14 @@ services:
     volumes:
       - whisper_models:/models
       - transcription_tmp:/transcription-tmp
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m,mode=1777
+    healthcheck:
+      test: ['CMD', 'node', '-e', 'process.kill(1, 0)']
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -112,6 +121,7 @@ services:
       dockerfile: Dockerfile.stems
     restart: unless-stopped
     init: true
+    read_only: true
     security_opt: ['no-new-privileges:true']
     cap_drop: ['ALL']
     env_file:
@@ -135,6 +145,14 @@ services:
     volumes:
       - demucs_models:/models
       - stems_tmp:/stems-tmp
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m,mode=1777
+    healthcheck:
+      test: ['CMD', 'node', '-e', 'process.kill(1, 0)']
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
