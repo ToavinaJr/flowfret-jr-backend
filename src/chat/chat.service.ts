@@ -359,7 +359,7 @@ export class ChatService {
       throw new BadRequestException('Invalid group members.');
     for (const memberId of memberIds) await this.assertFriend(userId, memberId);
     await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${conversationId}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${conversationId}))`;
       const administrator = await tx.conversationParticipant.findFirst({
         where: {
           conversationId,
@@ -429,7 +429,7 @@ export class ChatService {
     if (!isUuid(conversationId) || !isUuid(memberId))
       throw new BadRequestException('Invalid group or member id.');
     await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${conversationId}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${conversationId}))`;
       const conversation = await tx.conversation.findFirst({
         where: {
           id: conversationId,
@@ -496,7 +496,7 @@ export class ChatService {
     if (!isUuid(conversationId) || !isUuid(memberId))
       throw new BadRequestException('Invalid group or member id.');
     await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${conversationId}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${conversationId}))`;
       const administrator = await tx.conversationParticipant.findFirst({
         where: {
           conversationId,

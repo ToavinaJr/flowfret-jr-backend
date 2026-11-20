@@ -5,6 +5,14 @@ import { AppModule } from './../src/app.module';
 import { GraphQLSchemaHost } from '@nestjs/graphql';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { AuthService } from './../src/auth/auth.service';
+import { assertUserStorageQuota } from './../src/uploads/user-storage-quota';
+import {
+  ConversationParticipantRole,
+  ConversationType,
+  FriendshipStatus,
+  UserStatus,
+} from '@prisma/client';
+import { ChatService } from './../src/chat/chat.service';
 
 type GraphQLBody<TData> = {
   data?: TData;
@@ -24,6 +32,10 @@ const PROTECTED_HISTORY_QUERY = `
     myListeningHistory(take: 1) { id }
   }
 `;
+
+const PROTECTED_CHAT_QUERY = `query MyConversations { myConversations { id } }`;
+const PROTECTED_MUSIC_QUERY = `query MyFavoriteMusic { myFavoriteMusic { id } }`;
+const ADMIN_UPLOADS_QUERY = `query Uploads { uploads { id } }`;
 
 const ADMIN_USERS_QUERY = `
   query AdminUsers {
@@ -257,6 +269,22 @@ describe('AppController (e2e)', () => {
         extensions: { code: 'UNAUTHENTICATED' },
       });
 
+      for (const query of [PROTECTED_CHAT_QUERY, PROTECTED_MUSIC_QUERY]) {
+        const protectedResponse = await request(app.getHttpServer())
+          .post('/graphql')
+          .send({ query })
+          .expect(200);
+        const protectedBody = protectedResponse.body as GraphQLBody<unknown>;
+        expect(protectedBody.errors?.[0]).toMatchObject({
+          extensions: { code: 'UNAUTHENTICATED' },
+        });
+      }
+
+      await request(app.getHttpServer())
+        .post('/api/lyrics/report')
+        .send({})
+        .expect(401);
+
       const session = await app
         .get(AuthService)
         .register({ email, password, username });
@@ -271,6 +299,21 @@ describe('AppController (e2e)', () => {
       expect(adminBody.errors?.[0]).toMatchObject({
         extensions: { code: 'FORBIDDEN' },
       });
+
+      const uploadsResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ query: ADMIN_UPLOADS_QUERY })
+        .expect(200);
+      const uploadsBody = uploadsResponse.body as GraphQLBody<unknown>;
+      expect(uploadsBody.errors?.[0]).toMatchObject({
+        extensions: { code: 'FORBIDDEN' },
+      });
+
+      await request(app.getHttpServer())
+        .get('/api/lyrics/reports')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(403);
     } finally {
       await prisma.user.deleteMany({ where: { email } });
     }
@@ -349,6 +392,152 @@ describe('AppController (e2e)', () => {
       .send({ query: oversizedQuery })
       .expect(413);
   });
+
+  it('serializes concurrent upload quota reservations against PostgreSQL', async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const email = `quota-${suffix}@example.test`;
+    const user = await app.get(AuthService).register({
+      email,
+      password: 'E2e-password-123!',
+      username: `quota_${suffix}`,
+    });
+
+    try {
+      const reserve = (name: string) =>
+        prisma.$transaction(async (tx) => {
+          await assertUserStorageQuota(tx, user.user.id, 7, 10);
+          // Keep the first transaction open long enough for the second request
+          // to contend on the same PostgreSQL advisory lock.
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          await tx.upload.create({
+            data: {
+              userId: user.user.id,
+              fileName: `${name}.wav`,
+              fileType: 'audio/wav',
+              fileSize: 7n,
+              storagePath: `e2e/${suffix}/${name}.wav`,
+            },
+          });
+        });
+
+      const outcomes = await Promise.allSettled([
+        reserve('first'),
+        reserve('second'),
+      ]);
+
+      const reservationFailures = outcomes.flatMap((outcome) =>
+        outcome.status === 'rejected'
+          ? [
+              outcome.reason instanceof Error
+                ? outcome.reason.message
+                : String(outcome.reason),
+            ]
+          : [],
+      );
+      expect(reservationFailures).toEqual([
+        'The storage quota has been reached.',
+      ]);
+      expect(
+        outcomes.filter(({ status }) => status === 'fulfilled'),
+      ).toHaveLength(1);
+      expect(
+        outcomes.filter(({ status }) => status === 'rejected'),
+      ).toHaveLength(1);
+      const uploads = await prisma.upload.aggregate({
+        where: { userId: user.user.id, isDeleted: false },
+        _sum: { fileSize: true },
+      });
+      expect(uploads._sum.fileSize).toBe(7n);
+    } finally {
+      await prisma.user.delete({ where: { id: user.user.id } });
+    }
+  });
+
+  it('serializes concurrent group invitations at the PostgreSQL member limit', async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const emails: string[] = [];
+    const createdUserIds: string[] = [];
+    let conversationId: string | undefined;
+
+    try {
+      const users = await Promise.all(
+        Array.from({ length: 51 }, (_, index) => {
+          const email = `chat-${suffix}-${index}@example.test`;
+          emails.push(email);
+          return prisma.user.create({
+            data: {
+              email,
+              username: `chat_${suffix.replaceAll('-', '_')}_${index}`,
+              status: UserStatus.ACTIVE,
+            },
+            select: { id: true },
+          });
+        }),
+      );
+      createdUserIds.push(...users.map(({ id }) => id));
+      const [ownerId, ...otherIds] = createdUserIds;
+      const existingMemberIds = otherIds.slice(0, 48);
+      const candidateIds = otherIds.slice(48);
+
+      await prisma.friendship.createMany({
+        data: candidateIds.map((receiverId) => ({
+          requesterId: ownerId,
+          receiverId,
+          status: FriendshipStatus.ACCEPTED,
+        })),
+      });
+      const conversation = await prisma.conversation.create({
+        data: {
+          type: ConversationType.GROUP,
+          name: 'Concurrency test',
+          creatorId: ownerId,
+          participants: {
+            create: [
+              { userId: ownerId, role: ConversationParticipantRole.ADMIN },
+              ...existingMemberIds.map((userId) => ({ userId })),
+            ],
+          },
+        },
+        select: { id: true },
+      });
+      conversationId = conversation.id;
+
+      const outcomes = await Promise.allSettled(
+        candidateIds.map((candidateId) =>
+          app
+            .get(ChatService)
+            .addGroupMembers(ownerId, conversation.id, [candidateId]),
+        ),
+      );
+
+      const invitationFailures = outcomes.flatMap((outcome) =>
+        outcome.status === 'rejected'
+          ? [
+              outcome.reason instanceof Error
+                ? outcome.reason.message
+                : String(outcome.reason),
+            ]
+          : [],
+      );
+      expect(invitationFailures).toEqual(['A group is limited to 50 members.']);
+      expect(
+        outcomes.filter(({ status }) => status === 'fulfilled'),
+      ).toHaveLength(1);
+      expect(
+        outcomes.filter(({ status }) => status === 'rejected'),
+      ).toHaveLength(1);
+      await expect(
+        prisma.conversationParticipant.count({
+          where: { conversationId: conversation.id, isDeleted: false },
+        }),
+      ).resolves.toBe(50);
+    } finally {
+      if (conversationId) {
+        await prisma.conversation.deleteMany({ where: { id: conversationId } });
+      }
+      await prisma.user.deleteMany({ where: { email: { in: emails } } });
+    }
+  }, 20_000);
 
   afterAll(async () => {
     await app.close();

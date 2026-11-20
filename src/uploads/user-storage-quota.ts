@@ -2,7 +2,10 @@ import { HttpStatus } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ApplicationException } from '../common/application-exception';
 
-type UploadTransaction = Pick<Prisma.TransactionClient, '$queryRaw' | 'upload'>;
+type UploadTransaction = Pick<
+  Prisma.TransactionClient,
+  '$executeRaw' | 'upload'
+>;
 
 /** Serializes quota checks and metadata inserts for a user within a transaction. */
 export async function assertUserStorageQuota(
@@ -11,7 +14,7 @@ export async function assertUserStorageQuota(
   incomingBytes: number,
   quotaBytes: number,
 ): Promise<void> {
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(42, hashtext(${userId}))`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(42, hashtext(${userId}))`;
   const currentUsage = await tx.upload.aggregate({
     where: { userId, isDeleted: false },
     _sum: { fileSize: true },

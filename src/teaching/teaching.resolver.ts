@@ -809,7 +809,7 @@ export class TeachingResolver {
   ) {
     // Serialize capacity changes per course so concurrent requests cannot
     // reserve the same last seat.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${courseId}, 0))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${courseId}, 0))`;
     const occupied = await tx.teachingEnrollment.count({
       where: {
         courseId,

@@ -81,7 +81,7 @@ describe('ChatService', () => {
   it('rechecks group capacity under a conversation lock before adding members', async () => {
     const conversationId = '00000000-0000-4000-8000-000000000003';
     const tx = {
-      $queryRaw: jest.fn(),
+      $executeRaw: jest.fn(),
       conversationParticipant: {
         findFirst: jest.fn().mockResolvedValue({ id: 'admin' }),
         count: jest.fn().mockResolvedValue(50),
@@ -114,7 +114,7 @@ describe('ChatService', () => {
       service.addGroupMembers(userA, conversationId, [userB]),
     ).rejects.toThrow('A group is limited to 50 members.');
 
-    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.$executeRaw).toHaveBeenCalled();
     expect(tx.conversationParticipant.count).toHaveBeenCalledWith({
       where: { conversationId, isDeleted: false },
     });
@@ -168,7 +168,7 @@ describe('ChatService', () => {
 
   it('prevents the only group administrator from demoting themselves', async () => {
     const tx = {
-      $queryRaw: jest.fn(),
+      $executeRaw: jest.fn(),
       conversationParticipant: {
         findFirst: jest
           .fn()

@@ -4,6 +4,7 @@ import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthResolver } from './auth.resolver';
+import { AuthTokenCleanupService } from './auth-token-cleanup.service';
 import { AuthService } from './auth.service';
 import { GqlJwtAuthGuard } from './gql-jwt-auth.guard';
 import { JwtStrategy } from './jwt.strategy';
@@ -38,6 +39,7 @@ import { AccountResolver } from './account.resolver';
   ],
   providers: [
     AuthResolver,
+    AuthTokenCleanupService,
     AuthService,
     AuthSessionService,
     EmailVerificationService,

@@ -58,6 +58,7 @@ jobs:
           pip-audit -r workers/stems/requirements.txt
           pip-audit -r workers/stems/requirements-uvr.txt
           pip-audit -r workers/stems/requirements-uvr-trained.txt
+          pip-audit -r workers/chords/requirements.txt
           pip-audit -r requirements.youtube.txt
       - run: bun install --frozen-lockfile
       - run: bun audit --audit-level=high
@@ -66,3 +67,15 @@ jobs:
       - run: bun run test:e2e --runInBand
       - run: python -m unittest discover -s workers/transcription/tests -v
       - run: python -m unittest discover -s workers/stems/tests -v
+      - name: Build production backend image
+        run: docker build -t flowfret-backend:${{ github.sha }} .
+      - name: Scan repository history for secrets
+        run: >-
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:b109bc5f8f76a38196a3e413704fc5b9e3c32360bce4e4b603bd6f45b3721dbb
+          git /repo --redact --no-banner
+      - name: Scan backend image for high and critical vulnerabilities
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          ghcr.io/aquasecurity/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+          image --exit-code 1 --ignore-unfixed --severity HIGH,CRITICAL
+          flowfret-backend:${{ github.sha }}
